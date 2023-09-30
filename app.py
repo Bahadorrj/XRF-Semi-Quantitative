@@ -8,21 +8,21 @@ class Ui_conditionsWindow(QtWidgets.QWidget):
         self.setupUi()
 
     def setupUi(self):
-        self.df = SQLITE.read(
-            Addr['dbFundamentals'],
-            'conditions'
-        )
-        self.verticalLayout = QtWidgets.QHBoxLayout(self)
-        # print(self.df)
+        self.df = MYSQL.read(host, 'fundamentals', user,
+                             password, 'conditions')
+        self.gridLayout = QtWidgets.QGridLayout(self)
+        row = 0
+        column = 0
         for i in self.df.index:
             self.formLayout = QtWidgets.QFormLayout()
             self.formLayout.setFieldGrowthPolicy(
                 QtWidgets.QFormLayout.ExpandingFieldsGrow
             )
+
             # self.formLayout.setContentsMargins(20, -1, -1, -1)
             # self.formLayout.setHorizontalSpacing(6)
             self.conditionLabel = QtWidgets.QLabel(
-                self.df.at[i, 'condition_name']
+                self.df.at[i, 'name']
             )
             self.formLayout.addWidget(self.conditionLabel)
             self.KvLabel = QtWidgets.QLabel('Kv')
@@ -49,7 +49,11 @@ class Ui_conditionsWindow(QtWidgets.QWidget):
             self.maskLabel = QtWidgets.QLabel('mask')
             self.maskValue = QtWidgets.QLabel(str(self.df.at[i, 'mask']))
             self.formLayout.addRow(self.maskLabel, self.maskValue)
-            self.verticalLayout.addLayout(self.formLayout)
+            self.gridLayout.addLayout(self.formLayout, row, column)
+            column += 1
+            if column > 2:
+                column = 0
+                row += 1
 
 
 class Ui_PeakSearchWindow(QtWidgets.QMainWindow):
