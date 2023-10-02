@@ -487,6 +487,7 @@ class Ui_PlotWindow(QtWidgets.QMainWindow):
         self.actionDelete.triggered.connect(self.remove)
         self.actionDirectory = QtWidgets.QAction()
         self.actionDirectory.setText('Open file location')
+        self.actionDirectory.triggered.connect(self.openDirectory)
         self.customMenu = QtWidgets.QMenu(self.form)
         self.customMenu.addAction(self.actionDelete)
         self.customMenu.addSeparator()
@@ -502,6 +503,16 @@ class Ui_PlotWindow(QtWidgets.QMainWindow):
         self.mainWidget = QtWidgets.QWidget()
         self.mainWidget.setLayout(self.mainLayout)
         self.setCentralWidget(self.mainWidget)
+
+    def openDirectory(self):
+        item = self.form.selectedItems()[0]
+        path = self.files[self.form.indexOfTopLevelItem(item)]['path']
+        while True:
+            path = path[:-1]
+            if path[-1] == '/':
+                break
+        print(path)
+        os.startfile(path)
 
     def remove(self):
         item = self.form.selectedItems()[0]

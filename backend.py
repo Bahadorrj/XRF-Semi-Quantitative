@@ -9,6 +9,7 @@ from pyqtgraph import (ColorButton, InfiniteLine,
                        LinearRegionItem, GraphicsLayoutWidget,
                        InfLineLabel)
 from pathlib import Path
+import os
 
 icon_CSAN = r"myIcons\CSAN.ico"
 icon_toolbar_peak_search = r"myIcons\peak-search.png"
