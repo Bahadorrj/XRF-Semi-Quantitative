@@ -237,9 +237,21 @@ class Ui_PeakSearchWindow(QtWidgets.QMainWindow):
                     if item['active']:
                         line.setPen(self.activePen)
                         self.spectrumPlot.addItem(line)
+                        nline = InfiniteLine()
+                        nline.setAngle(90)
+                        nline.setMovable(False)
+                        nline.setValue(line.value())
+                        nline.setPen(self.activePen)
+                        self.peakPlot.addItem(nline)
                     elif item['active'] is False:
                         line.setPen(self.deactivePen)
                         self.spectrumPlot.addItem(line)
+                        nline = InfiniteLine()
+                        nline.setAngle(90)
+                        nline.setMovable(False)
+                        nline.setValue(line.value())
+                        nline.setPen(self.deactivePen)
+                        self.peakPlot.addItem(nline)
 
     def setItem(self, sym, type, ev, intensity, active, lines):
         self.removeButton = QtWidgets.QPushButton(icon=QtGui.QIcon(icon_cross))

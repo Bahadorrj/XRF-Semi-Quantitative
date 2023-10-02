@@ -171,7 +171,7 @@ class SQLITE:
     def deactiveElement(sym):
         conn = sqlite3.connect(Addr['dbFundamentals'])
         cur = conn.cursor()
-        query = f"""DELETE FROM general_element
+        query = f"""DELETE FROM elements
                 WHERE symbol = '{sym}'"""
         cur.execute(query)
         conn.commit()
