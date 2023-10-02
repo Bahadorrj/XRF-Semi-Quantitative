@@ -8,8 +8,7 @@ class Ui_conditionsWindow(QtWidgets.QWidget):
         self.setupUi()
 
     def setupUi(self):
-        self.df = MYSQL.read(host, 'fundamentals', user,
-                             password, 'conditions')
+        self.df = SQLITE.read(Addr['dbFundamentals'], 'conditions')
         self.gridLayout = QtWidgets.QGridLayout(self)
         row = 0
         column = 0
@@ -51,7 +50,7 @@ class Ui_conditionsWindow(QtWidgets.QWidget):
             self.formLayout.addRow(self.maskLabel, self.maskValue)
             self.gridLayout.addLayout(self.formLayout, row, column)
             column += 1
-            if column > 2:
+            if column > 4:
                 column = 0
                 row += 1
 
@@ -66,13 +65,7 @@ class Ui_PeakSearchWindow(QtWidgets.QMainWindow):
             Addr['xlsxGeneralData'],
             'sheet1'
         )
-        self.dfElements = MYSQL.read(
-            host,
-            'fundamentals',
-            user,
-            password,
-            'elements'
-        )
+        self.dfElements = SQLITE.read(Addr['dbFundamentals'], 'elements')
         self.file = file
         self.condition = condition
         self.intensity = TEXTREADER.listItems(
@@ -341,19 +334,12 @@ class Ui_PeakSearchWindow(QtWidgets.QMainWindow):
         statusButton = self.form.cellWidget(row, 6)
         item = self.items[row]
         if statusItem.text() == 'Deactivated':
-            MYSQL.activeElement(host,
-                                user,
-                                password,
-                                self.condition,
-                                item)
+            SQLITE.activeElement(self.condition, item)
             statusItem.setText('Activated')
             statusButton.setText('Deactivate')
             item['active'] = True
         else:
-            MYSQL.deactiveElement(host,
-                                  user,
-                                  password,
-                                  item['sym'])
+            SQLITE.deactiveElement(item['sym'])
             statusItem.setText('Deactivated')
             statusButton.setText('Activate')
             item['active'] = False
@@ -373,10 +359,7 @@ class Ui_PeakSearchWindow(QtWidgets.QMainWindow):
         returnValue = self.deleteMessageBox.exec()
         if returnValue == QtWidgets.QMessageBox.Ok:
             self.form.removeRow(row)
-            MYSQL.deactiveElement(host,
-                                  user,
-                                  password,
-                                  item['sym'])
+            SQLITE.deactiveElement(item['sym'])
             for line in self.items[row]['lines']:
                 self.spectrumPlot.removeItem(line)
             self.items.pop(row)
@@ -498,12 +481,16 @@ class Ui_PlotWindow(QtWidgets.QMainWindow):
         self.form.itemClicked.connect(self.itemClicked)
         self.form.itemDoubleClicked.connect(lambda: self.openPeakSearch())
 
-        self.deleteAction = QtWidgets.QAction()
-        self.deleteAction.setText('Delete')
-        self.deleteAction.setIcon(QtGui.QIcon(icon_cross))
-        self.deleteAction.triggered.connect(self.remove)
+        self.actionDelete = QtWidgets.QAction()
+        self.actionDelete.setText('Delete')
+        self.actionDelete.setIcon(QtGui.QIcon(icon_cross))
+        self.actionDelete.triggered.connect(self.remove)
+        self.actionDirectory = QtWidgets.QAction()
+        self.actionDirectory.setText('Open file location')
         self.customMenu = QtWidgets.QMenu(self.form)
-        self.customMenu.addAction(self.deleteAction)
+        self.customMenu.addAction(self.actionDelete)
+        self.customMenu.addSeparator()
+        self.customMenu.addAction(self.actionDirectory)
 
         # cordinate
         self.cordinateLabel = QtWidgets.QLabel()
@@ -542,11 +529,7 @@ class Ui_PlotWindow(QtWidgets.QMainWindow):
         fileItem.setCheckState(0, QtCore.Qt.Unchecked)
 
         conditionsDictionary = TEXTREADER.conditionDictionary(filePath)
-        self.dfConditions = MYSQL.read('127.0.0.1',
-                                       'fundamentals',
-                                       'CSAN',
-                                       'X-Ray2023',
-                                       'conditions')
+        self.dfConditions = SQLITE.read(Addr['dbFundamentals'], 'conditions')
         buttons = []
         for condition in self.dfConditions['name']:
             conditionItem = QtWidgets.QTreeWidgetItem()

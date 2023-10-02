@@ -35,7 +35,6 @@ class SQLITE:
     def read(dbAddr, tableName):
         con = sqlite3.connect(dbAddr)
         df = pd.read_sql_query(f"SELECT * FROM {tableName}", con)
-        con.commit()
         con.close()
         return df
 
@@ -125,55 +124,54 @@ class SQLITE:
         f.close()
         conn.close()
 
-    def activeElement(dfGeneralData, dbAddr, item, file, condition):
-        conn = sqlite3.connect(dbAddr)
+    def activeElement(condition, item):
+        dfGeneralData = pd.read_excel(
+            Addr['xlsxGeneralData'],
+            'sheet1'
+        )
+        conn = sqlite3.connect(Addr['dbFundamentals'])
         cur = conn.cursor()
-        parameters = file['conditions'][condition]
         sym = item['sym']
         type = item['type']
         intensity = item['intensity']
-        msk = np.logical_and(
-            dfGeneralData['Sym'] == sym, dfGeneralData['Type'] == type)
-        row = dfGeneralData[msk].to_dict('list')
-        query = f"""
-            INSERT INTO general_element (
-                atomic_number,
-                element_symbol,
-                element_name,
-                Kev,
-                low_Kev,
-                high_Kev,
-                condition_id,
-                type,
-                intensity
+        row = dfGeneralData[
+            np.logical_and(
+                dfGeneralData['Sym'] == sym,
+                dfGeneralData['Type'] == type
             )
-            VALUES (
-                {row['Atomic no.'][0]},
-                '{row['Sym'][0]}',
-                '{row['name'][0]}',
-                {row['Kev'][0]},
-                {row['Low'][0]},
-                {row['High'][0]},
-                (SELECT condition_id FROM conditions
-                WHERE condition_name = '{condition}'
-                AND mA = {parameters['mA']}
-                AND Kv = {parameters['Kv']}
-                AND time = {parameters['time']}
-                AND rotation = {parameters['rotation']}
-                AND environment = '{parameters['environment']}'
-                AND filter = {parameters['filter']}
-                AND mask = {parameters['mask']}),
-                '{type}',
-                {intensity}
-            )"""
+        ]
+        query = f"""
+                INSERT INTO elements (
+                    atomic_number,
+                    name,
+                    symbol,
+                    radiation_type,
+                    Kev,
+                    low_Kev,
+                    high_Kev,
+                    intensity,
+                    condition_id
+                )
+                VALUES (
+                    {row['Atomic no.'].values[0]},
+                    '{row['name'].values[0]}',
+                    '{row['Sym'].values[0]}',
+                    '{type}',
+                    {row['Kev'].values[0]},
+                    {row['Low'].values[0]},
+                    {row['High'].values[0]},
+                    {intensity},
+                    (SELECT condition_id FROM conditions
+                    WHERE conditions.name = '{condition}')
+                )"""
         cur.execute(query)
         conn.commit()
 
-    def deactiveElement(dbAddr, sym):
-        conn = sqlite3.connect(dbAddr)
+    def deactiveElement(sym):
+        conn = sqlite3.connect(Addr['dbFundamentals'])
         cur = conn.cursor()
         query = f"""DELETE FROM general_element
-                WHERE element_symbol = '{sym}'"""
+                WHERE symbol = '{sym}'"""
         cur.execute(query)
         conn.commit()
 
