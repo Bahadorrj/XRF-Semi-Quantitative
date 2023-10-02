@@ -195,6 +195,6 @@ pyrightconfig.json
 # End of https://www.toptal.com/developers/gitignore/api/python
 
 myIcons/
-myFiles/
-myPackage/
+*.txt
+*.xlsx
 test.py
