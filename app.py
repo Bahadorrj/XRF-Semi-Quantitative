@@ -492,9 +492,18 @@ class Ui_PlotWindow(QtWidgets.QMainWindow):
         self.form.setHeaderLabels(['File', 'Condition', 'Color'])
         self.form.setFrameShape(QtWidgets.QFrame.Box)
         self.form.setFrameShadow(QtWidgets.QFrame.Plain)
+        self.form.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
+        self.form.customContextMenuRequested.connect(self.showContextMenu)
         self.form.itemChanged.connect(self.itemChanged)
         self.form.itemClicked.connect(self.itemClicked)
         self.form.itemDoubleClicked.connect(lambda: self.openPeakSearch())
+
+        self.deleteAction = QtWidgets.QAction()
+        self.deleteAction.setText('Delete')
+        self.deleteAction.setIcon(QtGui.QIcon(icon_cross))
+        self.deleteAction.triggered.connect(self.remove)
+        self.customMenu = QtWidgets.QMenu(self.form)
+        self.customMenu.addAction(self.deleteAction)
 
         # cordinate
         self.cordinateLabel = QtWidgets.QLabel()
@@ -506,6 +515,15 @@ class Ui_PlotWindow(QtWidgets.QMainWindow):
         self.mainWidget = QtWidgets.QWidget()
         self.mainWidget.setLayout(self.mainLayout)
         self.setCentralWidget(self.mainWidget)
+
+    def remove(self):
+        item = self.form.selectedItems()[0]
+        self.form.takeTopLevelItem(self.form.indexOfTopLevelItem(item))
+
+    def showContextMenu(self, position):
+        item = self.form.itemAt(position)
+        if self.form.indexOfTopLevelItem(item) >= 0:
+            self.customMenu.exec_(self.form.mapToGlobal(position))
 
     def openFilesDialog(self):
         self.fileDialog = QtWidgets.QFileDialog()
