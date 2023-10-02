@@ -27,6 +27,9 @@ host = '127.0.0.1'
 user = 'CSAN'
 password = 'X-Ray2023'
 
+A0 = 0.0307
+A1 = 0.01504
+
 
 class SQLITE:
     def read(dbAddr, tableName):
@@ -273,9 +276,12 @@ class TEXTREADER:
             while line:
                 if 'Condition' in line:
                     condition = line.strip()
-                    my_dict[condition] = [index + 1, index + 2048]
+                elif 'Environment' in line:
+                    start = index + 1
+                    stop = index + 2048
+                    my_dict[condition] = [start, stop]
                 line = f.readline()
-                index = index + 1
+                index += 1
         f.close()
         return my_dict
 
@@ -287,26 +293,23 @@ class TEXTREADER:
 
 
 class CALCULATION:
-    A0 = 0.0307
-    A1 = 0.01504
+    def ev_to_px(ev):
+        return round((ev + A0) / A1)
 
-    def ev_to_px(self, ev):
-        return round((ev + self.A0) / self.A1)
+    def px_to_ev(px):
+        return (px * A1) - A0
 
-    def px_to_ev(self, px):
-        return (px * self.A1) - self.A0
-
-    def rawIntensity(self, df, listCounts, rng):
+    def rawIntensity(df, listCounts, rng):
         intensity = list()
         Ka1 = df['Ka1']
         La1 = df['La1']
         for element in range(rng):
             if Ka1[element] < 30:
-                start = self.ev_to_px(Ka1[element] - 0.2)
-                finish = self.ev_to_px(Ka1[element] + 0.2)
+                start = CALCULATION.ev_to_px(Ka1[element] - 0.2)
+                finish = CALCULATION.ev_to_px(Ka1[element] + 0.2)
             else:
-                start = self.ev_to_px(La1[element] - 0.2)
-                finish = self.ev_to_px(La1[element] + 0.2)
+                start = CALCULATION.ev_to_px(La1[element] - 0.2)
+                finish = CALCULATION.ev_to_px(La1[element] + 0.2)
 
             temp = 0
             for px in range(start, finish):

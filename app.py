@@ -133,6 +133,7 @@ class Ui_PeakSearchWindow(QtWidgets.QMainWindow):
         self.spectrumPlot.plot(
             x=self.px, y=self.intensity, pen=self.plotPen
         )
+        self.spectrumPlot.setMouseEnabled(y=False)
         self.spectrumPlot.scene().sigMouseMoved.connect(self.mouseMoved)
         self.peakPlot.setMinimumHeight(int(self.size().height()*0.4))
         self.peakPlot.showGrid(x=True, y=True)
@@ -141,6 +142,7 @@ class Ui_PeakSearchWindow(QtWidgets.QMainWindow):
         self.peakPlot.plot(
             x=self.px, y=self.intensity, pen=self.plotPen
         )
+        self.peakPlot.setMouseEnabled(x=False)  # Only allow zoom in Y-axis
         self.peakPlot.sigRangeChanged.connect(self.updateRegion)
         self.peakPlot.scene().sigMouseClicked.connect(self.openPopUp)
 
@@ -154,6 +156,7 @@ class Ui_PeakSearchWindow(QtWidgets.QMainWindow):
         self.peakPlot.addItem(self.hLine, ignoreBounds=True)
 
         self.peakPlotVB = self.peakPlot.vb
+        self.peakPlotVB.scaleBy(center=(0, 0))
         self.peakPlotVB.menu.clear()
         self.sepctrumPlotVB = self.spectrumPlot.vb
 
