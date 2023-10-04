@@ -1,5 +1,28 @@
+import typing
+from PyQt5 import QtCore, QtGui
+from PyQt5.QtWidgets import QWidget
 from backend import *
 import sys
+
+
+class myMainWindow(QtWidgets.QMainWindow):
+    def __init__(self):
+        super().__init__()
+
+    def closeEvent(self, event):
+        self.closeMessageBox = QtWidgets.QMessageBox()
+        self.closeMessageBox.setIcon(QtWidgets.QMessageBox.Warning)
+        self.closeMessageBox.setText(
+            "There are some unfinished changes in this window.\nAre you sure you want to quit?")
+        self.closeMessageBox.setWindowTitle("Warning!")
+        self.closeMessageBox.setStandardButtons(
+            QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.Cancel
+        )
+        ans = self.closeMessageBox.exec()
+        if ans == QtWidgets.QMessageBox.Yes:
+            event.accept()
+        else:
+            event.ignore()
 
 
 class Ui_conditionsWindow(QtWidgets.QWidget):
@@ -45,7 +68,7 @@ class Ui_conditionsWindow(QtWidgets.QWidget):
                 row += 1
 
 
-class Ui_PeakSearchWindow(QtWidgets.QMainWindow):
+class Ui_PeakSearchWindow(myMainWindow):
     def __init__(self):
         super().__init__()
 
