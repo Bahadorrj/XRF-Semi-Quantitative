@@ -17,9 +17,6 @@ class Ui_conditionsWindow(QtWidgets.QWidget):
             self.formLayout.setFieldGrowthPolicy(
                 QtWidgets.QFormLayout.ExpandingFieldsGrow
             )
-
-            # self.formLayout.setContentsMargins(20, -1, -1, -1)
-            # self.formLayout.setHorizontalSpacing(6)
             self.conditionLabel = QtWidgets.QLabel(
                 self.df.at[i, 'name']
             )
@@ -237,21 +234,9 @@ class Ui_PeakSearchWindow(QtWidgets.QMainWindow):
                     if item['active']:
                         line.setPen(self.activePen)
                         self.spectrumPlot.addItem(line)
-                        nline = InfiniteLine()
-                        nline.setAngle(90)
-                        nline.setMovable(False)
-                        nline.setValue(line.value())
-                        nline.setPen(self.activePen)
-                        self.peakPlot.addItem(nline)
                     elif item['active'] is False:
                         line.setPen(self.deactivePen)
                         self.spectrumPlot.addItem(line)
-                        nline = InfiniteLine()
-                        nline.setAngle(90)
-                        nline.setMovable(False)
-                        nline.setValue(line.value())
-                        nline.setPen(self.deactivePen)
-                        self.peakPlot.addItem(nline)
 
     def setItem(self, sym, type, ev, intensity, active, lines):
         self.removeButton = QtWidgets.QPushButton(icon=QtGui.QIcon(icon_cross))
@@ -528,7 +513,10 @@ class Ui_PlotWindow(QtWidgets.QMainWindow):
 
     def remove(self):
         item = self.form.selectedItems()[0]
-        self.form.takeTopLevelItem(self.form.indexOfTopLevelItem(item))
+        index = self.form.indexOfTopLevelItem(item)
+        self.form.takeTopLevelItem(index)
+        self.files.pop(index)
+        self.plotFiles()
 
     def showContextMenu(self, position):
         item = self.form.itemAt(position)
@@ -552,9 +540,8 @@ class Ui_PlotWindow(QtWidgets.QMainWindow):
         fileItem.setCheckState(0, QtCore.Qt.Unchecked)
 
         conditionsDictionary = TEXTREADER.conditionDictionary(filePath)
-        self.dfConditions = SQLITE.read(Addr['dbFundamentals'], 'conditions')
         buttons = []
-        for condition in self.dfConditions['name']:
+        for condition in list(conditionsDictionary.keys()):
             conditionItem = QtWidgets.QTreeWidgetItem()
             conditionItem.setText(1, condition)
             conditionItem.setCheckState(1, QtCore.Qt.Unchecked)
