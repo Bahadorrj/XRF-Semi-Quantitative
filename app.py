@@ -8,44 +8,37 @@ class Ui_conditionsWindow(QtWidgets.QWidget):
         self.setupUi()
 
     def setupUi(self):
+        # variable
         self.df = SQLITE.read(Addr['dbFundamentals'], 'conditions')
+
+        # window config
+        self.setFixedSize(QtCore.QSize(
+            int(size.width()*0.5), int(size.height()*0.3))
+        )
+        self.setWindowTitle('Conditions')
+
+        # layout
         self.gridLayout = QtWidgets.QGridLayout(self)
+
         row = 0
         column = 0
         for i in self.df.index:
-            self.formLayout = QtWidgets.QFormLayout()
-            self.formLayout.setFieldGrowthPolicy(
-                QtWidgets.QFormLayout.ExpandingFieldsGrow
-            )
-            self.conditionLabel = QtWidgets.QLabel(
-                self.df.at[i, 'name']
-            )
-            self.formLayout.addWidget(self.conditionLabel)
-            self.KvLabel = QtWidgets.QLabel('Kv')
-            self.KvValue = QtWidgets.QLabel(str(self.df.at[i, 'Kv']))
-            self.formLayout.addRow(self.KvLabel, self.KvValue)
-            self.mALabel = QtWidgets.QLabel('mA')
-            self.mAValue = QtWidgets.QLabel(str(self.df.at[i, 'mA']))
-            self.formLayout.addRow(self.mALabel, self.mAValue)
-            self.timeLabel = QtWidgets.QLabel('time')
-            self.timeValue = QtWidgets.QLabel(str(self.df.at[i, 'time']))
-            self.formLayout.addRow(self.timeLabel, self.timeValue)
-            self.rotationLabel = QtWidgets.QLabel('rotation')
-            self.rotationValue = QtWidgets.QLabel(
-                str(self.df.at[i, 'rotation']))
-            self.formLayout.addRow(self.rotationLabel, self.rotationValue)
-            self.environmentLabel = QtWidgets.QLabel('enviroment')
-            self.environmentValue = QtWidgets.QLabel(
-                self.df.at[i, 'environment'])
-            self.formLayout.addRow(self.environmentLabel,
-                                   self.environmentValue)
-            self.filterLabel = QtWidgets.QLabel('filter')
-            self.filterValue = QtWidgets.QLabel(str(self.df.at[i, 'filter']))
-            self.formLayout.addRow(self.filterLabel, self.filterValue)
-            self.maskLabel = QtWidgets.QLabel('mask')
-            self.maskValue = QtWidgets.QLabel(str(self.df.at[i, 'mask']))
-            self.formLayout.addRow(self.maskLabel, self.maskValue)
-            self.gridLayout.addLayout(self.formLayout, row, column)
+            self.form = QtWidgets.QListWidget()
+            self.form.setFrameShape(QtWidgets.QFrame.Box)
+            self.form.setFrameShadow(QtWidgets.QFrame.Plain)
+            properties = ['name',
+                          'Kv',
+                          'mA',
+                          'time',
+                          'rotation',
+                          'environment',
+                          'filter',
+                          'mask']
+            for property in properties:
+                self.form.addItem(
+                    f"{property} : {str(self.df.at[i, property])}"
+                )
+            self.gridLayout.addWidget(self.form, row, column)
             column += 1
             if column > 4:
                 column = 0
@@ -123,7 +116,7 @@ class Ui_PeakSearchWindow(QtWidgets.QMainWindow):
         self.spectrumPlot.plot(
             x=self.px, y=self.intensity, pen=self.plotPen
         )
-        self.spectrumPlot.setMouseEnabled(y=False)
+        self.spectrumPlot.setMouseEnabled(x=False, y=False)
         self.spectrumPlot.scene().sigMouseMoved.connect(self.mouseMoved)
         self.peakPlot.setMinimumHeight(int(self.size().height()*0.4))
         self.peakPlot.showGrid(x=True, y=True)
