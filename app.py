@@ -635,6 +635,15 @@ class Ui_PlotWindow(QtWidgets.QMainWindow):
             return False
 
     def itemChanged(self, item):
+        for topLevelIndex in range(self.form.topLevelItemCount()):
+            topLevelItem = self.form.topLevelItem(topLevelIndex)
+            if topLevelItem.isSelected():
+                topLevelItem.setSelected(False)
+            for childIndex in range(topLevelItem.childCount()):
+                child = topLevelItem.child(childIndex)
+                if child.isSelected():
+                    child.setSelected(False)
+        item.setSelected(True)
         self.form.blockSignals(True)
         topLevelIndex = self.form.indexOfTopLevelItem(item)
         if topLevelIndex != -1:  # if toplevel changed
