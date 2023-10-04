@@ -659,6 +659,7 @@ class Ui_PlotWindow(QtWidgets.QMainWindow):
                 if child.isSelected():
                     child.setSelected(False)
         item.setSelected(True)
+        self.form.setCurrentItem(item)
         self.form.blockSignals(True)
         topLevelIndex = self.form.indexOfTopLevelItem(item)
         if topLevelIndex != -1:  # if toplevel changed
