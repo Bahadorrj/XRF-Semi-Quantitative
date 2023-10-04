@@ -228,7 +228,7 @@ class Ui_PeakSearchWindow(QtWidgets.QMainWindow):
 
     def plotItems(self):
         for item in self.items:
-            for line in item['lines']:
+            for line in item['specLines']:
                 self.spectrumPlot.removeItem(line)
                 if item['hide'] is False:
                     if item['active']:
@@ -237,8 +237,17 @@ class Ui_PeakSearchWindow(QtWidgets.QMainWindow):
                     elif item['active'] is False:
                         line.setPen(self.deactivePen)
                         self.spectrumPlot.addItem(line)
+        for line in item['peakLines']:
+            self.peakPlot.removeItem(line)
+            if item['hide'] is False:
+                if item['active']:
+                    line.setPen(self.activePen)
+                    self.peakPlot.addItem(line)
+                elif item['active'] is False:
+                    line.setPen(self.deactivePen)
+                    self.peakPlot.addItem(line)
 
-    def setItem(self, sym, type, ev, intensity, active, lines):
+    def setItem(self, sym, type, ev, intensity, active, specLines, peakLines):
         self.removeButton = QtWidgets.QPushButton(icon=QtGui.QIcon(icon_cross))
         self.removeButton.clicked.connect(self.remove)
         self.hideButton = QtWidgets.QPushButton(icon=QtGui.QIcon(icon_unhide))
@@ -282,7 +291,8 @@ class Ui_PeakSearchWindow(QtWidgets.QMainWindow):
             'sym': sym,
             'type': type,
             'intensity': intensity,
-            'lines': lines,
+            'specLines': specLines,
+            'peakLines': peakLines,
             'active': active,
             'hide': False
         }
@@ -291,7 +301,8 @@ class Ui_PeakSearchWindow(QtWidgets.QMainWindow):
         self.plotItems()
 
     def initItem(self, sym, index):
-        lines = self.findLines(index)
+        specLines = self.findLines(index)
+        peakLines = self.findLines(index)
         intensity = 0
         for i in index:
             ev = self.dfGeneralData.at[i, 'Kev']
@@ -306,7 +317,8 @@ class Ui_PeakSearchWindow(QtWidgets.QMainWindow):
         for px in range(CALCULATION.ev_to_px(low), CALCULATION.ev_to_px(high)):
             intensity += self.intensity[px]
 
-        self.setItem(sym, itemType, itemEv, intensity, False, lines)
+        self.setItem(sym, itemType, itemEv, intensity,
+                     False, specLines, peakLines)
 
     def actionClicked(self, action):
         sym = action.text()
@@ -357,8 +369,10 @@ class Ui_PeakSearchWindow(QtWidgets.QMainWindow):
         if returnValue == QtWidgets.QMessageBox.Ok:
             self.form.removeRow(row)
             SQLITE.deactiveElement(item['sym'])
-            for line in self.items[row]['lines']:
+            for line in self.items[row]['specLines']:
                 self.spectrumPlot.removeItem(line)
+            for line in self.items[row]['peakLines']:
+                self.peakPlot.removeItem(line)
             self.items.pop(row)
             self.rowCount -= 1
 
@@ -389,8 +403,9 @@ class Ui_PeakSearchWindow(QtWidgets.QMainWindow):
             intensity = self.dfElements.at[i, 'intensity']
             index = self.dfGeneralData[self.dfGeneralData['Sym']
                                        == sym].index
-            lines = self.findLines(index)
-            self.setItem(sym, type, ev, intensity, True, lines)
+            specLines = self.findLines(index)
+            peakLines = self.findLines(index)
+            self.setItem(sym, type, ev, intensity, True, specLines, peakLines)
 
 
 class Ui_PlotWindow(QtWidgets.QMainWindow):
