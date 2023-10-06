@@ -1,6 +1,3 @@
-import typing
-from PyQt5 import QtCore, QtGui
-from PyQt5.QtWidgets import QWidget
 from backend import *
 import sys
 
