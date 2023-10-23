@@ -2,60 +2,70 @@ from backend import *
 import sys
 
 
+class myMainWindow(QtWidgets.QMainWindow):
+    def __init__(self):
+        super().__init__()
+
+    def closeEvent(self, event):
+        self.closeMessageBox = QtWidgets.QMessageBox()
+        self.closeMessageBox.setIcon(QtWidgets.QMessageBox.Warning)
+        self.closeMessageBox.setText(
+            "There are some unfinished changes in this window.\nAre you sure you want to quit?")
+        self.closeMessageBox.setWindowTitle("Warning!")
+        self.closeMessageBox.setStandardButtons(
+            QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.Cancel
+        )
+        ans = self.closeMessageBox.exec()
+        if ans == QtWidgets.QMessageBox.Yes:
+            event.accept()
+        else:
+            event.ignore()
+
+
 class Ui_conditionsWindow(QtWidgets.QWidget):
     def __init__(self):
         super().__init__()
         self.setupUi()
 
     def setupUi(self):
+        # variable
         self.df = SQLITE.read(Addr['dbFundamentals'], 'conditions')
+
+        # window config
+        self.setFixedSize(QtCore.QSize(
+            int(size.width()*0.5), int(size.height()*0.3))
+        )
+        self.setWindowTitle('Conditions')
+
+        # layout
         self.gridLayout = QtWidgets.QGridLayout(self)
+
         row = 0
         column = 0
         for i in self.df.index:
-            self.formLayout = QtWidgets.QFormLayout()
-            self.formLayout.setFieldGrowthPolicy(
-                QtWidgets.QFormLayout.ExpandingFieldsGrow
-            )
-
-            # self.formLayout.setContentsMargins(20, -1, -1, -1)
-            # self.formLayout.setHorizontalSpacing(6)
-            self.conditionLabel = QtWidgets.QLabel(
-                self.df.at[i, 'name']
-            )
-            self.formLayout.addWidget(self.conditionLabel)
-            self.KvLabel = QtWidgets.QLabel('Kv')
-            self.KvValue = QtWidgets.QLabel(str(self.df.at[i, 'Kv']))
-            self.formLayout.addRow(self.KvLabel, self.KvValue)
-            self.mALabel = QtWidgets.QLabel('mA')
-            self.mAValue = QtWidgets.QLabel(str(self.df.at[i, 'mA']))
-            self.formLayout.addRow(self.mALabel, self.mAValue)
-            self.timeLabel = QtWidgets.QLabel('time')
-            self.timeValue = QtWidgets.QLabel(str(self.df.at[i, 'time']))
-            self.formLayout.addRow(self.timeLabel, self.timeValue)
-            self.rotationLabel = QtWidgets.QLabel('rotation')
-            self.rotationValue = QtWidgets.QLabel(
-                str(self.df.at[i, 'rotation']))
-            self.formLayout.addRow(self.rotationLabel, self.rotationValue)
-            self.environmentLabel = QtWidgets.QLabel('enviroment')
-            self.environmentValue = QtWidgets.QLabel(
-                self.df.at[i, 'environment'])
-            self.formLayout.addRow(self.environmentLabel,
-                                   self.environmentValue)
-            self.filterLabel = QtWidgets.QLabel('filter')
-            self.filterValue = QtWidgets.QLabel(str(self.df.at[i, 'filter']))
-            self.formLayout.addRow(self.filterLabel, self.filterValue)
-            self.maskLabel = QtWidgets.QLabel('mask')
-            self.maskValue = QtWidgets.QLabel(str(self.df.at[i, 'mask']))
-            self.formLayout.addRow(self.maskLabel, self.maskValue)
-            self.gridLayout.addLayout(self.formLayout, row, column)
+            self.form = QtWidgets.QListWidget()
+            self.form.setFrameShape(QtWidgets.QFrame.Box)
+            self.form.setFrameShadow(QtWidgets.QFrame.Plain)
+            properties = ['name',
+                          'Kv',
+                          'mA',
+                          'time',
+                          'rotation',
+                          'environment',
+                          'filter',
+                          'mask']
+            for property in properties:
+                self.form.addItem(
+                    f"{property} : {str(self.df.at[i, property])}"
+                )
+            self.gridLayout.addWidget(self.form, row, column)
             column += 1
             if column > 4:
                 column = 0
                 row += 1
 
 
-class Ui_PeakSearchWindow(QtWidgets.QMainWindow):
+class Ui_PeakSearchWindow(myMainWindow):
     def __init__(self):
         super().__init__()
 
@@ -126,7 +136,7 @@ class Ui_PeakSearchWindow(QtWidgets.QMainWindow):
         self.spectrumPlot.plot(
             x=self.px, y=self.intensity, pen=self.plotPen
         )
-        self.spectrumPlot.setMouseEnabled(y=False)
+        self.spectrumPlot.setMouseEnabled(x=False, y=False)
         self.spectrumPlot.scene().sigMouseMoved.connect(self.mouseMoved)
         self.peakPlot.setMinimumHeight(int(self.size().height()*0.4))
         self.peakPlot.showGrid(x=True, y=True)
@@ -231,29 +241,26 @@ class Ui_PeakSearchWindow(QtWidgets.QMainWindow):
 
     def plotItems(self):
         for item in self.items:
-            for line in item['lines']:
+            for line in item['specLines']:
                 self.spectrumPlot.removeItem(line)
                 if item['hide'] is False:
                     if item['active']:
                         line.setPen(self.activePen)
                         self.spectrumPlot.addItem(line)
-                        nline = InfiniteLine()
-                        nline.setAngle(90)
-                        nline.setMovable(False)
-                        nline.setValue(line.value())
-                        nline.setPen(self.activePen)
-                        self.peakPlot.addItem(nline)
                     elif item['active'] is False:
                         line.setPen(self.deactivePen)
                         self.spectrumPlot.addItem(line)
-                        nline = InfiniteLine()
-                        nline.setAngle(90)
-                        nline.setMovable(False)
-                        nline.setValue(line.value())
-                        nline.setPen(self.deactivePen)
-                        self.peakPlot.addItem(nline)
+        for line in item['peakLines']:
+            self.peakPlot.removeItem(line)
+            if item['hide'] is False:
+                if item['active']:
+                    line.setPen(self.activePen)
+                    self.peakPlot.addItem(line)
+                elif item['active'] is False:
+                    line.setPen(self.deactivePen)
+                    self.peakPlot.addItem(line)
 
-    def setItem(self, sym, type, ev, intensity, active, lines):
+    def setItem(self, sym, type, ev, intensity, active, specLines, peakLines):
         self.removeButton = QtWidgets.QPushButton(icon=QtGui.QIcon(icon_cross))
         self.removeButton.clicked.connect(self.remove)
         self.hideButton = QtWidgets.QPushButton(icon=QtGui.QIcon(icon_unhide))
@@ -297,7 +304,8 @@ class Ui_PeakSearchWindow(QtWidgets.QMainWindow):
             'sym': sym,
             'type': type,
             'intensity': intensity,
-            'lines': lines,
+            'specLines': specLines,
+            'peakLines': peakLines,
             'active': active,
             'hide': False
         }
@@ -306,7 +314,8 @@ class Ui_PeakSearchWindow(QtWidgets.QMainWindow):
         self.plotItems()
 
     def initItem(self, sym, index):
-        lines = self.findLines(index)
+        specLines = self.findLines(index)
+        peakLines = self.findLines(index)
         intensity = 0
         for i in index:
             ev = self.dfGeneralData.at[i, 'Kev']
@@ -321,7 +330,8 @@ class Ui_PeakSearchWindow(QtWidgets.QMainWindow):
         for px in range(CALCULATION.ev_to_px(low), CALCULATION.ev_to_px(high)):
             intensity += self.intensity[px]
 
-        self.setItem(sym, itemType, itemEv, intensity, False, lines)
+        self.setItem(sym, itemType, itemEv, intensity,
+                     False, specLines, peakLines)
 
     def actionClicked(self, action):
         sym = action.text()
@@ -372,8 +382,10 @@ class Ui_PeakSearchWindow(QtWidgets.QMainWindow):
         if returnValue == QtWidgets.QMessageBox.Ok:
             self.form.removeRow(row)
             SQLITE.deactiveElement(item['sym'])
-            for line in self.items[row]['lines']:
+            for line in self.items[row]['specLines']:
                 self.spectrumPlot.removeItem(line)
+            for line in self.items[row]['peakLines']:
+                self.peakPlot.removeItem(line)
             self.items.pop(row)
             self.rowCount -= 1
 
@@ -404,8 +416,9 @@ class Ui_PeakSearchWindow(QtWidgets.QMainWindow):
             intensity = self.dfElements.at[i, 'intensity']
             index = self.dfGeneralData[self.dfGeneralData['Sym']
                                        == sym].index
-            lines = self.findLines(index)
-            self.setItem(sym, type, ev, intensity, True, lines)
+            specLines = self.findLines(index)
+            peakLines = self.findLines(index)
+            self.setItem(sym, type, ev, intensity, True, specLines, peakLines)
 
 
 class Ui_PlotWindow(QtWidgets.QMainWindow):
@@ -528,7 +541,10 @@ class Ui_PlotWindow(QtWidgets.QMainWindow):
 
     def remove(self):
         item = self.form.selectedItems()[0]
-        self.form.takeTopLevelItem(self.form.indexOfTopLevelItem(item))
+        index = self.form.indexOfTopLevelItem(item)
+        self.form.takeTopLevelItem(index)
+        self.files.pop(index)
+        self.plotFiles()
 
     def showContextMenu(self, position):
         item = self.form.itemAt(position)
@@ -552,9 +568,8 @@ class Ui_PlotWindow(QtWidgets.QMainWindow):
         fileItem.setCheckState(0, QtCore.Qt.Unchecked)
 
         conditionsDictionary = TEXTREADER.conditionDictionary(filePath)
-        self.dfConditions = SQLITE.read(Addr['dbFundamentals'], 'conditions')
         buttons = []
-        for condition in self.dfConditions['name']:
+        for condition in list(conditionsDictionary.keys()):
             conditionItem = QtWidgets.QTreeWidgetItem()
             conditionItem.setText(1, condition)
             conditionItem.setCheckState(1, QtCore.Qt.Unchecked)
@@ -648,6 +663,16 @@ class Ui_PlotWindow(QtWidgets.QMainWindow):
             return False
 
     def itemChanged(self, item):
+        for topLevelIndex in range(self.form.topLevelItemCount()):
+            topLevelItem = self.form.topLevelItem(topLevelIndex)
+            if topLevelItem.isSelected():
+                topLevelItem.setSelected(False)
+            for childIndex in range(topLevelItem.childCount()):
+                child = topLevelItem.child(childIndex)
+                if child.isSelected():
+                    child.setSelected(False)
+        item.setSelected(True)
+        self.form.setCurrentItem(item)
         self.form.blockSignals(True)
         topLevelIndex = self.form.indexOfTopLevelItem(item)
         if topLevelIndex != -1:  # if toplevel changed
