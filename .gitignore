@@ -198,3 +198,4 @@ myIcons/
 *.txt
 *.xlsx
 test.py
+.vscode
