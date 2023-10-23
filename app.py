@@ -61,10 +61,6 @@ class Ui_PeakSearchWindow(QtWidgets.QMainWindow):
 
     def setupUi(self, file, condition):
         # variables
-        self.dfGeneralData = pd.read_excel(
-            Addr['xlsxGeneralData'],
-            'sheet1'
-        )
         self.dfElements = SQLITE.read(Addr['dbFundamentals'], 'elements')
         self.file = file
         self.condition = condition
@@ -97,9 +93,10 @@ class Ui_PeakSearchWindow(QtWidgets.QMainWindow):
 
         # form
         self.form = QtWidgets.QTableWidget()
-        self.form.setColumnCount(4)
+        self.form.setColumnCount(7)
         self.form.setHorizontalHeaderLabels(
-            ['Element', 'Type', 'Intensity', 'Status']
+            ['Element', 'Type', 'Kev', 'Low Kev',
+                'High Kev', 'Intensity', 'Status']
         )
         self.form.setMaximumHeight(int(self.size().height()*0.3))
         self.form.verticalHeader().setSectionResizeMode(
@@ -194,13 +191,13 @@ class Ui_PeakSearchWindow(QtWidgets.QMainWindow):
         ev = CALCULATION.px_to_ev(int(self.mousePoint.x()))
         if event.button() == QtCore.Qt.RightButton:
             self.peakPlotVB.menu.clear()
-            df = CALCULATION.findElementParam(ev, self.dfGeneralData)
+            df = CALCULATION.findElementParam(ev, self.dfElements)
             for type in ['Ka', 'Kb', 'La', 'Lb', 'Ma']:
-                msk = df['Type'] == type
-                if df['Sym'][msk].empty is False:
+                msk = df['radiation_type'] == type
+                if df['symbol'][msk].empty is False:
                     menu = self.peakPlotVB.menu.addMenu(type)
                     menu.triggered.connect(self.actionClicked)
-                    for sym in df['Sym'][msk].tolist():
+                    for sym in df['symbol'][msk].tolist():
                         menu.addAction(sym)
 
     def findLines(self, index):
@@ -209,16 +206,16 @@ class Ui_PeakSearchWindow(QtWidgets.QMainWindow):
             line = InfiniteLine()
             line.setAngle(90)
             line.setMovable(False)
-            ev = self.dfGeneralData.at[i, 'Kev']
+            ev = self.dfElements.at[i, 'Kev']
             px = CALCULATION.ev_to_px(ev)
             line.setValue(px)
             symLabel = InfLineLabel(
                 line,
-                self.dfGeneralData.at[i, 'Sym'],
+                self.dfElements.at[i, 'symbol'],
                 movable=False,
                 position=0.9
             )
-            type = self.dfGeneralData.at[i, 'Type']
+            type = self.dfElements.at[i, 'radiation_type']
             typeLabel = InfLineLabel(
                 line,
                 type,
@@ -241,13 +238,16 @@ class Ui_PeakSearchWindow(QtWidgets.QMainWindow):
                         line.setPen(self.deactivePen)
                         self.spectrumPlot.addItem(line)
 
-    def setItem(self, sym, type, ev, intensity, active, lines):
+    def setItem(self, sym, type, kev, low, high, intensity, active, lines):
         self.removeButton = QtWidgets.QPushButton(icon=QtGui.QIcon(icon_cross))
         self.removeButton.clicked.connect(self.remove)
         self.hideButton = QtWidgets.QPushButton(icon=QtGui.QIcon(icon_unhide))
         self.hideButton.clicked.connect(self.hide)
         self.elementItem = QtWidgets.QTableWidgetItem(sym)
-        self.typeItem = QtWidgets.QTableWidgetItem(f"{type} - {ev}")
+        self.typeItem = QtWidgets.QTableWidgetItem(type)
+        self.KevItem = QtWidgets.QTableWidgetItem(str(kev))
+        self.lowItem = QtWidgets.QTableWidgetItem(str(low))
+        self.highItem = QtWidgets.QTableWidgetItem(str(high))
         self.intensityItem = QtWidgets.QTableWidgetItem(str(intensity))
         if active:
             self.statusItem = QtWidgets.QTableWidgetItem('Activated')
@@ -257,16 +257,17 @@ class Ui_PeakSearchWindow(QtWidgets.QMainWindow):
             self.statusButton = QtWidgets.QPushButton('Activate')
         self.statusButton.clicked.connect(self.statusChanged)
 
-        if self.form.columnCount() == 4:
-            self.form.setColumnCount(7)
+        if self.form.columnCount() == 7:
+            self.form.setColumnCount(10)
             self.form.setHorizontalHeaderLabels(
-                ['', '', 'Element', 'Type', 'Intensity', 'Status', '']
+                ['', '', 'Element', 'Type', 'Kev', 'Low Kev',
+                    'High Kev', 'Intensity', 'Status', '']
             )
-            for i in [0, 1, 6]:
+            for i in [0, 1, 9]:
                 self.form.horizontalHeader().setSectionResizeMode(
                     i, QtWidgets.QHeaderView.ResizeToContents
                 )
-            for i in [2, 3, 4, 5]:
+            for i in range(2, 8):
                 self.form.horizontalHeader().setSectionResizeMode(
                     i, QtWidgets.QHeaderView.Stretch
                 )
@@ -276,9 +277,12 @@ class Ui_PeakSearchWindow(QtWidgets.QMainWindow):
         self.form.setCellWidget(self.rowCount, 1, self.hideButton)
         self.form.setItem(self.rowCount, 2, self.elementItem)
         self.form.setItem(self.rowCount, 3, self.typeItem)
-        self.form.setItem(self.rowCount, 4, self.intensityItem)
-        self.form.setItem(self.rowCount, 5, self.statusItem)
-        self.form.setCellWidget(self.rowCount, 6, self.statusButton)
+        self.form.setItem(self.rowCount, 4, self.KevItem)
+        self.form.setItem(self.rowCount, 5, self.lowItem)
+        self.form.setItem(self.rowCount, 6, self.highItem)
+        self.form.setItem(self.rowCount, 7, self.intensityItem)
+        self.form.setItem(self.rowCount, 8, self.statusItem)
+        self.form.setCellWidget(self.rowCount, 9, self.statusButton)
         self.rowCount += 1
 
         self.item = {
@@ -297,23 +301,23 @@ class Ui_PeakSearchWindow(QtWidgets.QMainWindow):
         lines = self.findLines(index)
         intensity = 0
         for i in index:
-            ev = self.dfGeneralData.at[i, 'Kev']
-            type = self.dfGeneralData.at[i, 'Type']
+            ev = self.dfElements.at[i, 'Kev']
+            type = self.dfElements.at[i, 'radiation_type']
             if (type == 'Ka' and ev < 30) or (type == 'La'):
                 itemType = type
                 itemEv = ev
-                low = self.dfGeneralData.at[i, 'Low']
-                high = self.dfGeneralData.at[i, 'High']
+                low = self.dfElements.at[i, 'low_Kev']
+                high = self.dfElements.at[i, 'high_Kev']
                 if type == 'Ka':
                     break
         for px in range(CALCULATION.ev_to_px(low), CALCULATION.ev_to_px(high)):
             intensity += self.intensity[px]
 
-        self.setItem(sym, itemType, itemEv, intensity, False, lines)
+        self.setItem(sym, itemType, itemEv, low, high, intensity, False, lines)
 
     def actionClicked(self, action):
         sym = action.text()
-        index = self.dfGeneralData[self.dfGeneralData['Sym'] == sym].index
+        index = self.dfElements[self.dfElements['symbol'] == sym].index
         self.initItem(sym, index)
 
     def hide(self):
@@ -372,28 +376,29 @@ class Ui_PeakSearchWindow(QtWidgets.QMainWindow):
             super().keyPressEvent(event)
 
     def writeToTable(self):
-        if self.form.colorCount() == 4:
-            self.form.setColumnCount(7)
+        if self.form.colorCount() == 7:
+            self.form.setColumnCount(10)
             self.form.setHorizontalHeaderLabels(
-                ['', '', 'Element', 'Type', 'Intensity', 'Status', ''])
+                ['', '', 'Element', 'Type', 'Kev', ,'Low Kev', 'High Kev', 'Intensity', 'Status', ''])
             for i in [0, 1, 6]:
                 self.form.horizontalHeader().setSectionResizeMode(
                     i, QtWidgets.QHeaderView.ResizeToContents
                 )
-            for i in [2, 3, 4, 5]:
+            for i in range(2, 9):
                 self.form.horizontalHeader().setSectionResizeMode(
                     i, QtWidgets.QHeaderView.Stretch
                 )
 
         for i in self.dfElements.index:
-            sym = self.dfElements.at[i, 'symbol']
-            type = self.dfElements.at[i, 'radiation_type']
-            ev = self.dfElements.at[i, 'Kev']
-            intensity = self.dfElements.at[i, 'intensity']
-            index = self.dfGeneralData[self.dfGeneralData['Sym']
-                                       == sym].index
-            lines = self.findLines(index)
-            self.setItem(sym, type, ev, intensity, True, lines)
+            if self.dfElements.at[i, 'active'] == 1:
+                sym = self.dfElements.at[i, 'symbol']
+                type = self.dfElements.at[i, 'radiation_type']
+                ev = self.dfElements.at[i, 'Kev']
+                intensity = self.dfElements.at[i, 'intensity']
+                index = self.dfElements[self.dfElements['Sym']
+                                        == sym].index
+                lines = self.findLines(index)
+                self.setItem(sym, type, ev, intensity, True, lines)
 
 
 class Ui_PlotWindow(QtWidgets.QMainWindow):
@@ -540,9 +545,8 @@ class Ui_PlotWindow(QtWidgets.QMainWindow):
         fileItem.setCheckState(0, QtCore.Qt.Unchecked)
 
         conditionsDictionary = TEXTREADER.conditionDictionary(filePath)
-        self.dfConditions = SQLITE.read(Addr['dbFundamentals'], 'conditions')
         buttons = []
-        for condition in self.dfConditions['name']:
+        for condition in list(conditionsDictionary.keys()):
             conditionItem = QtWidgets.QTreeWidgetItem()
             conditionItem.setText(1, condition)
             conditionItem.setCheckState(1, QtCore.Qt.Unchecked)

@@ -125,43 +125,18 @@ class SQLITE:
         f.close()
         conn.close()
 
-    def activeElement(condition, item):
-        dfGeneralData = pd.read_excel(
-            Addr['xlsxGeneralData'],
-            'sheet1'
-        )
+    def activeElement(condition, range):
         conn = sqlite3.connect(Addr['dbFundamentals'])
         cur = conn.cursor()
-        sym = item['sym']
-        type = item['type']
-        intensity = item['intensity']
-        row = dfGeneralData[
-            np.logical_and(
-                dfGeneralData['Sym'] == sym,
-                dfGeneralData['Type'] == type
-            )
-        ]
         query = f"""
                 INSERT INTO elements (
-                    atomic_number,
-                    name,
-                    symbol,
-                    radiation_type,
-                    Kev,
-                    low_Kev,
-                    high_Kev,
+                    active,
                     intensity,
                     condition_id
                 )
                 VALUES (
-                    {row['Atomic no.'].values[0]},
-                    '{row['name'].values[0]}',
-                    '{row['Sym'].values[0]}',
-                    '{type}',
-                    {row['Kev'].values[0]},
-                    {row['Low'].values[0]},
-                    {row['High'].values[0]},
-                    {intensity},
+                    1,
+                    
                     (SELECT condition_id FROM conditions
                     WHERE conditions.name = '{condition}')
                 )"""
@@ -316,11 +291,11 @@ class CALCULATION:
             intensity.append(temp)
         return intensity
 
-    def findElementParam(ev, dfGeneralData):
-        greaterThanLow = dfGeneralData['Low'] < ev
-        smallerThanHigh = ev < dfGeneralData['High']
+    def findElementParam(ev, dfElements):
+        greaterThanLow = dfElements['low_Kev'] < ev
+        smallerThanHigh = ev < dfElements['high_Kev']
         msk = np.logical_and(greaterThanLow, smallerThanHigh)
-        return dfGeneralData[msk]
+        return dfElements[msk]
 
 
 class FLOATDELEGATE(QtWidgets.QItemDelegate):
