@@ -45,27 +45,34 @@ class SQLITE:
         conn.commit()
         conn.close()
 
-    def activeElement(condition, sym, type, intensity):
+    def activeElement(condition, item):
         conn = sqlite3.connect(Addr['dbFundamentals'])
         cur = conn.cursor()
         query = f"""
                 UPDATE elements
-                SET intensity = {intensity},
+                SET low_Kev = {item['low']},
+                    high_Kev = {item['high']},
+                    intensity = {item['intensity']},
                     active = 1,
                     condition_id =
                         (SELECT condition_id
                         FROM conditions
                         WHERE conditions.name = '{condition}')
-                WHERE symbol = '{sym}' AND radiation_type = '{type}'
+                WHERE symbol = '{item['sym']}'
+                        AND radiation_type = '{item['type']}';
                 """
         cur.execute(query)
         conn.commit()
 
-    def deactiveElement(sym):
+    def deactiveElement(item):
         conn = sqlite3.connect(Addr['dbFundamentals'])
         cur = conn.cursor()
-        query = f"""DELETE FROM elements
-                WHERE symbol = '{sym}'"""
+        query = f"""
+                UPDATE elements
+                SET active = 0
+                WHERE symbol = '{item['sym']}'
+                AND radiation_type = '{item['type']}'
+            """
         cur.execute(query)
         conn.commit()
 
