@@ -155,11 +155,11 @@ class Ui_PeakSearchWindow(QtWidgets.QMainWindow):
         self.form.setFrameShape(QtWidgets.QFrame.Box)
         self.form.setFrameShadow(QtWidgets.QFrame.Plain)
         self.form.setColumnCount(7)
+        self.form.itemChanged.connect(self.itemChanged)
         self.setupForm()
 
         # graphics config
         self.peakRegion.setZValue(10)
-        self.peakRegion.sigRegionChanged.connect(self.changeRange)
         self.spectrumRegion.setZValue(10)
         self.spectrumRegion.sigRegionChanged.connect(self.scalePeakPlot)
         self.spectrumPlot.showGrid(x=True, y=True)
@@ -197,6 +197,17 @@ class Ui_PeakSearchWindow(QtWidgets.QMainWindow):
 
         self.writeToTable()
 
+    def itemChanged(self, item):
+        if item.column() == 5 or item.column() == 6:
+            low = float(self.lowItem.text())
+            high = float(self.highItem.text())
+            self.peakRegion.setRegion(
+                [CALCULATION.ev_to_px(low),
+                 CALCULATION.ev_to_px(high)]
+            )
+            self.recentItem['low'] = low
+            self.recentItem['high'] = high
+
     def scalePeakPlot(self):
         self.spectrumRegion.setZValue(10)
         minX, maxX = self.spectrumRegion.getRegion()
@@ -221,9 +232,13 @@ class Ui_PeakSearchWindow(QtWidgets.QMainWindow):
     def updateSpecRegion(self, window, viewRange):
         rng = viewRange[0]
         self.spectrumRegion.setRegion(rng)
-        
+
     def changeRange(self):
-        
+        low, high = self.peakRegion.getRegion()
+        lowKev = round(CALCULATION.px_to_ev(low), 4)
+        highKev = round(CALCULATION.px_to_ev(high), 4)
+        self.lowItem.setText(str(lowKev))
+        self.highItem.setText(str(highKev))
 
     def openPopUp(self, event):
         ev = CALCULATION.px_to_ev(int(self.mousePoint.x()))
@@ -272,35 +287,51 @@ class Ui_PeakSearchWindow(QtWidgets.QMainWindow):
         peakLines = self.findLines(index)
         intensity = 0
         for i in index:
-            ev = self.dfElements.at[i, 'Kev']
+            Kev = self.dfElements.at[i, 'Kev']
             type = self.dfElements.at[i, 'radiation_type']
-            if (type == 'Ka' and ev < 30) or (type == 'La'):
+            if (type == 'Ka' and Kev < 30) or (type == 'La'):
                 itemType = type
-                itemEv = ev
+                itemEv = Kev
                 low = self.dfElements.at[i, 'low_Kev']
                 high = self.dfElements.at[i, 'high_Kev']
                 if type == 'Ka':
                     break
         for px in range(CALCULATION.ev_to_px(low), CALCULATION.ev_to_px(high)):
             intensity += self.intensityRange[px]
-        self.setItem(sym, itemType, itemEv, low, high,
-                     intensity, False, specLines, peakLines)
+        self.peakPlot.removeItem(self.peakRegion)
+        self.peakPlot.addItem(self.peakRegion, ignoreBounds=True)
+        self.peakRegion.setRegion(
+            [CALCULATION.ev_to_px(low), CALCULATION.ev_to_px(high)])
+        self.peakRegion.sigRegionChanged.connect(self.changeRange)
+        self.recentItem = {
+            'sym': sym,
+            'type': type,
+            'Kev': itemEv,
+            'low': low,
+            'high': high,
+            'intensity': intensity,
+            'specLines': specLines,
+            'peakLines': peakLines,
+            'active': False,
+            'hide': False
+        }
+        self.items.append(self.recentItem)
+        self.setItem(self.recentItem)
 
-    def setItem(self, sym, type, Kev, low, high,
-                intensity, active, specLines, peakLines):
+    def setItem(self, item):
         self.removeButton = QtWidgets.QPushButton(
             icon=QtGui.QIcon(icon['cross']))
         self.removeButton.clicked.connect(self.remove)
         self.hideButton = QtWidgets.QPushButton(
             icon=QtGui.QIcon(icon['unhide']))
         self.hideButton.clicked.connect(self.hide)
-        self.elementItem = QtWidgets.QTableWidgetItem(sym)
-        self.typeItem = QtWidgets.QTableWidgetItem(type)
-        self.KevItem = QtWidgets.QTableWidgetItem(str(Kev))
-        self.lowItem = QtWidgets.QTableWidgetItem(str(low))
-        self.highItem = QtWidgets.QTableWidgetItem(str(high))
-        self.intensityItem = QtWidgets.QTableWidgetItem(str(intensity))
-        if active:
+        self.elementItem = QtWidgets.QTableWidgetItem(item['sym'])
+        self.typeItem = QtWidgets.QTableWidgetItem(item['type'])
+        self.KevItem = QtWidgets.QTableWidgetItem(str(item['Kev']))
+        self.lowItem = QtWidgets.QTableWidgetItem(str(item['low']))
+        self.highItem = QtWidgets.QTableWidgetItem(str(item['high']))
+        self.intensityItem = QtWidgets.QTableWidgetItem(str(item['intensity']))
+        if item['active']:
             self.statusItem = QtWidgets.QTableWidgetItem('Activated')
             self.statusButton = QtWidgets.QPushButton('Deactivate')
         else:
@@ -320,19 +351,6 @@ class Ui_PeakSearchWindow(QtWidgets.QMainWindow):
         self.form.setItem(self.rowCount, 8, self.statusItem)
         self.form.setCellWidget(self.rowCount, 9, self.statusButton)
         self.rowCount += 1
-
-        recentItem = {
-            'sym': sym,
-            'type': type,
-            'low_item': self.lowItem,
-            'high_item': self.highItem,
-            'intensity': intensity,
-            'specLines': specLines,
-            'peakLines': peakLines,
-            'active': active,
-            'hide': False
-        }
-        self.items.append(recentItem)
 
         self.plotItems()
 
@@ -394,16 +412,12 @@ class Ui_PeakSearchWindow(QtWidgets.QMainWindow):
         statusButton = self.form.cellWidget(row, 9)
         item = self.items[row]
         if statusItem.text() == 'Deactivated':
-            SQLITE.activeElement(
-                self.condition,
-                item['sym'],
-                item['type'],
-                item['intensity'])
+            SQLITE.activeElement(self.condition, item)
             statusItem.setText('Activated')
             statusButton.setText('Deactivate')
             item['active'] = True
         else:
-            SQLITE.deactiveElement(item['sym'])
+            SQLITE.deactiveElement(item)
             statusItem.setText('Deactivated')
             statusButton.setText('Activate')
             item['active'] = False
@@ -467,8 +481,20 @@ class Ui_PeakSearchWindow(QtWidgets.QMainWindow):
                                         == sym].index
                 specLines = self.findLines(index)
                 peakLines = self.findLines(index)
-                self.setItem(sym, type, Kev, low, high, intensity,
-                             True, specLines, peakLines)
+                self.recentItem = {
+                    'sym': sym,
+                    'type': type,
+                    'Kev': Kev,
+                    'low': low,
+                    'high': high,
+                    'intensity': intensity,
+                    'specLines': specLines,
+                    'peakLines': peakLines,
+                    'active': True,
+                    'hide': False
+                }
+                self.items.append(self.recentItem)
+                self.setItem(self.recentItem)
 
 
 class Ui_PlotWindow(QtWidgets.QMainWindow):
