@@ -196,6 +196,7 @@ pyrightconfig.json
 
 myIcons/
 *.txt
+*.zip
 *.xlsx
 test.py
 *.vscode
