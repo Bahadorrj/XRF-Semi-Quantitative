@@ -11,18 +11,18 @@ from pyqtgraph import (ColorButton, InfiniteLine,
 from pathlib import Path
 import os
 
-icon_CSAN = r"myIcons\CSAN.ico"
-icon_toolbar_peak_search = r"myIcons\peak-search.png"
-icon_cross = r"myIcons\cross-button.png"
-icon_hide = r"myIcons\hide.png"
-icon_unhide = r"myIcons\unhide.png"
-icon_exclamation = r"myIcons\exclamation.png"
-icon_open = r"myIcons\folder-horizontal.png"
-icon_conditions = r"myIcons\database.png"
+icon = {'CSAN': r"myIcons\CSAN.ico",
+        'peak_search': r"myIcons\peak-search.png",
+        'cross': r"myIcons\cross-button.png",
+        'hide': r"myIcons\hide.png",
+        'unhide': r"myIcons\unhide.png",
+        'exclamation': r"myIcons\exclamation.png",
+        'open': r"myIcons\folder-horizontal.png",
+        'conditions': r"myIcons\database.png"
+        }
 
 Addr = {'dbFundamentals': r"myFiles\fundamentals.db",
-        'dbTables': r"myFiles\tables.db",
-        'xlsxGeneralData': r"myFiles\general-data.xlsx"}
+        'dbTables': r"myFiles\tables.db"}
 
 host = '127.0.0.1'
 user = 'CSAN'
@@ -45,126 +45,19 @@ class SQLITE:
         conn.commit()
         conn.close()
 
-    def addConditions(input_file_name, dbAddr):
-        conn = sqlite3.connect(dbAddr)
-        cur = conn.cursor()
-        with open(input_file_name, 'r') as f:
-            line = f.readline()  # read line
-            stopped = False
-            while line:
-                data = line.strip()
-                if data[0] == 'C':
-                    condition = data
-                elif ':' in data:
-                    i = data.index(':')
-                    property = data[:i - 1]
-                    value = data[i + 2:]
-                    match property:
-                        case 'Kv':
-                            Kv = float(value)
-                        case 'mA':
-                            mA = float(value)
-                        case 'Time':
-                            time = int(value)
-                        case 'Rotation':
-                            rotation = bool(value)
-                        case 'Environment':
-                            environment = value
-                            stopped = True
-                        case 'Filter':
-                            filter = int(value)
-                        case 'Mask':
-                            mask = int(value)
-                elif stopped:
-                    stopped = False
-                    query = f"""
-                        INSERT INTO conditions (
-                            condition_name,
-                            Kv,
-                            mA,
-                            time,
-                            rotation,
-                            environment,
-                            filter,
-                            mask
-                        )
-                        VALUES (
-                            '{condition}',
-                            {Kv},
-                            {mA},
-                            {time},
-                            {rotation},
-                            '{environment}',
-                            {filter},
-                            {mask}
-                        );
-                    """
-                    cur.execute(query)
-                    query = """
-                        DELETE FROM conditions
-                        WHERE EXISTS (
-                            SELECT 1 FROM conditions a
-                            WHERE conditions.condition_name = a.condition_name
-                            AND conditions.Kv = a.Kv
-                            AND conditions.mA = a.mA
-                            AND conditions.time = a.time
-                            AND conditions.rotation = a.rotation
-                            AND conditions.environment = a.environment
-                            AND conditions.filter = a.filter
-                            AND conditions.mask = a.mask
-                            AND conditions.condition_id > a.condition_id
-                        );
-                    """
-                    cur.execute(query)
-                    query = """
-                        DELETE FROM SQLITE_SEQUENCE WHERE name='conditions'
-                    """
-                    cur.execute(query)
-                    conn.commit()
-                line = f.readline()
-        f.close()
-        conn.close()
-
-    def activeElement(condition, item):
-        dfGeneralData = pd.read_excel(
-            Addr['xlsxGeneralData'],
-            'sheet1'
-        )
+    def activeElement(condition, sym, type, intensity):
         conn = sqlite3.connect(Addr['dbFundamentals'])
         cur = conn.cursor()
-        sym = item['sym']
-        type = item['type']
-        intensity = item['intensity']
-        row = dfGeneralData[
-            np.logical_and(
-                dfGeneralData['Sym'] == sym,
-                dfGeneralData['Type'] == type
-            )
-        ]
         query = f"""
-                INSERT INTO elements (
-                    atomic_number,
-                    name,
-                    symbol,
-                    radiation_type,
-                    Kev,
-                    low_Kev,
-                    high_Kev,
-                    intensity,
-                    condition_id
-                )
-                VALUES (
-                    {row['Atomic no.'].values[0]},
-                    '{row['name'].values[0]}',
-                    '{row['Sym'].values[0]}',
-                    '{type}',
-                    {row['Kev'].values[0]},
-                    {row['Low'].values[0]},
-                    {row['High'].values[0]},
-                    {intensity},
-                    (SELECT condition_id FROM conditions
-                    WHERE conditions.name = '{condition}')
-                )"""
+                UPDATE elements
+                SET intensity = {intensity},
+                    active = 1,
+                    condition_id =
+                        (SELECT condition_id
+                        FROM conditions
+                        WHERE conditions.name = '{condition}')
+                WHERE symbol = '{sym}' AND radiation_type = '{type}'
+                """
         cur.execute(query)
         conn.commit()
 
@@ -278,7 +171,10 @@ class TEXTREADER:
                 elif 'Environment' in line:
                     start = index + 1
                     stop = index + 2048
-                    my_dict[condition] = [start, stop]
+                    my_dict[condition] = {
+                        'range': [start, stop],
+                        'active': False
+                    }
                 line = f.readline()
                 index += 1
         f.close()
@@ -316,11 +212,11 @@ class CALCULATION:
             intensity.append(temp)
         return intensity
 
-    def findElementParam(ev, dfGeneralData):
-        greaterThanLow = dfGeneralData['Low'] < ev
-        smallerThanHigh = ev < dfGeneralData['High']
+    def findElementParam(ev, dfElements):
+        greaterThanLow = dfElements['low_Kev'] < ev
+        smallerThanHigh = ev < dfElements['high_Kev']
         msk = np.logical_and(greaterThanLow, smallerThanHigh)
-        return dfGeneralData[msk]
+        return dfElements[msk]
 
 
 class FLOATDELEGATE(QtWidgets.QItemDelegate):
