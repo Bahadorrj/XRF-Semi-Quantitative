@@ -28,8 +28,8 @@ host = '127.0.0.1'
 user = 'CSAN'
 password = 'X-Ray2023'
 
-A0 = 0.0317
-A1 = 0.01518
+A0 = -0.0255
+A1 = 0.01491
 
 
 class SQLITE:
