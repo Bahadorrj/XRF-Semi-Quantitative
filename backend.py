@@ -50,16 +50,16 @@ class SQLITE:
         cur = conn.cursor()
         query = f"""
                 UPDATE elements
-                SET low_Kev = {item['low']},
-                    high_Kev = {item['high']},
+                SET low_Kev = {item['low_Kev']},
+                    high_Kev = {item['high_Kev']},
                     intensity = {item['intensity']},
                     active = 1,
                     condition_id =
                         (SELECT condition_id
                         FROM conditions
                         WHERE conditions.name = '{condition}')
-                WHERE symbol = '{item['sym']}'
-                        AND radiation_type = '{item['type']}';
+                WHERE symbol = '{item['symbol']}'
+                        AND radiation_type = '{item['radiation_type']}';
                 """
         cur.execute(query)
         conn.commit()
@@ -70,8 +70,8 @@ class SQLITE:
         query = f"""
                 UPDATE elements
                 SET active = 0
-                WHERE symbol = '{item['sym']}'
-                AND radiation_type = '{item['type']}'
+                WHERE symbol = '{item['symbol']}'
+                AND radiation_type = '{item['radiation_type']}'
             """
         cur.execute(query)
         conn.commit()
@@ -200,6 +200,12 @@ class CALCULATION:
 
     def px_to_ev(px):
         return (px * A1) - A0
+
+    def intensity(low, high, intensityRange):
+        intensity = 0
+        for px in range(CALCULATION.ev_to_px(low), CALCULATION.ev_to_px(high)):
+            intensity += intensityRange[px]
+        return intensity
 
     def rawIntensity(df, listCounts, rng):
         intensity = list()
