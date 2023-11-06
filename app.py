@@ -1,7 +1,15 @@
-from backend import *
-import sys
+from PyQt5 import QtCore, QtGui, QtWidgets
+from pyqtgraph import (ColorButton, InfiniteLine,
+                       PlotWidget, SignalProxy,
+                       hsvColor, mkPen,
+                       LinearRegionItem, GraphicsLayoutWidget,
+                       InfLineLabel)
+from pathlib import Path
+import numpy as np
 import functools
 import time
+import sys
+from backend import *
 
 
 def runtime_monitor(input_function):
@@ -108,6 +116,66 @@ class Ui_ConditionsWindow(QtWidgets.QWidget):
 
 
 class Ui_PeakSearchWindow(QtWidgets.QMainWindow):
+    """This class represents a user interface for peak search and analysis.
+
+    Args:
+        path (str): The path to the data file (default is "F:/CSAN/myFiles1/Au.txt").
+        rng (list): A list specifying the data range as [start, end] (default is [4126, 6173]).
+        condition (str): The condition label (default is "Condition 4").
+
+    Attributes:
+        windowSize (QtCore.QSize): The size of the main window.
+        dfElements: A DataFrame containing elemental data.
+        path (str): The path to the data file.
+        range (list): The data range.
+        condition (str): The condition label.
+        intensityRange: A list of intensity values.
+        px: Numpy array for X-axis values.
+        plotPen: Pen for plotting data.
+        deactivePen: Pen for deactivated elements.
+        activePen: Pen for active elements.
+        items: A list of element items.
+        mainLayout (QtWidgets.QVBoxLayout): The main layout for the user interface.
+        form (QtWidgets.QTableWidget): The table widget for displaying element data.
+        graph (GraphicsLayoutWidget): The graphical layout widget.
+        peakPlot: The plot for displaying peak data.
+        spectrumPlot: The plot for displaying spectrum data.
+        peakRegion: Linear region for peak selection.
+        spectrumRegion: Linear region for spectrum selection.
+        vLine: Vertical line for mouse tracking.
+        hLine: Horizontal line for mouse tracking.
+        cordinateLabel (QtWidgets.QLabel): Label for displaying mouse coordinates.
+        mainWidget (QtWidgets.QWidget): The main widget for the user interface.
+
+    Methods:
+        setupUi(self): Set up the user interface.
+        itemClicked(self, item): Handle item click event.
+        itemChanged(self, item): Handle item change event.
+        lowKevItemChanged(self, item): Handle low Kev item change event.
+        highKevItemChanged(self, item): Handle high Kev item change event.
+        scalePeakPlot(self): Scale the peak plot based on spectrum region.
+        mouseMoved(self, event): Handle mouse move event.
+        updateSpecRegion(self, window, viewRange): Update the spectrum region.
+        changeRegionRange(self): Change the region range.
+        updateItem(self, index, lowKev, highKev, intensity): Update item data.
+        openPopUp(self, event): Open a popup menu for element options.
+        writeToTable(self): Write elemental data to the table.
+        actionClicked(self, action): Handle action click event.
+        initItem(self, item, index): Initialize an element item.
+        setItem(self, item): Set an item in the table.
+        addItemToForm(self): Add an item to the table.
+        setRegion(self, item): Set the region for an item.
+        statusChanged(self): Change the status of an item.
+        activeItem(self, item): Activate an item.
+        deactiveItem(self, item): Deactivate an item.
+        hide(self): Hide an item in the plot.
+        keyPressEvent(self, event): Handle key press events.
+        removeRow(self): Remove a row from the table.
+        setupForm(self): Set up the table form.
+        findLines(self, index): Find lines for an element.
+
+    """
+
     def __init__(
         self, path="F:/CSAN/myFiles1/Au.txt", rng=[4126, 6173], condition="Condition 4"
     ):
@@ -196,6 +264,20 @@ class Ui_PeakSearchWindow(QtWidgets.QMainWindow):
         self.writeToTable()
 
     def itemClicked(self, item):
+        """
+        Handle the item click event in the table.
+
+        This function is called when an item in the table is clicked. It checks if the clicked item is in column 5 or 6,
+        which corresponds to the "Low Kev" or "High Kev" columns in the table. If the clicked item is in one of these
+        columns and the corresponding element is not currently active, it triggers the "setRegion" method to update the
+        region selection in the plot.
+
+        Args:
+            item: The QTableWidgetItem that was clicked.
+
+        Returns:
+            None
+        """
         # print("itemClicked")
         if item.column() in [5, 6]:
             currentRow = self.form.currentRow()
@@ -203,6 +285,22 @@ class Ui_PeakSearchWindow(QtWidgets.QMainWindow):
                 self.setRegion(self.items[currentRow])
 
     def itemChanged(self, item):
+        """
+        Handle item change event in the element data table.
+
+        This function is called when an item in the element data table is modified.
+        It checks the column of the modified item and delegates the handling
+        to the appropriate function based on the column:
+
+        - If the item is in column 5, it calls `lowKevItemChanged(item)`.
+        - If the item is in column 6, it calls `highKevItemChanged(item)`.
+
+        Args:
+            item (QtWidgets.QTableWidgetItem): The item that was changed in the table.
+
+        Returns:
+            None
+        """
         # print("itemChanged")
         if item.column() == 5:
             self.lowKevItemChanged(item)
@@ -210,6 +308,23 @@ class Ui_PeakSearchWindow(QtWidgets.QMainWindow):
             self.highKevItemChanged(item)
 
     def lowKevItemChanged(self, item):
+        """
+        Handle the change of the low Kev value for an element in the user interface.
+
+        This function is called when the user edits the low Kev value of an element in the table.
+        It updates the displayed region on the peak plot based on the changed low Kev value,
+        and recalculates the intensity within the updated region.
+
+        Args:
+            item (QtWidgets.QTableWidgetItem): The table item representing the low Kev value.
+
+        Returns:
+            None
+
+        Notes:
+            - The updated low Kev value affects the displayed region on the peak plot.
+            - The calculated intensity is updated and displayed in the corresponding table cell.
+        """
         # print("lowKevItemChanged")
         highPx = self.peakRegion.getRegion()[1]
         lowKev = float(item.text())
@@ -220,6 +335,23 @@ class Ui_PeakSearchWindow(QtWidgets.QMainWindow):
         self.updateItem(self.form.currentRow(), lowKev, highKev, intensity)
 
     def highKevItemChanged(self, item):
+        """
+        Handle the change of the high Kev value for an element in the user interface.
+
+        This function is called when the user edits the high Kev value of an element in the table.
+        It updates the displayed region on the peak plot based on the changed low Kev value,
+        and recalculates the intensity within the updated region.
+
+        Args:
+            item (QtWidgets.QTableWidgetItem): The table item representing the low Kev value.
+
+        Returns:
+            None
+
+        Notes:
+            - The updated low Kev value affects the displayed region on the peak plot.
+            - The calculated intensity is updated and displayed in the corresponding table cell.
+        """
         # print("highKevItemChanged")
         lowPx = self.peakRegion.getRegion()[0]
         lowKev = CALCULATION.px_to_ev(lowPx)
@@ -230,12 +362,43 @@ class Ui_PeakSearchWindow(QtWidgets.QMainWindow):
         self.updateItem(self.form.currentRow(), lowKev, highKev, intensity)
 
     def scalePeakPlot(self):
+        """
+        Scale the peak plot based on the selected region in the spectrum plot.
+
+        This function adjusts the visible range of the peak plot to match the selected region
+        in the spectrum plot. It updates the X-axis range of the peak plot to match the
+        minimum and maximum values of the selected region in the spectrum plot, ensuring
+        that both plots are synchronized.
+
+        This function is called when the user interacts with the spectrum plot to select a
+        region, allowing for zooming and focusing on specific areas of the data.
+
+        Args:
+            None
+
+        Returns:
+            None
+
+        """
         # print("scalePeakPlot")
         self.spectrumRegion.setZValue(10)
         minX, maxX = self.spectrumRegion.getRegion()
         self.peakPlot.setXRange(minX, maxX, padding=0)
 
     def mouseMoved(self, event):
+        """
+        Handle the mouse movement event within the peak plot.
+
+        This function is called when the mouse moves over the peak plot, updating the mouse position
+        and displaying the corresponding coordinates on the user interface.
+
+        Args:
+            event: The mouse movement event object.
+
+        Returns:
+            None
+
+        """
         # print("mouseMoved")
         pos = event
         if self.peakPlot.sceneBoundingRect().contains(pos):
@@ -254,11 +417,37 @@ class Ui_PeakSearchWindow(QtWidgets.QMainWindow):
             self.hLine.setPos(self.mousePoint.y())
 
     def updateSpecRegion(self, window, viewRange):
+        """
+        Update the spectrum region based on the view range.
+
+        This function is called when the view range of the spectrum plot changes. It updates the
+        spectrum region to match the new view range, ensuring that the selected region is correctly
+        displayed on the spectrum plot.
+
+        Args:
+            window: The window object related to the view range.
+            viewRange: A tuple containing the new view range.
+
+        Returns:
+            None
+
+        """
         # print("updateSpecRegion")
         rng = viewRange[0]
         self.spectrumRegion.setRegion(rng)
 
     def changeRegionRange(self):
+        """
+        Update the region range based on the user's interaction.
+
+        This function is called when the user adjusts the region selection on the peak plot.
+        It calculates the low and high energy values in keV based on pixel positions and
+        updates the item's attributes and the displayed values in the user interface.
+
+        Returns:
+            None
+
+        """
         # print("changeReagionRange")
         lowPx, highPx = self.peakRegion.getRegion()
         lowKev = round(CALCULATION.px_to_ev(lowPx), 4)
@@ -274,12 +463,41 @@ class Ui_PeakSearchWindow(QtWidgets.QMainWindow):
         self.updateItem(currentRow, lowKev, highKev, intensity)
 
     def updateItem(self, index, lowKev, highKev, intensity):
+        """
+        Update an item's attributes with new values.
+
+        This function is responsible for updating the attributes of an element item with
+        the provided low and high energy values and intensity. It is called when a change
+        is made to the region selection in the user interface.
+
+        Args:
+            index: The index of the item to be updated.
+            lowKev: The new low energy value in keV.
+            highKev: The new high energy value in keV.
+            intensity: The new intensity value.
+
+        Returns:
+            None
+
+        """
         # print("updateItem")
         self.items[index]["low_Kev"] = lowKev
         self.items[index]["high_Kev"] = highKev
         self.items[index]["intensity"] = intensity
 
     def openPopUp(self, event):
+        """
+        Handle the event when the user opens a pop-up menu in response to a mouse event.
+
+        This function is responsible for creating and displaying a context menu when the
+        right mouse button is clicked within the peak plot.
+
+        Args:
+            event: The mouse event object.
+
+        Returns:
+            None
+        """
         # print("openPopUp")
         ev = CALCULATION.px_to_ev(int(self.mousePoint.x()))
         if event.button() == QtCore.Qt.RightButton:
@@ -294,6 +512,15 @@ class Ui_PeakSearchWindow(QtWidgets.QMainWindow):
                         menu.addAction(sym)
 
     def writeToTable(self):
+        """
+        Update the table with information about active elements.
+
+        This function populates the table in the user interface with information about active
+        elements, such as their symbols, radiation types, energy values, and intensity.
+
+        Returns:
+            None
+        """
         # print("writeToTable")
         if not (self.dfElements[self.dfElements["active"] == 1].empty):
             self.form.setColumnCount(10)
@@ -326,6 +553,18 @@ class Ui_PeakSearchWindow(QtWidgets.QMainWindow):
                 self.setItem(item)
 
     def actionClicked(self, action):
+        """
+        Handle the user's click on a specific action within the context menu.
+
+        This function is called when the user clicks on a specific action within the context
+        menu to activate or deactivate an element.
+
+        Args:
+            action: The QAction object representing the user's selection.
+
+        Returns:
+            None
+        """
         # print("actionCllicked")
         item = dict()  # init the item dictionary
         item["symbol"] = action.text()
@@ -338,6 +577,19 @@ class Ui_PeakSearchWindow(QtWidgets.QMainWindow):
         self.initItem(item, index)
 
     def initItem(self, item, index):
+        """
+        Initialize an item with information from the context menu.
+
+        This function initializes an item with details about an element selected from the
+        context menu and updates its properties.
+
+        Args:
+            item: A dictionary containing information about the element.
+            index: The index of the element in the data.
+
+        Returns:
+            None
+        """
         # print("initItem")
         item["specLines"] = self.findLines(index)
         for line in item["specLines"]:
@@ -366,6 +618,18 @@ class Ui_PeakSearchWindow(QtWidgets.QMainWindow):
         self.setRegion(item)
 
     def setItem(self, item):
+        """
+        Set an item in the table with information about an element.
+
+        This function creates and displays a new item in the table with information about
+        an element, including its symbol, radiation type, energy values, and status.
+
+        Args:
+            item: A dictionary containing information about the element.
+
+        Returns:
+            None
+        """
         # print("setItem")
         self.removeButton = QtWidgets.QPushButton(
             icon=QtGui.QIcon(icon["cross"]))
@@ -414,6 +678,15 @@ class Ui_PeakSearchWindow(QtWidgets.QMainWindow):
         self.addItemToForm()
 
     def addItemToForm(self):
+        """
+        Add an item to the table in the user interface.
+
+        This function adds a new item to the table in the user interface, updating the table
+        with information about active elements.
+
+        Returns:
+            None
+        """
         # print("addItemToForm")
         self.form.blockSignals(True)
         self.form.setRowCount(self.form.rowCount() + 1)
@@ -432,6 +705,18 @@ class Ui_PeakSearchWindow(QtWidgets.QMainWindow):
         self.form.blockSignals(False)
 
     def setRegion(self, item):
+        """
+        Set the region in the peak plot.
+
+        This function sets the region in the peak plot based on the energy values of an
+        element.
+
+        Args:
+            item: A dictionary containing information about the element.
+
+        Returns:
+            None
+        """
         # print("setRegion")
         lowPx = CALCULATION.ev_to_px(item["low_Kev"])
         highPx = CALCULATION.ev_to_px(item["high_Kev"])
@@ -441,6 +726,15 @@ class Ui_PeakSearchWindow(QtWidgets.QMainWindow):
         self.spectrumRegion.setRegion([lowPx - 10, highPx + 10])
 
     def statusChanged(self):
+        """
+        Handle changes in the status of an element.
+
+        This function is called when the user changes the status (activates or deactivates)
+        an element, updating the element's appearance and behavior.
+
+        Returns:
+            None
+        """
         # print("statusChanged")
         currentRow = self.form.currentRow()
         statusItem = self.form.item(currentRow, 8)
@@ -460,6 +754,18 @@ class Ui_PeakSearchWindow(QtWidgets.QMainWindow):
         self.form.blockSignals(False)
 
     def activeItem(self, item):
+        """
+        Activate an element and update its appearance.
+
+        This function activates an element and updates its appearance, including changing the
+        pen style for associated lines in the plots.
+
+        Args:
+            item: A dictionary containing information about the element.
+
+        Returns:
+            None
+        """
         # print("activeItem")
         SQLITE.activeElement(self.condition, item)
         item["active"] = True
@@ -473,6 +779,18 @@ class Ui_PeakSearchWindow(QtWidgets.QMainWindow):
             self.peakPlot.addItem(line)
 
     def deactiveItem(self, item):
+        """
+        Deactivate an element and update its appearance.
+
+        This function deactivates an element and updates its appearance, including changing
+        the pen style for associated lines in the plots.
+
+        Args:
+            item: A dictionary containing information about the element.
+
+        Returns:
+            None
+        """
         # print("deactiveItem")
         SQLITE.deactiveElement(item)
         item["active"] = False
@@ -486,6 +804,15 @@ class Ui_PeakSearchWindow(QtWidgets.QMainWindow):
             self.peakPlot.addItem(line)
 
     def hide(self):
+        """
+        Hide or unhide an element in the plots.
+
+        This function allows the user to hide or unhide an element's lines in the plots, 
+        depending on its current visibility.
+
+        Returns:
+            None
+        """
         # print("hide")
         currentRow = self.form.currentRow()
         hideButton = self.form.cellWidget(currentRow, 1)
@@ -506,6 +833,18 @@ class Ui_PeakSearchWindow(QtWidgets.QMainWindow):
             item["hide"] = True
 
     def keyPressEvent(self, event):
+        """
+        Handle key press events, including deleting rows from the table.
+
+        This function handles key press events, and if the delete key is pressed, it allows
+        the user to remove rows from the table.
+
+        Args:
+            event: The key press event.
+
+        Returns:
+            None
+        """
         # print("keyPressEvent")
         if event.key() == QtCore.Qt.Key_Delete:
             self.removeRow()
@@ -514,6 +853,15 @@ class Ui_PeakSearchWindow(QtWidgets.QMainWindow):
 
     # @runtime_monitor
     def removeRow(self):
+        """
+        Remove a row from the table and deactivate the corresponding element.
+
+        This function removes a selected row from the table in the user interface and
+        deactivates the corresponding element, including updating the plots.
+
+        Returns:
+            None
+    """
         # print("removeRow")
         row = self.form.currentRow()
         item = self.items[row]
@@ -541,6 +889,15 @@ class Ui_PeakSearchWindow(QtWidgets.QMainWindow):
                 self.setupForm()
 
     def setupForm(self):
+        """
+        Set up the table in the user interface.
+
+        This function configures the appearance and headers of the table in the user
+        interface, adjusting the column headers based on the current state of the table.
+
+        Returns:
+            None
+        """
         # print("setupForm")
         headers = [
             "",
@@ -572,6 +929,18 @@ class Ui_PeakSearchWindow(QtWidgets.QMainWindow):
             )
 
     def findLines(self, index):
+        """
+        Find lines associated with elements.
+
+        This function finds and returns lines associated with the elements specified by
+        their index.
+
+        Args:
+            index: The index of the elements in the data.
+
+        Returns:
+            List of lines associated with the elements.
+        """
         # print("findLines")
         lines = []
         for i in index:
@@ -1046,7 +1415,7 @@ if __name__ == "__main__":
     size = screen.size()
     # app.setStyleSheet(tr.getString(r"F:\CSAN\XRF\Text Files\style.txt"))
     app.setWindowIcon(QtGui.QIcon(icon["CSAN"]))
-    MainWindow = Ui_PlotWindow()
+    MainWindow = Ui_PeakSearchWindow()
     MainWindow.setupUi()
     MainWindow.show()
     sys.exit(app.exec())
