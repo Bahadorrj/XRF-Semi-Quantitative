@@ -6,7 +6,6 @@ from pyqtgraph import (ColorButton, InfiniteLine,
                        InfLineLabel)
 from pathlib import Path
 import numpy as np
-import functools
 import time
 import sys
 import os
@@ -206,7 +205,7 @@ class Ui_PeakSearchWindow(QtWidgets.QMainWindow):
         self.cordinateLabel = QtWidgets.QLabel()
         self.mainWidget = QtWidgets.QWidget()
 
-    @runtime_monitor
+    # @runtime_monitor
     def setupUi(self):
         # window config
         self.setMinimumSize(self.windowSize)
@@ -263,7 +262,7 @@ class Ui_PeakSearchWindow(QtWidgets.QMainWindow):
 
         self.writeToTable()
 
-    @runtime_monitor
+    # @runtime_monitor
     def itemClicked(self, item):
         """
         Handle the item click event in the table.
@@ -284,8 +283,15 @@ class Ui_PeakSearchWindow(QtWidgets.QMainWindow):
             currentRow = self.form.currentRow()
             if not self.items[currentRow]['active']:
                 self.setRegion(self.items[currentRow])
+            else:
+                message_box = QtWidgets.QMessageBox()
+                message_box.setIcon(QtWidgets.QMessageBox.Warning)
+                message_box.setText(
+                    "To use the scaling system, you need to deactivate the element first.")
+                message_box.setWindowTitle("Element is Active")
+                message_box.exec_()
 
-    @runtime_monitor
+    # @runtime_monitor
     def itemChanged(self, item):
         """
         Handle item change event in the element data table.
@@ -309,7 +315,7 @@ class Ui_PeakSearchWindow(QtWidgets.QMainWindow):
         elif item.column() == 6:
             self.highKevItemChanged(item)
 
-    @runtime_monitor
+    # @runtime_monitor
     def lowKevItemChanged(self, item):
         """
         Handle the change of the low Kev value for an element in the user interface.
@@ -337,7 +343,7 @@ class Ui_PeakSearchWindow(QtWidgets.QMainWindow):
             lowKev, highKev, self.intensityRange)
         self.updateItem()
 
-    @runtime_monitor
+    # @runtime_monitor
     def highKevItemChanged(self, item):
         """
         Handle the change of the high Kev value for an element in the user interface.
@@ -465,7 +471,7 @@ class Ui_PeakSearchWindow(QtWidgets.QMainWindow):
         item["intensityItem"].setText(str(intensity))
         self.form.blockSignals(False)
 
-    @runtime_monitor
+    # @runtime_monitor
     def updateItem(self):
         """
         Update an item's attributes with new values.
@@ -749,6 +755,8 @@ class Ui_PeakSearchWindow(QtWidgets.QMainWindow):
         """
         # print("statusChanged")
         currentRow = self.form.currentRow()
+        lowKevItem = self.form.item(currentRow, 5)
+        highKevItem = self.form.item(currentRow, 6)
         statusItem = self.form.item(currentRow, 8)
         statusButton = self.form.cellWidget(currentRow, 9)
         item = self.items[currentRow]
