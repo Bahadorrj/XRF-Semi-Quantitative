@@ -13,18 +13,16 @@ import os
 from backend import *
 
 
-def runtime_monitor(input_function):
-    @functools.wraps(input_function)
-    def runtime_wrapper(*args, **kwargs):
-        start_value = time.perf_counter()
-        return_value = input_function(*args, **kwargs)
-        end_value = time.perf_counter()
-        runtime_value = end_value - start_value
+def runtime_monitor(func):
+    def wrapper(*args, **kwargs):
+        start_time = time.time()
+        result = func(*args, **kwargs)
+        end_time = time.time()
+        execution_time = end_time - start_time
         print(
-            f"Finished executing {input_function.__name__} in {runtime_value} seconds\n"
-        )
-        return return_value
-    return runtime_wrapper
+            f"Function '{func.__name__}' took {execution_time:.6f} seconds to run.")
+        return result
+    return wrapper
 
 
 class Ui_ConditionsWindow(QtWidgets.QWidget):
@@ -208,6 +206,7 @@ class Ui_PeakSearchWindow(QtWidgets.QMainWindow):
         self.cordinateLabel = QtWidgets.QLabel()
         self.mainWidget = QtWidgets.QWidget()
 
+    @runtime_monitor
     def setupUi(self):
         # window config
         self.setMinimumSize(self.windowSize)
@@ -264,6 +263,7 @@ class Ui_PeakSearchWindow(QtWidgets.QMainWindow):
 
         self.writeToTable()
 
+    @runtime_monitor
     def itemClicked(self, item):
         """
         Handle the item click event in the table.
@@ -285,6 +285,7 @@ class Ui_PeakSearchWindow(QtWidgets.QMainWindow):
             if not self.items[currentRow]['active']:
                 self.setRegion(self.items[currentRow])
 
+    @runtime_monitor
     def itemChanged(self, item):
         """
         Handle item change event in the element data table.
@@ -308,6 +309,7 @@ class Ui_PeakSearchWindow(QtWidgets.QMainWindow):
         elif item.column() == 6:
             self.highKevItemChanged(item)
 
+    @runtime_monitor
     def lowKevItemChanged(self, item):
         """
         Handle the change of the low Kev value for an element in the user interface.
@@ -333,8 +335,9 @@ class Ui_PeakSearchWindow(QtWidgets.QMainWindow):
         self.peakRegion.setRegion([CALCULATION.ev_to_px(lowKev), highPx])
         intensity = CALCULATION.intensity(
             lowKev, highKev, self.intensityRange)
-        self.updateItem(self.form.currentRow(), lowKev, highKev, intensity)
+        self.updateItem()
 
+    @runtime_monitor
     def highKevItemChanged(self, item):
         """
         Handle the change of the high Kev value for an element in the user interface.
@@ -360,7 +363,7 @@ class Ui_PeakSearchWindow(QtWidgets.QMainWindow):
         self.peakRegion.setRegion([lowPx, CALCULATION.ev_to_px(highKev)])
         intensity = CALCULATION.intensity(
             lowKev, highKev, self.intensityRange)
-        self.updateItem(self.form.currentRow(), lowKev, highKev, intensity)
+        self.updateItem()
 
     def scalePeakPlot(self):
         """
@@ -461,9 +464,9 @@ class Ui_PeakSearchWindow(QtWidgets.QMainWindow):
         item["highItem"].setText(str(highKev))
         item["intensityItem"].setText(str(intensity))
         self.form.blockSignals(False)
-        self.updateItem(currentRow, lowKev, highKev, intensity)
 
-    def updateItem(self, index, lowKev, highKev, intensity):
+    @runtime_monitor
+    def updateItem(self):
         """
         Update an item's attributes with new values.
 
@@ -472,20 +475,22 @@ class Ui_PeakSearchWindow(QtWidgets.QMainWindow):
         is made to the region selection in the user interface.
 
         Args:
-            index: The index of the item to be updated.
-            lowKev: The new low energy value in keV.
-            highKev: The new high energy value in keV.
-            intensity: The new intensity value.
+            None
 
         Returns:
             None
 
         """
         # print("updateItem")
-        self.items[index]["low_Kev"] = lowKev
-        self.items[index]["high_Kev"] = highKev
-        self.items[index]["intensity"] = intensity
+        currentRow = self.form.currentRow()
+        self.items[currentRow]["low_Kev"] = float(
+            self.form.item(currentRow, 5).text())
+        self.items[currentRow]["high_Kev"] = float(
+            self.form.item(currentRow, 6).text())
+        self.items[currentRow]["intensity"] = int(
+            self.form.item(currentRow, 7).text())
 
+    # @runtime_monitor
     def openPopUp(self, event):
         """
         Handle the event when the user opens a pop-up menu in response to a mouse event.
@@ -512,6 +517,7 @@ class Ui_PeakSearchWindow(QtWidgets.QMainWindow):
                     for sym in df["symbol"][msk].tolist():
                         menu.addAction(sym)
 
+    # @runtime_monitor
     def writeToTable(self):
         """
         Update the table with information about active elements.
@@ -553,6 +559,7 @@ class Ui_PeakSearchWindow(QtWidgets.QMainWindow):
 
                 self.setItem(item)
 
+    # @runtime_monitor
     def actionClicked(self, action):
         """
         Handle the user's click on a specific action within the context menu.
@@ -577,6 +584,7 @@ class Ui_PeakSearchWindow(QtWidgets.QMainWindow):
             self.setupForm()
         self.initItem(item, index)
 
+    # @runtime_monitor
     def initItem(self, item, index):
         """
         Initialize an item with information from the context menu.
@@ -618,6 +626,7 @@ class Ui_PeakSearchWindow(QtWidgets.QMainWindow):
         self.setItem(item)
         self.setRegion(item)
 
+    # @runtime_monitor
     def setItem(self, item):
         """
         Set an item in the table with information about an element.
@@ -678,6 +687,7 @@ class Ui_PeakSearchWindow(QtWidgets.QMainWindow):
 
         self.addItemToForm()
 
+    # @runtime_monitor
     def addItemToForm(self):
         """
         Add an item to the table in the user interface.
@@ -705,6 +715,7 @@ class Ui_PeakSearchWindow(QtWidgets.QMainWindow):
         self.form.setCurrentItem(self.elementItem)
         self.form.blockSignals(False)
 
+    # @runtime_monitor
     def setRegion(self, item):
         """
         Set the region in the peak plot.
@@ -754,6 +765,7 @@ class Ui_PeakSearchWindow(QtWidgets.QMainWindow):
             self.setRegion(item)
         self.form.blockSignals(False)
 
+    # @runtime_monitor
     def activeItem(self, item):
         """
         Activate an element and update its appearance.
@@ -768,6 +780,7 @@ class Ui_PeakSearchWindow(QtWidgets.QMainWindow):
             None
         """
         # print("activeItem")
+        self.updateItem()
         SQLITE.activeElement(self.condition, item)
         item["active"] = True
         for line in item["specLines"]:
@@ -779,6 +792,7 @@ class Ui_PeakSearchWindow(QtWidgets.QMainWindow):
             line.setPen(self.activePen)
             self.peakPlot.addItem(line)
 
+    # @runtime_monitor
     def deactiveItem(self, item):
         """
         Deactivate an element and update its appearance.
@@ -804,6 +818,7 @@ class Ui_PeakSearchWindow(QtWidgets.QMainWindow):
             line.setPen(self.deactivePen)
             self.peakPlot.addItem(line)
 
+    # @runtime_monitor
     def hide(self):
         """
         Hide or unhide an element in the plots.
@@ -833,6 +848,7 @@ class Ui_PeakSearchWindow(QtWidgets.QMainWindow):
                 self.peakPlot.removeItem(line)
             item["hide"] = True
 
+    # @runtime_monitor
     def keyPressEvent(self, event):
         """
         Handle key press events, including deleting rows from the table.
@@ -889,6 +905,7 @@ class Ui_PeakSearchWindow(QtWidgets.QMainWindow):
                 self.form.setColumnCount(7)
                 self.setupForm()
 
+    # @runtime_monitor
     def setupForm(self):
         """
         Set up the table in the user interface.
@@ -929,6 +946,7 @@ class Ui_PeakSearchWindow(QtWidgets.QMainWindow):
                 QtWidgets.QHeaderView.Stretch
             )
 
+    # @runtime_monitor
     def findLines(self, index):
         """
         Find lines associated with elements.
