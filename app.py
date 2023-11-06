@@ -1046,7 +1046,7 @@ if __name__ == "__main__":
     size = screen.size()
     # app.setStyleSheet(tr.getString(r"F:\CSAN\XRF\Text Files\style.txt"))
     app.setWindowIcon(QtGui.QIcon(icon["CSAN"]))
-    MainWindow = Ui_PeakSearchWindow()
+    MainWindow = Ui_PlotWindow()
     MainWindow.setupUi()
     MainWindow.show()
     sys.exit(app.exec())
