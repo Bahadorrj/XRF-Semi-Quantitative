@@ -1,15 +1,8 @@
+from PyQt5 import QtCore, QtGui, QtWidgets
 import numpy as np
 import pandas as pd
 import sqlite3
 import sqlalchemy
-from PyQt5 import QtCore, QtGui, QtWidgets
-from pyqtgraph import (ColorButton, InfiniteLine,
-                       PlotWidget, SignalProxy,
-                       hsvColor, mkPen,
-                       LinearRegionItem, GraphicsLayoutWidget,
-                       InfLineLabel)
-from pathlib import Path
-import os
 
 icon = {'CSAN': r"myIcons\CSAN.ico",
         'peak_search': r"myIcons\peak-search.png",
