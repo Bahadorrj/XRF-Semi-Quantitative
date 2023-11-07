@@ -6,22 +6,9 @@ from pyqtgraph import (ColorButton, InfiniteLine,
                        InfLineLabel)
 from pathlib import Path
 import numpy as np
-import time
 import sys
 import os
 from backend import *
-
-
-def runtime_monitor(func):
-    def wrapper(*args, **kwargs):
-        start_time = time.time()
-        result = func(*args, **kwargs)
-        end_time = time.time()
-        execution_time = end_time - start_time
-        print(
-            f"Function '{func.__name__}' took {execution_time:.6f} seconds to run.")
-        return result
-    return wrapper
 
 
 class Ui_ConditionsWindow(QtWidgets.QWidget):
@@ -117,9 +104,9 @@ class Ui_PeakSearchWindow(QtWidgets.QMainWindow):
     """This class represents a user interface for peak search and analysis.
 
     Args:
-        path (str): The path to the data file (default is "F:/CSAN/myFiles1/Au.txt").
-        rng (list): A list specifying the data range as [start, end] (default is [4126, 6173]).
-        condition (str): The condition label (default is "Condition 4").
+        path (str): The path to the data file.
+        rng (list): A list specifying the data range as [start, end].
+        condition (str): The condition label.
 
     Attributes:
         windowSize (QtCore.QSize): The size of the main window.
@@ -149,6 +136,7 @@ class Ui_PeakSearchWindow(QtWidgets.QMainWindow):
         setupUi(self): Set up the user interface.
         itemClicked(self, item): Handle item click event.
         itemChanged(self, item): Handle item change event.
+        headerClicked(self, column): Handle header click event.
         lowKevItemChanged(self, item): Handle low Kev item change event.
         highKevItemChanged(self, item): Handle high Kev item change event.
         scalePeakPlot(self): Scale the peak plot based on spectrum region.
@@ -167,16 +155,16 @@ class Ui_PeakSearchWindow(QtWidgets.QMainWindow):
         activeItem(self, item): Activate an item.
         deactiveItem(self, item): Deactivate an item.
         hide(self): Hide an item in the plot.
+        hideAll(self): Hide all items in the plot.
         keyPressEvent(self, event): Handle key press events.
-        removeRow(self): Remove a row from the table.
+        removeRow(self): Remove a row from the table and database.
+        removeAll(self): Remove all rows from the table and database.
         setupForm(self): Set up the table form.
         findLines(self, index): Find lines for an element.
 
     """
 
-    def __init__(
-        self, path="F:/CSAN/myFiles1/Au.txt", rng=[4126, 6173], condition="Condition 4"
-    ):
+    def __init__(self, path, rng, condition):
         super().__init__()
         self.windowSize = QtCore.QSize(
             int(size.width() * 0.75), int(size.height() * 0.75)
@@ -188,6 +176,7 @@ class Ui_PeakSearchWindow(QtWidgets.QMainWindow):
         # F:/CSAN/main/myFiles/Au.txt [4126, 6173] Condition 4
         self.intensityRange = TEXTREADER.listItems(self.path, self.range, int)
         self.px = np.arange(0, len(self.intensityRange), 1)
+        self.addedElements = list()
         # pens
         self.plotPen = mkPen("w", width=2)
         self.deactivePen = mkPen("r", width=2)
@@ -218,6 +207,7 @@ class Ui_PeakSearchWindow(QtWidgets.QMainWindow):
         self.form.setFrameShadow(QtWidgets.QFrame.Plain)
         self.form.itemChanged.connect(self.itemChanged)
         self.form.itemClicked.connect(self.itemClicked)
+        self.form.horizontalHeader().sectionClicked.connect(self.headerClicked)
         self.form.setColumnCount(7)
         self.setupForm()
 
@@ -278,14 +268,13 @@ class Ui_PeakSearchWindow(QtWidgets.QMainWindow):
         Returns:
             None
         """
-        # print("itemClicked")
         if item.column() in [5, 6]:
             currentRow = self.form.currentRow()
             if not self.items[currentRow]['active']:
                 self.setRegion(self.items[currentRow])
             else:
                 message_box = QtWidgets.QMessageBox()
-                message_box.setIcon(QtWidgets.QMessageBox.Warning)
+                message_box.setIcon(QtWidgets.QMessageBox.NoIcon)
                 message_box.setText(
                     "To use the scaling system, you need to deactivate the element first.")
                 message_box.setWindowTitle("Element is Active")
@@ -309,11 +298,31 @@ class Ui_PeakSearchWindow(QtWidgets.QMainWindow):
         Returns:
             None
         """
-        # print("itemChanged")
         if item.column() == 5:
             self.lowKevItemChanged(item)
         elif item.column() == 6:
             self.highKevItemChanged(item)
+
+    def headerClicked(self, column):
+        """
+        Handle header click event in the element data table.
+
+        It checks the column of the clicked header and delegates the handling
+        to the appropriate function based on the column:
+
+        - If the item is in column 0, it calls `removeAll()`.
+        - If the item is in column 1, it calls `changeVisibilityForAll()`.
+
+        Args:
+            column (int): The column of the clicked header.
+
+        Returns:
+            None
+        """
+        if column == 0:
+            self.removeAll()
+        elif column == 1:
+            self.changeVisibilityForAll()
 
     # @runtime_monitor
     def lowKevItemChanged(self, item):
@@ -334,7 +343,6 @@ class Ui_PeakSearchWindow(QtWidgets.QMainWindow):
             - The updated low Kev value affects the displayed region on the peak plot.
             - The calculated intensity is updated and displayed in the corresponding table cell.
         """
-        # print("lowKevItemChanged")
         highPx = self.peakRegion.getRegion()[1]
         lowKev = float(item.text())
         highKev = CALCULATION.px_to_ev(highPx)
@@ -362,7 +370,6 @@ class Ui_PeakSearchWindow(QtWidgets.QMainWindow):
             - The updated low Kev value affects the displayed region on the peak plot.
             - The calculated intensity is updated and displayed in the corresponding table cell.
         """
-        # print("highKevItemChanged")
         lowPx = self.peakRegion.getRegion()[0]
         lowKev = CALCULATION.px_to_ev(lowPx)
         highKev = float(item.text())
@@ -390,7 +397,6 @@ class Ui_PeakSearchWindow(QtWidgets.QMainWindow):
             None
 
         """
-        # print("scalePeakPlot")
         self.spectrumRegion.setZValue(10)
         minX, maxX = self.spectrumRegion.getRegion()
         self.peakPlot.setXRange(minX, maxX, padding=0)
@@ -409,7 +415,6 @@ class Ui_PeakSearchWindow(QtWidgets.QMainWindow):
             None
 
         """
-        # print("mouseMoved")
         pos = event
         if self.peakPlot.sceneBoundingRect().contains(pos):
             self.mousePoint = self.peakPlotVB.mapSceneToView(pos)
@@ -442,7 +447,6 @@ class Ui_PeakSearchWindow(QtWidgets.QMainWindow):
             None
 
         """
-        # print("updateSpecRegion")
         rng = viewRange[0]
         self.spectrumRegion.setRegion(rng)
 
@@ -458,7 +462,6 @@ class Ui_PeakSearchWindow(QtWidgets.QMainWindow):
             None
 
         """
-        # print("changeReagionRange")
         lowPx, highPx = self.peakRegion.getRegion()
         lowKev = round(CALCULATION.px_to_ev(lowPx), 4)
         highKev = round(CALCULATION.px_to_ev(highPx), 4)
@@ -487,7 +490,6 @@ class Ui_PeakSearchWindow(QtWidgets.QMainWindow):
             None
 
         """
-        # print("updateItem")
         currentRow = self.form.currentRow()
         self.items[currentRow]["low_Kev"] = float(
             self.form.item(currentRow, 5).text())
@@ -510,7 +512,6 @@ class Ui_PeakSearchWindow(QtWidgets.QMainWindow):
         Returns:
             None
         """
-        # print("openPopUp")
         ev = CALCULATION.px_to_ev(int(self.mousePoint.x()))
         if event.button() == QtCore.Qt.RightButton:
             self.peakPlotVB.menu.clear()
@@ -521,6 +522,7 @@ class Ui_PeakSearchWindow(QtWidgets.QMainWindow):
                     menu = self.peakPlotVB.menu.addMenu(type)
                     menu.triggered.connect(self.actionClicked)
                     for sym in df["symbol"][msk].tolist():
+                        self.addedElements.append(sym)
                         menu.addAction(sym)
 
     # @runtime_monitor
@@ -534,7 +536,6 @@ class Ui_PeakSearchWindow(QtWidgets.QMainWindow):
         Returns:
             None
         """
-        # print("writeToTable")
         if not (self.dfElements[self.dfElements["active"] == 1].empty):
             self.form.setColumnCount(10)
             self.setupForm()
@@ -579,7 +580,6 @@ class Ui_PeakSearchWindow(QtWidgets.QMainWindow):
         Returns:
             None
         """
-        # print("actionCllicked")
         item = dict()  # init the item dictionary
         item["symbol"] = action.text()
         item["radiation_type"] = action.parent().title()
@@ -605,7 +605,6 @@ class Ui_PeakSearchWindow(QtWidgets.QMainWindow):
         Returns:
             None
         """
-        # print("initItem")
         item["specLines"] = self.findLines(index)
         for line in item["specLines"]:
             line.setPen(self.deactivePen)
@@ -646,13 +645,12 @@ class Ui_PeakSearchWindow(QtWidgets.QMainWindow):
         Returns:
             None
         """
-        # print("setItem")
         self.removeButton = QtWidgets.QPushButton(
             icon=QtGui.QIcon(icon["cross"]))
         self.removeButton.clicked.connect(self.removeRow)
         self.hideButton = QtWidgets.QPushButton(
             icon=QtGui.QIcon(icon["unhide"]))
-        self.hideButton.clicked.connect(self.hide)
+        self.hideButton.clicked.connect(self.changeVisibility)
         self.elementItem = QtWidgets.QTableWidgetItem(item["symbol"])
         self.elementItem.setTextAlignment(QtCore.Qt.AlignCenter)
         self.elementItem.setFlags(
@@ -704,7 +702,6 @@ class Ui_PeakSearchWindow(QtWidgets.QMainWindow):
         Returns:
             None
         """
-        # print("addItemToForm")
         self.form.blockSignals(True)
         self.form.setRowCount(self.form.rowCount() + 1)
         index = self.form.rowCount() - 1
@@ -735,7 +732,6 @@ class Ui_PeakSearchWindow(QtWidgets.QMainWindow):
         Returns:
             None
         """
-        # print("setRegion")
         lowPx = CALCULATION.ev_to_px(item["low_Kev"])
         highPx = CALCULATION.ev_to_px(item["high_Kev"])
         self.peakPlot.removeItem(self.peakRegion)
@@ -753,7 +749,6 @@ class Ui_PeakSearchWindow(QtWidgets.QMainWindow):
         Returns:
             None
         """
-        # print("statusChanged")
         currentRow = self.form.currentRow()
         lowKevItem = self.form.item(currentRow, 5)
         highKevItem = self.form.item(currentRow, 6)
@@ -787,7 +782,6 @@ class Ui_PeakSearchWindow(QtWidgets.QMainWindow):
         Returns:
             None
         """
-        # print("activeItem")
         self.updateItem()
         SQLITE.activeElement(self.condition, item)
         item["active"] = True
@@ -814,7 +808,6 @@ class Ui_PeakSearchWindow(QtWidgets.QMainWindow):
         Returns:
             None
         """
-        # print("deactiveItem")
         SQLITE.deactiveElement(item)
         item["active"] = False
         for line in item["specLines"]:
@@ -827,7 +820,7 @@ class Ui_PeakSearchWindow(QtWidgets.QMainWindow):
             self.peakPlot.addItem(line)
 
     # @runtime_monitor
-    def hide(self):
+    def changeVisibility(self):
         """
         Hide or unhide an element in the plots.
 
@@ -837,7 +830,6 @@ class Ui_PeakSearchWindow(QtWidgets.QMainWindow):
         Returns:
             None
         """
-        # print("hide")
         currentRow = self.form.currentRow()
         hideButton = self.form.cellWidget(currentRow, 1)
         item = self.items[currentRow]
@@ -856,6 +848,33 @@ class Ui_PeakSearchWindow(QtWidgets.QMainWindow):
                 self.peakPlot.removeItem(line)
             item["hide"] = True
 
+    def changeVisibilityForAll(self):
+        """
+        Hide or unhide all the elements in the plots.
+
+        This function allows the user to hide or unhide all the elements in the plots, 
+        depending on the first row element visibility.
+
+        Returns:
+            None
+        """
+        state = self.items[0]['hide']
+        for i in range(len(self.items)):
+            self.items[i]['hide'] = not state
+            hideButton = self.form.cellWidget(i, 1)
+            if state:
+                hideButton.setIcon(QtGui.QIcon(icon["unhide"]))
+                for line in self.items[i]["specLines"]:
+                    self.spectrumPlot.addItem(line)
+                for line in self.items[i]["peakLines"]:
+                    self.peakPlot.addItem(line)
+            else:
+                hideButton.setIcon(QtGui.QIcon(icon["hide"]))
+                for line in self.items[i]["specLines"]:
+                    self.spectrumPlot.removeItem(line)
+                for line in self.items[i]["peakLines"]:
+                    self.peakPlot.removeItem(line)
+
     # @runtime_monitor
     def keyPressEvent(self, event):
         """
@@ -870,7 +889,6 @@ class Ui_PeakSearchWindow(QtWidgets.QMainWindow):
         Returns:
             None
         """
-        # print("keyPressEvent")
         if event.key() == QtCore.Qt.Key_Delete:
             self.removeRow()
         else:
@@ -886,14 +904,13 @@ class Ui_PeakSearchWindow(QtWidgets.QMainWindow):
 
         Returns:
             None
-    """
-        # print("removeRow")
+        """
         row = self.form.currentRow()
         item = self.items[row]
         self.deleteMessageBox = QtWidgets.QMessageBox()
         self.deleteMessageBox.setIcon(QtWidgets.QMessageBox.Warning)
         self.deleteMessageBox.setText(
-            f"{item['symbol']} will be removed. Press ok to continue"
+            f"{item['symbol']} will be removed."
         )
         self.deleteMessageBox.setWindowTitle("Warning!")
         self.deleteMessageBox.setStandardButtons(
@@ -913,6 +930,36 @@ class Ui_PeakSearchWindow(QtWidgets.QMainWindow):
                 self.form.setColumnCount(7)
                 self.setupForm()
 
+    def removeAll(self):
+        """
+        Remove all rows from the table and deactivate all the corresponding elements.
+
+        Returns:
+            None
+        """
+        self.deleteMessageBox = QtWidgets.QMessageBox()
+        self.deleteMessageBox.setIcon(QtWidgets.QMessageBox.Warning)
+        self.deleteMessageBox.setText(
+            f"All records will be removed. Note that all of the activated elements will also be deactivated.\nPress OK if you want to continue."
+        )
+        self.deleteMessageBox.setWindowTitle("Warning!")
+        self.deleteMessageBox.setStandardButtons(
+            QtWidgets.QMessageBox.Ok | QtWidgets.QMessageBox.Cancel
+        )
+        returnValue = self.deleteMessageBox.exec()
+        if returnValue == QtWidgets.QMessageBox.Ok:
+            for i in range(len(self.items)):
+                for line in self.items[i]["specLines"]:
+                    self.spectrumPlot.removeItem(line)
+                for line in self.items[i]["peakLines"]:
+                    self.peakPlot.removeItem(line)
+            self.items.clear()
+            self.form.setRowCount(0)
+        SQLITE.deactiveAll()
+        self.peakPlot.removeItem(self.peakRegion)
+        self.form.setColumnCount(7)
+        self.setupForm()
+
     # @runtime_monitor
     def setupForm(self):
         """
@@ -924,7 +971,6 @@ class Ui_PeakSearchWindow(QtWidgets.QMainWindow):
         Returns:
             None
         """
-        # print("setupForm")
         headers = [
             "",
             "",
@@ -968,7 +1014,6 @@ class Ui_PeakSearchWindow(QtWidgets.QMainWindow):
         Returns:
             List of lines associated with the elements.
         """
-        # print("findLines")
         lines = []
         for i in index:
             line = InfiniteLine()
@@ -1442,7 +1487,7 @@ if __name__ == "__main__":
     size = screen.size()
     # app.setStyleSheet(tr.getString(r"F:\CSAN\XRF\Text Files\style.txt"))
     app.setWindowIcon(QtGui.QIcon(icon["CSAN"]))
-    MainWindow = Ui_PeakSearchWindow()
+    MainWindow = Ui_PlotWindow()
     MainWindow.setupUi()
     MainWindow.show()
     sys.exit(app.exec())
