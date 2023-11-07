@@ -1032,8 +1032,50 @@ class Ui_PeakSearchWindow(QtWidgets.QMainWindow):
 
 
 class Ui_PlotWindow(QtWidgets.QMainWindow):
+    """
+    This class represents the main user interface for a plot window.
+
+    Attributes:
+        xLim (int): The x-axis limit for the plot.
+        yLim (int): The y-axis limit for the plot.
+        colorIndex (float): The index for color selection.
+        addedFiles (dict): A dictionary to store information about added files.
+        windowSize (QSize): The size of the main window.
+        toolbar (QToolBar): The toolbar for user actions.
+        statusbar (QStatusBar): The status bar for messages.
+        actionOpen (QAction): Action to open files.
+        actionPeakSearch (QAction): Action to perform peak search.
+        actionConditions (QAction): Action to manage conditions.
+        mainLayout (QGridLayout): The main layout of the user interface.
+        mainWidget (QWidget): The main widget for the window.
+        curvePlot (PlotWidget): The plot widget for displaying data.
+        form (QTreeWidget): The tree widget to display file and condition information.
+        customMenu (QMenu): Custom context menu for the tree widget.
+        actionDelete (QAction): Action to delete items.
+        actionDirectory (QAction): Action to open the file location.
+        cordinateLabel (QLabel): Label to display cursor coordinates on the plot.
+
+    Methods:
+        setupUi(self): Set up the user interface components and their configurations.
+        openDirectory(self): Open the file location of a selected item.
+        remove(self): Remove selected items from the tree widget and update the plot.
+        showContextMenu(self, position): Display a context menu at a specified position.
+        openFilesDialog(self): Open a file dialog to select and initialize new items.
+        initItem(self, file): Initialize a new item based on the selected file.
+        plotFiles(self): Plot the selected files and conditions on the plot widget.
+        openPeakSearch(self, item): Open a peak search window for a selected item.
+        openConditions(self): Open a conditions window for managing conditions.
+        itemClicked(self, item): Handle item selection in the tree widget.
+        itemChanged(self, item): Handle changes in item check states.
+        mouseMoved(self, e): Update the cursor coordinates when the mouse is moved over the plot.
+    """
+
     def __init__(self):
         super().__init__()
+        self.xLim = 0
+        self.yLim = 0
+        self.colorIndex = 0
+        self.addedFiles = {}
         self.windowSize = QtCore.QSize(
             int(size.width() * 0.75), int(size.height() * 0.75)
         )
@@ -1050,13 +1092,6 @@ class Ui_PlotWindow(QtWidgets.QMainWindow):
         self.actionDelete = QtWidgets.QAction()
         self.actionDirectory = QtWidgets.QAction()
         self.cordinateLabel = QtWidgets.QLabel()
-        self.proxy = SignalProxy(
-            self.curvePlot.scene().sigMouseMoved, rateLimit=60, slot=self.mouseMoved
-        )
-        self.xLim = 0
-        self.yLim = 0
-        self.colorIndex = 0
-        self.addedFiles = {}
 
     def setupUi(self):
         # window config
@@ -1118,6 +1153,9 @@ class Ui_PlotWindow(QtWidgets.QMainWindow):
                                 """,
         )
         self.curvePlot.showGrid(x=True, y=True)
+        self.proxy = SignalProxy(
+            self.curvePlot.scene().sigMouseMoved, rateLimit=60, slot=self.mouseMoved
+        )
 
         # form config
         self.form.setFixedWidth(int(self.windowSize.width() * 0.25))
@@ -1139,6 +1177,9 @@ class Ui_PlotWindow(QtWidgets.QMainWindow):
         self.setCentralWidget(self.mainWidget)
 
     def openDirectory(self):
+        """
+        Open the file location of a selected item from the form.
+        """
         item = self.form.selectedItems()[0]
         path = self.addedFiles[self.form.indexOfTopLevelItem(item)]["path"]
         while True:
@@ -1148,6 +1189,9 @@ class Ui_PlotWindow(QtWidgets.QMainWindow):
         os.startfile(path)
 
     def remove(self):
+        """
+        Remove a selected item from the form and update the plot.
+        """
         item = self.form.selectedItems()[0]
         index = self.form.indexOfTopLevelItem(item)
         self.form.takeTopLevelItem(index)
@@ -1155,11 +1199,20 @@ class Ui_PlotWindow(QtWidgets.QMainWindow):
         self.plotFiles()
 
     def showContextMenu(self, position):
+        """
+        Display a context menu for the selected item at the specified position.
+
+        Args:
+            position (QPoint): The position where the context menu should be displayed.
+        """
         item = self.form.itemAt(position)
         if self.form.indexOfTopLevelItem(item) >= 0:
             self.customMenu.exec_(self.form.mapToGlobal(position))
 
     def openFilesDialog(self):
+        """
+        Open a file dialog for selecting and initializing new items in the form.
+        """
         self.fileDialog = QtWidgets.QFileDialog()
         self.fileDialog.setFileMode(QtWidgets.QFileDialog.AnyFile)
         self.fileDialog.setNameFilter("Texts (*.txt)")
@@ -1167,6 +1220,12 @@ class Ui_PlotWindow(QtWidgets.QMainWindow):
         self.fileDialog.fileSelected.connect(self.initItem)
 
     def initItem(self, file):
+        """
+        Initialize a new item based on the selected file, including adding conditions and color buttons.
+
+        Args:
+            file (str): The path of the selected file.
+        """
         fileItem = QtWidgets.QTreeWidgetItem()
         fileName = Path(file).stem
         fileItem.setText(0, fileName)
@@ -1200,6 +1259,9 @@ class Ui_PlotWindow(QtWidgets.QMainWindow):
         self.addedFiles[fileName] = properties
 
     def plotFiles(self):
+        """
+        Plot the selected files and conditions on the curve plot.
+        """
         self.curvePlot.clear()
         for properties in self.addedFiles.values():
             for index, condition in enumerate(properties["conditions"].values()):
@@ -1220,6 +1282,12 @@ class Ui_PlotWindow(QtWidgets.QMainWindow):
                     self.curvePlot.plot(x=px, y=intensity, pen=pen)
 
     def openPeakSearch(self, item):
+        """
+        Open a peak search window for the selected item.
+
+        Args:
+            item (QTreeWidgetItem): The selected item in the form.
+        """
         if self.form.indexOfTopLevelItem(item) == -1:
             itemText = item.text(1)
             topLevelText = item.parent().text(0)
@@ -1232,11 +1300,20 @@ class Ui_PlotWindow(QtWidgets.QMainWindow):
             self.peakSearchWindow.show()
 
     def openConditions(self):
+        """
+        Open a conditions window for managing conditions.
+        """
         self.conditionsWindow = Ui_ConditionsWindow()
         self.conditionsWindow.setupUi()
         self.conditionsWindow.show()
 
     def itemClicked(self, item):
+        """
+        Handle item selection in the form and enable or disable the 'Peak Search' action accordingly.
+
+        Args:
+            item (QTreeWidgetItem): The selected item in the form.
+        """
         for i in range(self.form.topLevelItemCount()):
             item = self.form.topLevelItem(i)
             if item.isSelected():
@@ -1249,6 +1326,12 @@ class Ui_PlotWindow(QtWidgets.QMainWindow):
                     break
 
     def itemChanged(self, item):
+        """
+        Handle changes in item check states and update the plot accordingly.
+
+        Args:
+            item (QTreeWidgetItem): The item for which the check state has changed.
+        """
         topLevelIndex = self.form.indexOfTopLevelItem(item)
         if topLevelIndex != -1:
             if item.checkState(0) != 0:
@@ -1279,6 +1362,12 @@ class Ui_PlotWindow(QtWidgets.QMainWindow):
         self.plotFiles()
 
     def mouseMoved(self, e):
+        """
+        Update the cursor coordinates when the mouse is moved over the plot.
+        
+        Args:
+            e (list): A list containing information about the mouse event.
+        """
         pos = e[0]
         if self.curvePlot.sceneBoundingRect().contains(pos):
             mousePoint = self.curvePlot.getPlotItem().vb.mapSceneToView(pos)
