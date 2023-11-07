@@ -2,7 +2,7 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 import numpy as np
 import pandas as pd
 import sqlite3
-import sqlalchemy
+import time
 
 icon = {'CSAN': r"myIcons\CSAN.ico",
         'peak_search': r"myIcons\peak-search.png",
@@ -17,12 +17,20 @@ icon = {'CSAN': r"myIcons\CSAN.ico",
 Addr = {'dbFundamentals': r"myFiles\fundamentals.db",
         'dbTables': r"myFiles\tables.db"}
 
-host = '127.0.0.1'
-user = 'CSAN'
-password = 'X-Ray2023'
-
 A0 = -0.0255
 A1 = 0.01491
+
+
+def runtime_monitor(func):
+    def wrapper(*args, **kwargs):
+        start_time = time.time()
+        result = func(*args, **kwargs)
+        end_time = time.time()
+        execution_time = end_time - start_time
+        print(
+            f"Function '{func.__name__}' took {execution_time:.6f} seconds to run.")
+        return result
+    return wrapper
 
 
 class SQLITE:
@@ -69,69 +77,15 @@ class SQLITE:
         cur.execute(query)
         conn.commit()
 
-
-class MYSQL:
-    def read(host, dbName, user, password, tableName):
-        engine = sqlalchemy.create_engine(
-            f"mysql+mysqldb://{user}:{password}@{host}/{dbName}"
-        )
-        df = pd.read_sql(f"SELECT * FROM {tableName}", engine)
-        return df
-
-    def activeElement(host, user, password, condition, item):
-        engine = sqlalchemy.create_engine(
-            f"mysql+mysqldb://{user}:{password}@{host}/fundamentals"
-        )
-        with engine.connect() as conn:
-            dfGeneralData = pd.read_excel(
-                Addr['xlsxGeneralData'],
-                'sheet1'
-            )
-            sym = item['sym']
-            type = item['type']
-            intensity = item['intensity']
-            row = dfGeneralData[
-                np.logical_and(
-                    dfGeneralData['Sym'] == sym,
-                    dfGeneralData['Type'] == type
-                )
-            ]
-            query = f"""
-                INSERT INTO elements (
-                    atomic_number,
-                    name,
-                    symbol,
-                    radiation_type,
-                    Kev,
-                    low_Kev,
-                    high_Kev,
-                    intensity,
-                    condition_id
-                )
-                VALUES (
-                    {row['Atomic no.'].values[0]},
-                    '{row['name'].values[0]}',
-                    '{row['Sym'].values[0]}',
-                    '{type}',
-                    {row['Kev'].values[0]},
-                    {row['Low'].values[0]},
-                    {row['High'].values[0]},
-                    {intensity},
-                    (SELECT condition_id FROM conditions
-                    WHERE conditions.name = '{condition}')
-                )"""
-            conn.execute(sqlalchemy.text(query))
-            conn.commit()
-
-    def deactiveElement(host, user, password, sym):
-        engine = sqlalchemy.create_engine(
-            f"mysql+mysqldb://{user}:{password}@{host}/fundamentals"
-        )
-        with engine.connect() as conn:
-            query = f"""DELETE FROM elements
-                    WHERE symbol = '{sym}'"""
-            conn.execute(sqlalchemy.text(query))
-            conn.commit()
+    def deactiveAll():
+        conn = sqlite3.connect(Addr['dbFundamentals'])
+        cur = conn.cursor()
+        query = f"""
+                UPDATE elements
+                SET active = 0;
+            """
+        cur.execute(query)
+        conn.commit()
 
 
 class TEXTREADER:
