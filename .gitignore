@@ -199,8 +199,8 @@ myIcons/
 *.zip
 *.xlsx
 test.py
-<<<<<<< HEAD
 *.zip
-=======
 *.vscode
->>>>>>> 38ea56ac0a6cadcec61b1b2c5a773d7613d5111a
+additional/
+packenv/
+Exe/
