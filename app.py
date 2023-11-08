@@ -177,11 +177,11 @@ class Ui_PeakSearchWindow(QtWidgets.QMainWindow):
         self.intensityRange = TEXTREADER.listItems(self.path, self.range, int)
         self.px = np.arange(0, len(self.intensityRange), 1)
         self.addedElements = list()
+        self.items = []
         # pens
         self.plotPen = mkPen("w", width=2)
         self.deactivePen = mkPen("r", width=2)
         self.activePen = mkPen("g", width=2)
-        self.items = []
         self.mainLayout = QtWidgets.QVBoxLayout()
         self.form = QtWidgets.QTableWidget()
         self.graph = GraphicsLayoutWidget()
@@ -515,14 +515,17 @@ class Ui_PeakSearchWindow(QtWidgets.QMainWindow):
         ev = CALCULATION.px_to_ev(int(self.mousePoint.x()))
         if event.button() == QtCore.Qt.RightButton:
             self.peakPlotVB.menu.clear()
-            df = CALCULATION.findElementParam(ev, self.dfElements)
+            greaterThanLow = self.dfElements['low_Kev'] < ev
+            smallerThanHigh = ev < self.dfElements['high_Kev']
+            msk = np.logical_and(greaterThanLow, smallerThanHigh)
+            df = self.dfElements[msk]
+            # print(df)
             for type in ["Ka", "Kb", "La", "Lb", "Ma"]:
-                msk = df["radiation_type"] == type
-                if df["symbol"][msk].empty is False:
+                df = df[df["radiation_type"] == type]
+                if df["symbol"].empty is False:
                     menu = self.peakPlotVB.menu.addMenu(type)
                     menu.triggered.connect(self.actionClicked)
-                    for sym in df["symbol"][msk].tolist():
-                        self.addedElements.append(sym)
+                    for sym in df["symbol"].tolist():
                         menu.addAction(sym)
 
     # @runtime_monitor
@@ -580,15 +583,29 @@ class Ui_PeakSearchWindow(QtWidgets.QMainWindow):
         Returns:
             None
         """
-        item = dict()  # init the item dictionary
-        item["symbol"] = action.text()
-        item["radiation_type"] = action.parent().title()
-        index = self.dfElements[self.dfElements["symbol"]
-                                == item["symbol"]].index
-        if self.form.columnCount() == 7:
-            self.form.setColumnCount(10)
-            self.setupForm()
-        self.initItem(item, index)
+        sym = action.text()
+        if sym in self.addedElements:
+            self.deleteMessageBox = QtWidgets.QMessageBox()
+            self.deleteMessageBox.setIcon(QtWidgets.QMessageBox.Information)
+            self.deleteMessageBox.setText(
+                f"{sym} is already added to the table."
+            )
+            self.deleteMessageBox.setWindowTitle("Duplicate  element!")
+            self.deleteMessageBox.setStandardButtons(
+                QtWidgets.QMessageBox.Ok
+            )
+            self.deleteMessageBox.exec()
+        else:
+            self.addedElements.append(sym)
+            item = dict()  # init the item dictionary
+            item["symbol"] = sym
+            item["radiation_type"] = action.parent().title()
+            index = self.dfElements[self.dfElements["symbol"]
+                                    == item["symbol"]].index
+            if self.form.columnCount() == 7:
+                self.form.setColumnCount(10)
+                self.setupForm()
+            self.initItem(item, index)
 
     # @runtime_monitor
     def initItem(self, item, index):
