@@ -1,7 +1,7 @@
 from PyQt5 import QtCore, QtGui, QtWidgets
 from pyqtgraph import (ColorButton, InfiniteLine,
                        PlotWidget, SignalProxy,
-                       hsvColor, mkPen,
+                       mkColor, mkPen,
                        LinearRegionItem, GraphicsLayoutWidget,
                        InfLineLabel)
 from pathlib import Path
@@ -1074,7 +1074,8 @@ class Ui_PlotWindow(QtWidgets.QMainWindow):
         super().__init__()
         self.xLim = 0
         self.yLim = 0
-        self.colorIndex = 0
+        self.colors = ["#FF0000", "#FFD700", "#00FF00", "#00FFFF", "#000080", "#0000FF", "#8B00FF",
+                       "#FF1493", "#FFC0CB", "#FF4500", "#FFFF00", "#FF00FF", "#00FF7F", "#FF7F00"]
         self.addedFiles = {}
         self.windowSize = QtCore.QSize(
             int(size.width() * 0.75), int(size.height() * 0.75)
@@ -1233,7 +1234,7 @@ class Ui_PlotWindow(QtWidgets.QMainWindow):
 
         conditionsDictionary = TEXTREADER.conditionDictionary(file)
         colorButtons = list()
-        for condition in list(conditionsDictionary.keys()):
+        for index, condition in enumerate(list(conditionsDictionary.keys())):
             conditionItem = QtWidgets.QTreeWidgetItem()
             conditionItem.setText(1, condition)
             conditionItem.setCheckState(1, QtCore.Qt.Unchecked)
@@ -1242,11 +1243,7 @@ class Ui_PlotWindow(QtWidgets.QMainWindow):
             self.form.addTopLevelItem(fileItem)
 
             button = ColorButton()
-            color = hsvColor(self.colorIndex)
-            self.colorIndex += 0.05
-            if self.colorIndex > 1:
-                self.colorIndex = 0
-            button.setColor(color)
+            button.setColor(self.colors[index])
             button.sigColorChanged.connect(self.plotFiles)
             colorButtons.append(button)
             self.form.setItemWidget(conditionItem, 2, button)
@@ -1332,14 +1329,18 @@ class Ui_PlotWindow(QtWidgets.QMainWindow):
         Args:
             item (QTreeWidgetItem): The item for which the check state has changed.
         """
+        self.form.blockSignals(True)
+        self.form.setCurrentItem(item)
         topLevelIndex = self.form.indexOfTopLevelItem(item)
         if topLevelIndex != -1:
             if item.checkState(0) != 0:
-                for state in self.addedFiles[item.text(0)]["conditions"].values():
+                for index, state in enumerate(self.addedFiles[item.text(0)]["conditions"].values()):
                     state["active"] = True
+                    item.child(index).setCheckState(1, QtCore.Qt.Checked)
             else:
-                for state in self.addedFiles[item.text(0)]["conditions"].values():
+                for index, state in enumerate(self.addedFiles[item.text(0)]["conditions"].values()):
                     state["active"] = False
+                    item.child(index).setCheckState(1, QtCore.Qt.Unchecked)
         else:
             topLevel = item.parent()
             if item.checkState(1) != 0:
@@ -1360,11 +1361,12 @@ class Ui_PlotWindow(QtWidgets.QMainWindow):
                 topLevel.setCheckState(0, QtCore.Qt.Checked)
 
         self.plotFiles()
+        self.form.blockSignals(False)
 
     def mouseMoved(self, e):
         """
         Update the cursor coordinates when the mouse is moved over the plot.
-        
+
         Args:
             e (list): A list containing information about the mouse event.
         """
@@ -1574,7 +1576,6 @@ if __name__ == "__main__":
     app = QtWidgets.QApplication(sys.argv)
     screen = app.primaryScreen()
     size = screen.size()
-    # app.setStyleSheet(tr.getString(r"F:\CSAN\XRF\Text Files\style.txt"))
     app.setWindowIcon(QtGui.QIcon(icon["CSAN"]))
     MainWindow = Ui_PlotWindow()
     MainWindow.setupUi()
