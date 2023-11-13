@@ -172,12 +172,6 @@ class CALCULATION:
             intensity.append(temp)
         return intensity
 
-    def findElementParam(ev, dfElements):
-        greaterThanLow = dfElements['low_Kev'] < ev
-        smallerThanHigh = ev < dfElements['high_Kev']
-        msk = np.logical_and(greaterThanLow, smallerThanHigh)
-        return dfElements[msk]
-
 
 class FLOATDELEGATE(QtWidgets.QItemDelegate):
     # a class only for getting float inputs from the user
