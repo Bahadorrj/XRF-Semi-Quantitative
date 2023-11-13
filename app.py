@@ -40,7 +40,7 @@ class Ui_ElementsWindow(QtWidgets.QWidget):
             'High Kev',
             'Intensity',
             'Active',
-            'Actived in'
+            'Activated in'
         ]
         self.form.setHorizontalHeaderLabels(headers)
         self.form.horizontalHeader().setSectionResizeMode(QtWidgets.QHeaderView.Stretch)
@@ -55,34 +55,42 @@ class Ui_ElementsWindow(QtWidgets.QWidget):
                 str(self.dfElements.at[row, 'atomic_number'])
             )
             self.atomicNoItem.setTextAlignment(QtCore.Qt.AlignCenter)
+            self.atomicNoItem.setFlags(QtCore.Qt.ItemIsEnabled)
             self.nameItem = QtWidgets.QTableWidgetItem(
                 self.dfElements.at[row, 'name']
             )
             self.nameItem.setTextAlignment(QtCore.Qt.AlignCenter)
+            self.nameItem.setFlags(QtCore.Qt.ItemIsEnabled)
             self.symbolItem = QtWidgets.QTableWidgetItem(
                 self.dfElements.at[row, 'symbol']
             )
             self.symbolItem.setTextAlignment(QtCore.Qt.AlignCenter)
+            self.symbolItem.setFlags(QtCore.Qt.ItemIsEnabled)
             self.radiationItem = QtWidgets.QTableWidgetItem(
                 self.dfElements.at[row, 'radiation_type']
             )
             self.radiationItem.setTextAlignment(QtCore.Qt.AlignCenter)
+            self.radiationItem.setFlags(QtCore.Qt.ItemIsEnabled)
             self.KevItem = QtWidgets.QTableWidgetItem(
                 str(self.dfElements.at[row, 'Kev'])
             )
             self.KevItem.setTextAlignment(QtCore.Qt.AlignCenter)
+            self.KevItem.setFlags(QtCore.Qt.ItemIsEnabled)
             self.lowItem = QtWidgets.QTableWidgetItem(
                 str(self.dfElements.at[row, 'low_Kev'])
             )
             self.lowItem.setTextAlignment(QtCore.Qt.AlignCenter)
+            self.lowItem.setFlags(QtCore.Qt.ItemIsEnabled)
             self.highItem = QtWidgets.QTableWidgetItem(
                 str(self.dfElements.at[row, 'high_Kev'])
             )
             self.highItem.setTextAlignment(QtCore.Qt.AlignCenter)
+            self.highItem.setFlags(QtCore.Qt.ItemIsEnabled)
             self.intensityItem = QtWidgets.QTableWidgetItem(
                 str(self.dfElements.at[row, 'intensity'])
             )
             self.intensityItem.setTextAlignment(QtCore.Qt.AlignCenter)
+            self.intensityItem.setFlags(QtCore.Qt.ItemIsEnabled)
             active = bool(self.dfElements.at[row, 'active'])
             self.activeItem = QtWidgets.QTableWidgetItem(
                 str(active)
@@ -92,13 +100,14 @@ class Ui_ElementsWindow(QtWidgets.QWidget):
             else:
                 self.activeItem.setForeground(QtCore.Qt.red)
             self.activeItem.setTextAlignment(QtCore.Qt.AlignCenter)
-            # print(type(self.dfElements.at[row, 'condition_id']))
+            self.activeItem.setFlags(QtCore.Qt.ItemIsEnabled)
             self.conditionItem = QtWidgets.QTableWidgetItem(
                 SQLITE.getConditionNameWhere(
                     self.dfElements.at[row, 'condition_id']
                 )
             )
             self.conditionItem.setTextAlignment(QtCore.Qt.AlignCenter)
+            self.conditionItem.setFlags(QtCore.Qt.ItemIsEnabled)
             self.form.setItem(row, 0, self.atomicNoItem)
             self.form.setItem(row, 1, self.nameItem)
             self.form.setItem(row, 2, self.symbolItem)
