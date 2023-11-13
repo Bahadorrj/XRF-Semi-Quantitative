@@ -16,7 +16,10 @@ class Ui_ElementsWindow(QtWidgets.QWidget):
         self.windowSize = QtCore.QSize(
             int(size.width() * 0.5), int(size.height() * 0.3)
         )
-        self.mainLayout = QtWidgets.QHBoxLayout()
+        self.mainLayout = QtWidgets.QVBoxLayout()
+        self.filterLayout = QtWidgets.QHBoxLayout()
+        self.filterLabel = QtWidgets.QLabel()
+        self.filter = QtWidgets.QComboBox()
         self.form = QtWidgets.QTableWidget()
         self.dfElements = SQLITE.read(Addr["dbFundamentals"], "elements")
         self.rows = self.dfElements.shape[0]
@@ -26,10 +29,35 @@ class Ui_ElementsWindow(QtWidgets.QWidget):
         self.setWindowTitle("Elements")
         self.showMaximized()
 
+        self.filterLabel.setText('Filter by: ')
+
+        self.filter.addItems(['all elements', 'active elements'])
+        self.filter.currentIndexChanged.connect(self.filterTable)
+
+        self.spacerItem = QtWidgets.QSpacerItem(
+            0, 0, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum
+        )
+
+        self.filterLayout.addWidget(self.filterLabel)
+        self.filterLayout.addWidget(self.filter)
+        self.filterLayout.addItem(self.spacerItem)
+
+        self.mainLayout.addLayout(self.filterLayout)
+
         self.form.setFrameShape(QtWidgets.QFrame.Box)
         self.form.setFrameShadow(QtWidgets.QFrame.Plain)
         self.form.setColumnCount(10)
-        self.form.setRowCount(self.rows)
+        self.form.horizontalHeader().setSectionResizeMode(QtWidgets.QHeaderView.Stretch)
+        self.form.verticalHeader().setSectionResizeMode(
+            QtWidgets.QHeaderView.ResizeToContents
+        )
+
+        self.setUpTable(range(self.rows))
+
+        self.mainLayout.addWidget(self.form)
+        self.setLayout(self.mainLayout)
+
+    def setUpTable(self, rowList):
         headers = [
             'Atomic No',
             'Name',
@@ -43,14 +71,8 @@ class Ui_ElementsWindow(QtWidgets.QWidget):
             'Activated in'
         ]
         self.form.setHorizontalHeaderLabels(headers)
-        self.form.horizontalHeader().setSectionResizeMode(QtWidgets.QHeaderView.Stretch)
-        self.form.verticalHeader().setSectionResizeMode(
-            QtWidgets.QHeaderView.ResizeToContents
-        )
-        self.mainLayout.addWidget(self.form)
-        self.setLayout(self.mainLayout)
-
-        for row in range(self.rows):
+        self.form.setRowCount(len(rowList))
+        for index, row in enumerate(rowList):
             self.atomicNoItem = QtWidgets.QTableWidgetItem(
                 str(self.dfElements.at[row, 'atomic_number'])
             )
@@ -108,16 +130,25 @@ class Ui_ElementsWindow(QtWidgets.QWidget):
             )
             self.conditionItem.setTextAlignment(QtCore.Qt.AlignCenter)
             self.conditionItem.setFlags(QtCore.Qt.ItemIsEnabled)
-            self.form.setItem(row, 0, self.atomicNoItem)
-            self.form.setItem(row, 1, self.nameItem)
-            self.form.setItem(row, 2, self.symbolItem)
-            self.form.setItem(row, 3, self.radiationItem)
-            self.form.setItem(row, 4, self.KevItem)
-            self.form.setItem(row, 5, self.lowItem)
-            self.form.setItem(row, 6, self.highItem)
-            self.form.setItem(row, 7, self.intensityItem)
-            self.form.setItem(row, 8, self.activeItem)
-            self.form.setItem(row, 9, self.conditionItem)
+            self.form.setItem(index, 0, self.atomicNoItem)
+            self.form.setItem(index, 1, self.nameItem)
+            self.form.setItem(index, 2, self.symbolItem)
+            self.form.setItem(index, 3, self.radiationItem)
+            self.form.setItem(index, 4, self.KevItem)
+            self.form.setItem(index, 5, self.lowItem)
+            self.form.setItem(index, 6, self.highItem)
+            self.form.setItem(index, 7, self.intensityItem)
+            self.form.setItem(index, 8, self.activeItem)
+            self.form.setItem(index, 9, self.conditionItem)
+
+    def filterTable(self, index):
+        self.form.clear()
+        if index == 0:
+            self.setUpTable(range(self.rows))
+        else:
+            self.setUpTable(
+                self.dfElements[self.dfElements['active'] == 1].index
+            )
 
 
 class Ui_ConditionsWindow(QtWidgets.QWidget):
