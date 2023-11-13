@@ -11,7 +11,8 @@ icon = {'CSAN': r"myIcons\CSAN.ico",
         'unhide': r"myIcons\unhide.png",
         'exclamation': r"myIcons\exclamation.png",
         'open': r"myIcons\folder-horizontal.png",
-        'conditions': r"myIcons\database.png"
+        'conditions': r"myIcons\database.png",
+        'elements': r"myIcons\map.png"
         }
 
 Addr = {'dbFundamentals': r"myFiles\fundamentals.db",
@@ -86,6 +87,21 @@ class SQLITE:
             """
         cur.execute(query)
         conn.commit()
+
+    def getConditionNameWhere(id):
+        if np.isnan(id):
+            return 'Not Activated'
+        conn = sqlite3.connect(Addr['dbFundamentals'])
+        cur = conn.cursor()
+        query = f"""
+                SELECT name
+                FROM conditions
+                WHERE condition_id = {id};
+            """
+        cur.execute(query)
+        name = cur.fetchone()[0]
+        conn.commit()
+        return name
 
 
 class TEXTREADER:
@@ -195,3 +211,7 @@ class TEXTDELEGATE(QtWidgets.QItemDelegate):
         validator = QtGui.QRegExpValidator(regex)
         editor.setValidator(validator)
         return editor
+
+
+if __name__ == '__main__':
+    SQLITE.getConditionNameWhere(2)
