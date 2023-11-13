@@ -1,9 +1,8 @@
 from PyQt5 import QtCore, QtGui, QtWidgets
 from pyqtgraph import (ColorButton, InfiniteLine,
                        PlotWidget, SignalProxy,
-                       mkColor, mkPen,
-                       LinearRegionItem, GraphicsLayoutWidget,
-                       InfLineLabel)
+                       mkPen, LinearRegionItem,
+                       GraphicsLayoutWidget, InfLineLabel)
 from pathlib import Path
 import numpy as np
 import sys
@@ -575,7 +574,7 @@ class Ui_PeakSearchWindow(QtWidgets.QMainWindow):
         Handle the user's click on a specific action within the context menu.
 
         This function is called when the user clicks on a specific action within the context
-        menu to activate or deactivate an element.
+        menu to add it to the table.
 
         Args:
             action: The QAction object representing the user's selection.
