@@ -211,7 +211,3 @@ class TEXTDELEGATE(QtWidgets.QItemDelegate):
         validator = QtGui.QRegExpValidator(regex)
         editor.setValidator(validator)
         return editor
-
-
-if __name__ == '__main__':
-    SQLITE.getConditionNameWhere(2)
