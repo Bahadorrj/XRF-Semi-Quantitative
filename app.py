@@ -10,6 +10,107 @@ import os
 from backend import *
 
 
+class Ui_ElementsWindow(QtWidgets.QWidget):
+    def __init__(self):
+        super().__init__()
+        self.windowSize = QtCore.QSize(
+            int(size.width() * 0.5), int(size.height() * 0.3)
+        )
+        self.mainLayout = QtWidgets.QHBoxLayout()
+        self.form = QtWidgets.QTableWidget()
+        self.dfElements = SQLITE.read(Addr["dbFundamentals"], "elements")
+        self.rows = self.dfElements.shape[0]
+
+    def setupUi(self):
+        self.setMinimumSize(self.windowSize)
+        self.setWindowTitle("Elements")
+        self.showMaximized()
+
+        self.form.setFrameShape(QtWidgets.QFrame.Box)
+        self.form.setFrameShadow(QtWidgets.QFrame.Plain)
+        self.form.setColumnCount(10)
+        self.form.setRowCount(self.rows)
+        headers = [
+            'Atomic No',
+            'Name',
+            'Symbol',
+            'Radiation',
+            'Kev',
+            'Low Kev',
+            'High Kev',
+            'Intensity',
+            'Active',
+            'Actived in'
+        ]
+        self.form.setHorizontalHeaderLabels(headers)
+        self.form.horizontalHeader().setSectionResizeMode(QtWidgets.QHeaderView.Stretch)
+        self.form.verticalHeader().setSectionResizeMode(
+            QtWidgets.QHeaderView.ResizeToContents
+        )
+        self.mainLayout.addWidget(self.form)
+        self.setLayout(self.mainLayout)
+
+        for row in range(self.rows):
+            self.atomicNoItem = QtWidgets.QTableWidgetItem(
+                str(self.dfElements.at[row, 'atomic_number'])
+            )
+            self.atomicNoItem.setTextAlignment(QtCore.Qt.AlignCenter)
+            self.nameItem = QtWidgets.QTableWidgetItem(
+                self.dfElements.at[row, 'name']
+            )
+            self.nameItem.setTextAlignment(QtCore.Qt.AlignCenter)
+            self.symbolItem = QtWidgets.QTableWidgetItem(
+                self.dfElements.at[row, 'symbol']
+            )
+            self.symbolItem.setTextAlignment(QtCore.Qt.AlignCenter)
+            self.radiationItem = QtWidgets.QTableWidgetItem(
+                self.dfElements.at[row, 'radiation_type']
+            )
+            self.radiationItem.setTextAlignment(QtCore.Qt.AlignCenter)
+            self.KevItem = QtWidgets.QTableWidgetItem(
+                str(self.dfElements.at[row, 'Kev'])
+            )
+            self.KevItem.setTextAlignment(QtCore.Qt.AlignCenter)
+            self.lowItem = QtWidgets.QTableWidgetItem(
+                str(self.dfElements.at[row, 'low_Kev'])
+            )
+            self.lowItem.setTextAlignment(QtCore.Qt.AlignCenter)
+            self.highItem = QtWidgets.QTableWidgetItem(
+                str(self.dfElements.at[row, 'high_Kev'])
+            )
+            self.highItem.setTextAlignment(QtCore.Qt.AlignCenter)
+            self.intensityItem = QtWidgets.QTableWidgetItem(
+                str(self.dfElements.at[row, 'intensity'])
+            )
+            self.intensityItem.setTextAlignment(QtCore.Qt.AlignCenter)
+            active = bool(self.dfElements.at[row, 'active'])
+            self.activeItem = QtWidgets.QTableWidgetItem(
+                str(active)
+            )
+            if active is True:
+                self.activeItem.setForeground(QtCore.Qt.green)
+            else:
+                self.activeItem.setForeground(QtCore.Qt.red)
+            self.activeItem.setTextAlignment(QtCore.Qt.AlignCenter)
+            # print(type(self.dfElements.at[row, 'condition_id']))
+            self.conditionItem = QtWidgets.QTableWidgetItem(
+                SQLITE.getConditionNameWhere(
+                    self.dfElements.at[row, 'condition_id']
+                )
+            )
+            self.conditionItem.setTextAlignment(QtCore.Qt.AlignCenter)
+            self.form.setItem(row, 0, self.atomicNoItem)
+            self.form.setItem(row, 1, self.nameItem)
+            self.form.setItem(row, 2, self.symbolItem)
+            self.form.setItem(row, 3, self.radiationItem)
+            self.form.setItem(row, 4, self.KevItem)
+            self.form.setItem(row, 5, self.lowItem)
+            self.form.setItem(row, 6, self.highItem)
+            self.form.setItem(row, 7, self.intensityItem)
+            self.form.setItem(row, 8, self.activeItem)
+            self.form.setItem(row, 9, self.conditionItem)
+
+
 class Ui_ConditionsWindow(QtWidgets.QWidget):
     def __init__(self):
         super().__init__()
@@ -1101,6 +1202,7 @@ class Ui_PlotWindow(QtWidgets.QMainWindow):
         self.actionOpen = QtWidgets.QAction()
         self.actionPeakSearch = QtWidgets.QAction()
         self.actionConditions = QtWidgets.QAction()
+        self.actionElements = QtWidgets.QAction()
         self.mainLayout = QtWidgets.QGridLayout()
         self.mainWidget = QtWidgets.QWidget()
         self.curvePlot = PlotWidget()
@@ -1130,6 +1232,10 @@ class Ui_PlotWindow(QtWidgets.QMainWindow):
         self.actionConditions.setIcon(QtGui.QIcon(icon["conditions"]))
         self.actionConditions.setText("Conditions")
         self.actionConditions.triggered.connect(lambda: self.openConditions())
+        self.actionElements.setIcon(QtGui.QIcon(icon['elements']))
+        self.actionElements.setText("Elements")
+        self.actionElements.triggered.connect(self.openElements)
+
         self.actionDelete.setText("Delete")
         self.actionDelete.setIcon(QtGui.QIcon(icon["cross"]))
         self.actionDelete.triggered.connect(self.remove)
@@ -1148,6 +1254,7 @@ class Ui_PlotWindow(QtWidgets.QMainWindow):
         self.toolbar.addAction(self.actionOpen)
         self.toolbar.addAction(self.actionPeakSearch)
         self.toolbar.addAction(self.actionConditions)
+        self.toolbar.addAction(self.actionElements)
         self.addToolBar(self.toolbar)
 
         # statubar config
@@ -1314,11 +1421,19 @@ class Ui_PlotWindow(QtWidgets.QMainWindow):
 
     def openConditions(self):
         """
-        Open a conditions window for managing conditions.
+        Open Conditions window for managing conditions.
         """
         self.conditionsWindow = Ui_ConditionsWindow()
         self.conditionsWindow.setupUi()
         self.conditionsWindow.show()
+
+    def openElements(self):
+        """
+        Open Elements window for managing elements.
+        """
+        self.elementsWindow = Ui_ElementsWindow()
+        self.elementsWindow.setupUi()
+        self.elementsWindow.show()
 
     def itemClicked(self, item):
         """
