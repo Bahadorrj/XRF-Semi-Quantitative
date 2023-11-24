@@ -22,6 +22,9 @@ class Ui_ElementsWindow(QtWidgets.QWidget):
         self.filter = QtWidgets.QComboBox()
         self.form = QtWidgets.QTableWidget()
         self.dfElements = SQLITE.read(Addr["dbFundamentals"], "elements")
+        query = "element_id IN (SELECT element_id FROM UQ ORDER BY element_id)"
+        self.dfUQ = SQLITE.read(
+            Addr["dbFundamentals"], "elements", where=query)
         self.rows = self.dfElements.shape[0]
 
     def setupUi(self):
@@ -31,7 +34,7 @@ class Ui_ElementsWindow(QtWidgets.QWidget):
 
         self.filterLabel.setText('Filter by: ')
 
-        self.filter.addItems(['all elements', 'active elements'])
+        self.filter.addItems(['all elements', 'active elements', 'UQR'])
         self.filter.currentIndexChanged.connect(self.filterTable)
 
         self.spacerItem = QtWidgets.QSpacerItem(
@@ -47,10 +50,6 @@ class Ui_ElementsWindow(QtWidgets.QWidget):
         self.form.setFrameShape(QtWidgets.QFrame.Box)
         self.form.setFrameShadow(QtWidgets.QFrame.Plain)
         self.form.setColumnCount(10)
-        self.form.horizontalHeader().setSectionResizeMode(QtWidgets.QHeaderView.Stretch)
-        self.form.verticalHeader().setSectionResizeMode(
-            QtWidgets.QHeaderView.ResizeToContents
-        )
 
         self.setUpTable(range(self.rows))
 
@@ -72,6 +71,7 @@ class Ui_ElementsWindow(QtWidgets.QWidget):
         ]
         self.form.setHorizontalHeaderLabels(headers)
         self.form.setRowCount(len(rowList))
+        self.form.horizontalHeader().setSectionResizeMode(QtWidgets.QHeaderView.Stretch)
         for index, row in enumerate(rowList):
             self.atomicNoItem = QtWidgets.QTableWidgetItem(
                 str(self.dfElements.at[row, 'atomic_number'])
@@ -145,9 +145,13 @@ class Ui_ElementsWindow(QtWidgets.QWidget):
         self.form.clear()
         if index == 0:
             self.setUpTable(range(self.rows))
-        else:
+        elif index == 1:
             self.setUpTable(
                 self.dfElements[self.dfElements['active'] == 1].index
+            )
+        else:
+            self.setUpTable(
+                self.dfUQ.index
             )
 
 
@@ -184,9 +188,6 @@ class Ui_ConditionsWindow(QtWidgets.QWidget):
         self.form.setHorizontalHeaderLabels(headers)
         self.form.horizontalHeader().setSectionResizeMode(QtWidgets.QHeaderView.Stretch)
         self.form.setRowCount(self.dfConditions.shape[0])
-        self.form.verticalHeader().setSectionResizeMode(
-            QtWidgets.QHeaderView.ResizeToContents
-        )
         self.mainLayout.addWidget(self.form)
         self.setLayout(self.mainLayout)
 
@@ -660,7 +661,7 @@ class Ui_PeakSearchWindow(QtWidgets.QMainWindow):
             msk = np.logical_and(greaterThanLow, smallerThanHigh)
             df = self.dfElements[msk]
             # print(df)
-            for type in ["Ka", "Kb", "La", "Lb", "Ma"]:
+            for type in ["Ka", "Kb", "La", "Lb", "Ma", "Bg"]:
                 df = df[df["radiation_type"] == type]
                 if df["symbol"].empty is False:
                     menu = self.peakPlotVB.menu.addMenu(type)
@@ -683,10 +684,13 @@ class Ui_PeakSearchWindow(QtWidgets.QMainWindow):
             self.form.setColumnCount(10)
             self.setupForm()
             for i in self.dfElements[self.dfElements["active"] == 1].index:
+                id = self.dfElements.at[i, "element_id"]
+                self.addedElements.append(id)
                 item = {}
                 item["symbol"] = self.dfElements.at[i, "symbol"]
                 item["radiation_type"] = self.dfElements.at[i, "radiation_type"]
                 item["Kev"] = self.dfElements.at[i, "Kev"]
+                item["px"] = CALCULATION.ev_to_px(item["Kev"])
                 item["low_Kev"] = self.dfElements.at[i, "low_Kev"]
                 item["high_Kev"] = self.dfElements.at[i, "high_Kev"]
                 item["intensity"] = int(self.dfElements.at[i, "intensity"])
@@ -694,19 +698,21 @@ class Ui_PeakSearchWindow(QtWidgets.QMainWindow):
                     self.dfElements["symbol"] == item["symbol"]
                 ].index
                 item["specLines"] = self.findLines(index)
+                for line in item['specLines']:
+                    if line.value() == item['px']:
+                        item["specLine"] = line
+                        break
                 item["peakLines"] = self.findLines(index)
+                for line in item["peakLines"]:
+                    if line.value() == item["px"]:
+                        item["peakLine"] = line
+                        break
                 item["active"] = True
                 item["hide"] = False
-
-                for line in item["specLines"]:
-                    self.spectrumPlot.removeItem(line)
-                    line.setPen(self.activePen)
-                    self.spectrumPlot.addItem(line)
-                for line in item["peakLines"]:
-                    self.peakPlot.removeItem(line)
-                    line.setPen(self.activePen)
-                    self.peakPlot.addItem(line)
-
+                item["specLine"].setPen(self.activePen)
+                item["peakLine"].setPen(self.activePen)
+                self.spectrumPlot.addItem(item['specLine'])
+                self.peakPlot.addItem(item['peakLine'])
                 self.setItem(item)
 
     # @runtime_monitor
@@ -724,11 +730,15 @@ class Ui_PeakSearchWindow(QtWidgets.QMainWindow):
             None
         """
         sym = action.text()
-        if sym in self.addedElements:
+        radiationType = action.parent().title()
+        mask = np.logical_and(
+            self.dfElements["symbol"] == sym, self.dfElements["radiation_type"] == radiationType)
+        id = self.dfElements[mask]["element_id"].iloc[0]
+        if id in self.addedElements:
             self.deleteMessageBox = QtWidgets.QMessageBox()
             self.deleteMessageBox.setIcon(QtWidgets.QMessageBox.Information)
             self.deleteMessageBox.setText(
-                f"{sym} is already added to the table."
+                f"{sym} - {radiationType} is already added to the table."
             )
             self.deleteMessageBox.setWindowTitle("Duplicate  element!")
             self.deleteMessageBox.setStandardButtons(
@@ -736,10 +746,10 @@ class Ui_PeakSearchWindow(QtWidgets.QMainWindow):
             )
             self.deleteMessageBox.exec()
         else:
-            self.addedElements.append(sym)
+            self.addedElements.append(id)
             item = dict()  # init the item dictionary
             item["symbol"] = sym
-            item["radiation_type"] = action.parent().title()
+            item["radiation_type"] = radiationType
             index = self.dfElements[self.dfElements["symbol"]
                                     == item["symbol"]].index
             if self.form.columnCount() == 7:
@@ -762,6 +772,19 @@ class Ui_PeakSearchWindow(QtWidgets.QMainWindow):
         Returns:
             None
         """
+        mask = np.logical_and(
+            self.dfElements["symbol"] == item["symbol"],
+            self.dfElements["radiation_type"] == item["radiation_type"],
+        )
+        item["Kev"] = self.dfElements[mask]["Kev"].iloc[0]
+        item["px"] = CALCULATION.ev_to_px(item["Kev"])
+        item["low_Kev"] = self.dfElements[mask]["low_Kev"].iloc[0]
+        item["high_Kev"] = self.dfElements[mask]["high_Kev"].iloc[0]
+        item["intensity"] = CALCULATION.intensity(
+            item["low_Kev"], item["high_Kev"], self.intensityRange
+        )
+        item["active"] = False
+        item['hide'] = False
         item["specLines"] = self.findLines(index)
         for line in item["specLines"]:
             line.setPen(self.deactivePen)
@@ -772,19 +795,6 @@ class Ui_PeakSearchWindow(QtWidgets.QMainWindow):
             line.setPen(self.deactivePen)
             self.peakPlot.addItem(line)
 
-        mask = np.logical_and(
-            self.dfElements["symbol"] == item["symbol"],
-            self.dfElements["radiation_type"] == item["radiation_type"],
-        )
-
-        item["Kev"] = self.dfElements[mask]["Kev"].iloc[0]
-        item["low_Kev"] = self.dfElements[mask]["low_Kev"].iloc[0]
-        item["high_Kev"] = self.dfElements[mask]["high_Kev"].iloc[0]
-        item["intensity"] = CALCULATION.intensity(
-            item["low_Kev"], item["high_Kev"], self.intensityRange
-        )
-        item["active"] = False
-        item['hide'] = False
         self.setItem(item)
         self.setRegion(item)
 
@@ -907,8 +917,6 @@ class Ui_PeakSearchWindow(QtWidgets.QMainWindow):
             None
         """
         currentRow = self.form.currentRow()
-        lowKevItem = self.form.item(currentRow, 5)
-        highKevItem = self.form.item(currentRow, 6)
         statusItem = self.form.item(currentRow, 8)
         statusButton = self.form.cellWidget(currentRow, 9)
         item = self.items[currentRow]
@@ -944,12 +952,16 @@ class Ui_PeakSearchWindow(QtWidgets.QMainWindow):
         item["active"] = True
         for line in item["specLines"]:
             self.spectrumPlot.removeItem(line)
-            line.setPen(self.activePen)
-            self.spectrumPlot.addItem(line)
+            if line.value() == item['px']:
+                line.setPen(self.activePen)
+                item['specLine'] = line
+                self.spectrumPlot.addItem(line)
         for line in item["peakLines"]:
             self.peakPlot.removeItem(line)
-            line.setPen(self.activePen)
-            self.peakPlot.addItem(line)
+            if line.value() == item['px']:
+                line.setPen(self.activePen)
+                item['peakLine'] = line
+                self.peakPlot.addItem(line)
 
     # @runtime_monitor
     def deactiveItem(self, item):
@@ -967,12 +979,12 @@ class Ui_PeakSearchWindow(QtWidgets.QMainWindow):
         """
         SQLITE.deactiveElement(item)
         item["active"] = False
+        self.spectrumPlot.removeItem(item['specLine'])
+        self.peakPlot.removeItem(item['peakLine'])
         for line in item["specLines"]:
-            self.spectrumPlot.removeItem(line)
             line.setPen(self.deactivePen)
             self.spectrumPlot.addItem(line)
         for line in item["peakLines"]:
-            self.peakPlot.removeItem(line)
             line.setPen(self.deactivePen)
             self.peakPlot.addItem(line)
 
@@ -992,17 +1004,11 @@ class Ui_PeakSearchWindow(QtWidgets.QMainWindow):
         item = self.items[currentRow]
         if item["hide"]:
             hideButton.setIcon(QtGui.QIcon(icon["unhide"]))
-            for line in item["specLines"]:
-                self.spectrumPlot.addItem(line)
-            for line in item["peakLines"]:
-                self.peakPlot.addItem(line)
+            self.configureItem()
             item["hide"] = False
         else:
             hideButton.setIcon(QtGui.QIcon(icon["hide"]))
-            for line in item["specLines"]:
-                self.spectrumPlot.removeItem(line)
-            for line in item["peakLines"]:
-                self.peakPlot.removeItem(line)
+            self.removeItem(item)
             item["hide"] = True
 
     def changeVisibilityForAll(self):
@@ -1019,18 +1025,13 @@ class Ui_PeakSearchWindow(QtWidgets.QMainWindow):
         for i in range(len(self.items)):
             self.items[i]['hide'] = not state
             hideButton = self.form.cellWidget(i, 1)
+            item = self.items[i]
             if state:
                 hideButton.setIcon(QtGui.QIcon(icon["unhide"]))
-                for line in self.items[i]["specLines"]:
-                    self.spectrumPlot.addItem(line)
-                for line in self.items[i]["peakLines"]:
-                    self.peakPlot.addItem(line)
+                self.addItem(item)
             else:
                 hideButton.setIcon(QtGui.QIcon(icon["hide"]))
-                for line in self.items[i]["specLines"]:
-                    self.spectrumPlot.removeItem(line)
-                for line in self.items[i]["peakLines"]:
-                    self.peakPlot.removeItem(line)
+                self.removeItem(item)
 
     # @runtime_monitor
     def keyPressEvent(self, event):
@@ -1077,10 +1078,7 @@ class Ui_PeakSearchWindow(QtWidgets.QMainWindow):
         if returnValue == QtWidgets.QMessageBox.Ok:
             self.form.removeRow(row)
             SQLITE.deactiveElement(item)
-            for line in self.items[row]["specLines"]:
-                self.spectrumPlot.removeItem(line)
-            for line in self.items[row]["peakLines"]:
-                self.peakPlot.removeItem(line)
+            self.removeItem(item)
             self.items.pop(row)
             if self.form.rowCount() == 0:
                 self.peakPlot.removeItem(self.peakRegion)
@@ -1106,16 +1104,34 @@ class Ui_PeakSearchWindow(QtWidgets.QMainWindow):
         returnValue = self.deleteMessageBox.exec()
         if returnValue == QtWidgets.QMessageBox.Ok:
             for i in range(len(self.items)):
-                for line in self.items[i]["specLines"]:
-                    self.spectrumPlot.removeItem(line)
-                for line in self.items[i]["peakLines"]:
-                    self.peakPlot.removeItem(line)
+                item = self.items[i]
+                self.removeItem(item)
             self.items.clear()
             self.form.setRowCount(0)
         SQLITE.deactiveAll()
         self.peakPlot.removeItem(self.peakRegion)
         self.form.setColumnCount(7)
         self.setupForm()
+
+    def addItem(self, item):
+        if item["active"]:
+            self.spectrumPlot.addItem(item["specLine"])
+            self.peakPlot.addItem(item["peakLine"])
+        else:
+            for line in item["specLines"]:
+                self.spectrumPlot.addItem(line)
+            for line in item["peakLines"]:
+                self.peakPlot.addItem(line)
+
+    def removeItem(self, item):
+        if item["active"]:
+            self.spectrumPlot.removeItem(item["specLine"])
+            self.peakPlot.removeItem(item["peakLine"])
+        else:
+            for line in item["specLines"]:
+                self.spectrumPlot.removeItem(line)
+            for line in item["peakLines"]:
+                self.peakPlot.removeItem(line)
 
     # @runtime_monitor
     def setupForm(self):
@@ -1176,8 +1192,8 @@ class Ui_PeakSearchWindow(QtWidgets.QMainWindow):
             line = InfiniteLine()
             line.setAngle(90)
             line.setMovable(False)
-            ev = self.dfElements.at[i, "Kev"]
-            px = CALCULATION.ev_to_px(ev)
+            Kev = self.dfElements.at[i, "Kev"]
+            px = CALCULATION.ev_to_px(Kev)
             line.setValue(px)
             symLabel = InfLineLabel(
                 line, self.dfElements.at[i, "symbol"], movable=False, position=0.9
