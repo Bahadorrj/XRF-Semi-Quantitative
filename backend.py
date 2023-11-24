@@ -35,9 +35,13 @@ def runtime_monitor(func):
 
 
 class SQLITE:
-    def read(dbAddr, tableName):
+    def read(dbAddr, tableName, column='*', where=''):
         con = sqlite3.connect(dbAddr)
-        df = pd.read_sql_query(f"SELECT * FROM {tableName}", con)
+        if where == '':
+            df = pd.read_sql_query(f"SELECT {column} FROM {tableName}", con)
+        else:
+            df = pd.read_sql_query(
+                f"SELECT {column} FROM {tableName} WHERE {where}", con)
         con.close()
         return df
 
