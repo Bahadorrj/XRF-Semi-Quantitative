@@ -1004,7 +1004,7 @@ class Ui_PeakSearchWindow(QtWidgets.QMainWindow):
         item = self.items[currentRow]
         if item["hide"]:
             hideButton.setIcon(QtGui.QIcon(icon["unhide"]))
-            self.configureItem()
+            self.addItem(item)
             item["hide"] = False
         else:
             hideButton.setIcon(QtGui.QIcon(icon["hide"]))
