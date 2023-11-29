@@ -661,12 +661,13 @@ class Ui_PeakSearchWindow(QtWidgets.QMainWindow):
             msk = np.logical_and(greaterThanLow, smallerThanHigh)
             df = self.dfElements[msk]
             # print(df)
-            for type in ["Ka", "Kb", "La", "Lb", "Ma", "Bg"]:
-                df = df[df["radiation_type"] == type]
-                if df["symbol"].empty is False:
+            for type in ["Ka", "KB", "La", "LB", "Ly", "Ma", "Bg"]:
+                new = df[df["radiation_type"] == type]
+                # print(f"{type} df:\n{new}")
+                if new.empty is False:
                     menu = self.peakPlotVB.menu.addMenu(type)
                     menu.triggered.connect(self.actionClicked)
-                    for sym in df["symbol"].tolist():
+                    for sym in new["symbol"].tolist():
                         menu.addAction(sym)
 
     # @runtime_monitor
@@ -693,7 +694,7 @@ class Ui_PeakSearchWindow(QtWidgets.QMainWindow):
                 item["px"] = CALCULATION.ev_to_px(item["Kev"])
                 item["low_Kev"] = self.dfElements.at[i, "low_Kev"]
                 item["high_Kev"] = self.dfElements.at[i, "high_Kev"]
-                item["intensity"] = int(self.dfElements.at[i, "intensity"])
+                item["intensity"] = float(self.dfElements.at[i, "intensity"])
                 index = self.dfElements[
                     self.dfElements["symbol"] == item["symbol"]
                 ].index
