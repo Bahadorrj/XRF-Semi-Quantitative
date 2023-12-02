@@ -113,13 +113,17 @@ class Ui_ElementsWindow(QtWidgets.QWidget):
             )
             self.intensityItem.setTextAlignment(QtCore.Qt.AlignCenter)
             self.intensityItem.setFlags(QtCore.Qt.ItemIsEnabled)
-            active = bool(self.dfElements.at[row, 'active'])
-            self.activeItem = QtWidgets.QTableWidgetItem(
-                str(active)
-            )
-            if active is True:
+            active = self.dfElements.at[row, 'active']
+
+            if active == 1:
+                self.activeItem = QtWidgets.QTableWidgetItem(
+                    str(True)
+                )
                 self.activeItem.setForeground(QtCore.Qt.green)
             else:
+                self.activeItem = QtWidgets.QTableWidgetItem(
+                    str(False)
+                )
                 self.activeItem.setForeground(QtCore.Qt.red)
             self.activeItem.setTextAlignment(QtCore.Qt.AlignCenter)
             self.activeItem.setFlags(QtCore.Qt.ItemIsEnabled)
@@ -146,13 +150,14 @@ class Ui_ElementsWindow(QtWidgets.QWidget):
         if index == 0:
             self.setUpTable(range(self.rows))
         elif index == 1:
+            # print(self.dfElements[self.dfElements['active'] == 1].index)
             self.setUpTable(
                 self.dfElements[self.dfElements['active'] == 1].index
             )
         else:
-            self.setUpTable(
-                self.dfUQ.index
-            )
+            # print(self.dfUQ['element_id'].tolist())
+            # print(self.dfElements.at[74, "radiation_type"])
+            self.setUpTable(self.dfUQ["element_id"].index)
 
 
 class Ui_ConditionsWindow(QtWidgets.QWidget):
