@@ -113,13 +113,17 @@ class Ui_ElementsWindow(QtWidgets.QWidget):
             )
             self.intensityItem.setTextAlignment(QtCore.Qt.AlignCenter)
             self.intensityItem.setFlags(QtCore.Qt.ItemIsEnabled)
-            active = bool(self.dfElements.at[row, 'active'])
-            self.activeItem = QtWidgets.QTableWidgetItem(
-                str(active)
-            )
-            if active is True:
+            active = self.dfElements.at[row, 'active']
+
+            if active == 1:
+                self.activeItem = QtWidgets.QTableWidgetItem(
+                    str(True)
+                )
                 self.activeItem.setForeground(QtCore.Qt.green)
             else:
+                self.activeItem = QtWidgets.QTableWidgetItem(
+                    str(False)
+                )
                 self.activeItem.setForeground(QtCore.Qt.red)
             self.activeItem.setTextAlignment(QtCore.Qt.AlignCenter)
             self.activeItem.setFlags(QtCore.Qt.ItemIsEnabled)
@@ -150,9 +154,10 @@ class Ui_ElementsWindow(QtWidgets.QWidget):
                 self.dfElements[self.dfElements['active'] == 1].index
             )
         else:
-            self.setUpTable(
-                self.dfUQ.index
-            )
+            indexes = self.dfUQ["element_id"].to_list()
+            for i in range(len(indexes)):
+                indexes[i] -= 1
+            self.setUpTable(indexes)
 
 
 class Ui_ConditionsWindow(QtWidgets.QWidget):
