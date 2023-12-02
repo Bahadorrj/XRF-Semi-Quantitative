@@ -150,6 +150,7 @@ class Ui_ElementsWindow(QtWidgets.QWidget):
         if index == 0:
             self.setUpTable(range(self.rows))
         elif index == 1:
+            # print(self.dfElements[self.dfElements['active'] == 1].index)
             self.setUpTable(
                 self.dfElements[self.dfElements['active'] == 1].index
             )
