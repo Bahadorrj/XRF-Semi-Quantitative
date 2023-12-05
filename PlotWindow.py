@@ -281,7 +281,7 @@ class Window(QtWidgets.QMainWindow):
                 self.addedFiles[top_level_text]["conditions"][item_text]["range"],
                 item_text,
             )
-            self.peakSearchWindow.setupUi()
+            self.peakSearchWindow.setup_ui()
             self.peakSearchWindow.show()
 
     def open_conditions(self):
