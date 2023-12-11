@@ -283,6 +283,8 @@ class Window(QtWidgets.QMainWindow):
             )
             self.peakSearchWindow.setup_ui()
             self.peakSearchWindow.show()
+            QtWidgets.QApplication.processEvents()
+            self.peakSearchWindow.write_to_table()
 
     def open_conditions(self):
         """
