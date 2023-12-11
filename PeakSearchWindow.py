@@ -1,3 +1,4 @@
+import time
 from pathlib import Path
 
 import numpy as np
@@ -160,9 +161,8 @@ class Window(QtWidgets.QMainWindow):
         self.mainWidget.setLayout(self.mainLayout)
         self.setCentralWidget(self.mainWidget)
 
-        self.write_to_table()
-
     # @runtime_monitor
+
     def item_clicked(self, item):
         """
         Handle the item click event in the table.
@@ -368,7 +368,8 @@ class Window(QtWidgets.QMainWindow):
         low_px, high_px = self.peakRegion.getRegion()
         low_kev = round(Calculation.px_to_ev(low_px), 4)
         high_kev = round(Calculation.px_to_ev(high_px), 4)
-        intensity = Calculation.calculate_intensity_in_range(low_kev, high_kev, self.intensityRange)
+        intensity = Calculation.calculate_intensity_in_range(
+            low_kev, high_kev, self.intensityRange)
         current_row = self.form.currentRow()
         item = self.items[current_row]
         self.form.blockSignals(True)
@@ -474,6 +475,8 @@ class Window(QtWidgets.QMainWindow):
                 self.spectrumPlot.addItem(item['specLine'])
                 self.peakPlot.addItem(item['peakLine'])
                 self.set_item(item)
+                QtWidgets.QApplication.processEvents()
+                time.sleep(0.025)
 
     # @runtime_monitor
     def action_clicked(self, action):
@@ -959,6 +962,7 @@ class Window(QtWidgets.QMainWindow):
                 line, self.dfElements.at[i, "symbol"], movable=False, position=0.9
             )
             radiation_type = self.dfElements.at[i, "radiation_type"]
-            radiation_type_label = InfLineLabel(line, radiation_type, movable=False, position=0.8)
+            radiation_type_label = InfLineLabel(
+                line, radiation_type, movable=False, position=0.8)
             lines.append(line)
         return lines
