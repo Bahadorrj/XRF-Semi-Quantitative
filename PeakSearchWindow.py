@@ -10,6 +10,8 @@ import Sqlite
 import TextReader
 from Backend import addr, icon
 
+import LoadingDialog
+
 
 class Window(QtWidgets.QMainWindow):
     """This class represents a user interface for peak search and analysis.
@@ -442,8 +444,13 @@ class Window(QtWidgets.QMainWindow):
             None
         """
         if not self.dfElements[self.dfElements["active"] == 1].empty:
+            self.loading_dialog = LoadingDialog.Window()
+            self.loading_dialog.setup_ui()
+            self.loading_dialog.show()
             self.form.setColumnCount(10)
             self.setup_form()
+            size_df = self.dfElements[self.dfElements["active"] == 1].shape[0]
+            count = 0
             for i in self.dfElements[self.dfElements["active"] == 1].index:
                 element_id = self.dfElements.at[i, "element_id"]
                 self.addedElements.append(element_id)
@@ -475,8 +482,12 @@ class Window(QtWidgets.QMainWindow):
                 self.spectrumPlot.addItem(item['specLine'])
                 self.peakPlot.addItem(item['peakLine'])
                 self.set_item(item)
+                count += 1
+                if count > size_df / 2:
+                    self.loading_dialog.label.setText("Almost done!")
                 QtWidgets.QApplication.processEvents()
-                time.sleep(0.025)
+                time.sleep(0.05)
+            self.loading_dialog.close()
 
     # @runtime_monitor
     def action_clicked(self, action):
