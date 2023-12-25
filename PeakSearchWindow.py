@@ -10,9 +10,12 @@ import Sqlite
 import TextReader
 from Backend import addr, icon
 
-import LoadingDialog
+import MessegeBox
+import LoadingDialogue
+import TableWidget
 
 
+# noinspection PyUnresolvedReferences
 class Window(QtWidgets.QMainWindow):
     """This class represents a user interface for peak search and analysis.
 
@@ -42,7 +45,7 @@ class Window(QtWidgets.QMainWindow):
         spectrumRegion: Linear region for spectrum selection.
         vLine: Vertical line for mouse tracking.
         hLine: Horizontal line for mouse tracking.
-        cordinateLabel (QtWidgets.QLabel): Label for displaying mouse coordinates.
+        coordinateLabel (QtWidgets.QLabel): Label for displaying mouse coordinates.
         mainWidget (QtWidgets.QWidget): The main widget for the user interface.
 
     Methods:
@@ -79,35 +82,60 @@ class Window(QtWidgets.QMainWindow):
 
     def __init__(self, size, path, rng, condition):
         super().__init__()
+        # size
         self.windowSize = QtCore.QSize(
             int(size.width() * 0.75), int(size.height() * 0.75)
         )
-        self.dfElements = Sqlite.read(addr["dbFundamentals"], "elements")
-        self.path = path
-        self.range = rng
-        self.condition = condition
-        # F:/CSAN/main/myFiles/Au.txt [4126, 6173] Condition 4
-        self.intensityRange = TextReader.list_items(self.path, self.range, int)
-        self.px = np.arange(0, len(self.intensityRange), 1)
-        self.addedElements = list()
-        self.items = []
-        # pens
-        self.plotPen = mkPen("w", width=2)
-        self.deactivePen = mkPen("r", width=2)
-        self.activePen = mkPen("g", width=2)
+        # components
         self.mainLayout = QtWidgets.QVBoxLayout()
-        self.form = QtWidgets.QTableWidget()
+        self.form = TableWidget.Form()
         self.graph = GraphicsLayoutWidget()
         self.peakPlot = self.graph.addPlot(row=0, col=0)
         self.spectrumPlot = self.graph.addPlot(row=1, col=0)
+        self.peakPlotVB = self.peakPlot.vb
+        self.spectrumPlotVB = self.spectrumPlot.vb
         self.peakRegion = LinearRegionItem()
         self.spectrumRegion = LinearRegionItem()
         self.vLine = InfiniteLine(angle=90, movable=False)
         self.hLine = InfiniteLine(angle=0, movable=False)
-        self.cordinateLabel = QtWidgets.QLabel()
+        self.coordinateLabel = QtWidgets.QLabel()
         self.mainWidget = QtWidgets.QWidget()
+        # variables
+        self.dfElements = Sqlite.read(addr["dbFundamentals"], "elements")
+        self.path = path
+        self.range = rng
+        self.condition = condition
+        self.form_headers_labels = [
+            "Element",
+            "Type",
+            "Kev",
+            "Low Kev",
+            "High Kev",
+            "Intensity",
+            "Status"
+        ]
+        self.form_extended_labels = [
+            "",
+            "",
+            "Element",
+            "Type",
+            "Kev",
+            "Low Kev",
+            "High Kev",
+            "Intensity",
+            "Status",
+            ""
+        ]
+        # F:/CSAN/main/myFiles/Au.txt [4126, 6173] Condition 4
+        self.intensityRange = TextReader.list_items(self.path, self.range, int)
+        self.px = np.arange(0, len(self.intensityRange), 1)
+        self.addedIds = list()
+        self.items = list()
+        # pens
+        self.plotPen = mkPen("w", width=2)
+        self.deactivePen = mkPen("r", width=2)
+        self.activePen = mkPen("g", width=2)
 
-    # @runtime_monitor
     def setup_ui(self):
         # window config
         self.setMinimumSize(self.windowSize)
@@ -116,13 +144,10 @@ class Window(QtWidgets.QMainWindow):
 
         # form config
         self.form.setMaximumHeight(int(self.size().height() * 0.3))
-        self.form.setFrameShape(QtWidgets.QFrame.Box)
-        self.form.setFrameShadow(QtWidgets.QFrame.Plain)
         self.form.itemChanged.connect(self.item_changed)
         self.form.itemClicked.connect(self.item_clicked)
         self.form.horizontalHeader().sectionClicked.connect(self.header_clicked)
-        self.form.setColumnCount(7)
-        self.setup_form()
+        self.form.setup_ui(self.form_headers_labels)
 
         # graphics config
         self.peakRegion.setZValue(10)
@@ -146,24 +171,20 @@ class Window(QtWidgets.QMainWindow):
         self.peakPlot.plot(x=self.px, y=self.intensityRange, pen=self.plotPen)
         self.peakPlot.setMouseEnabled(x=False)  # Only allow zoom in Y-axis
         self.peakPlot.sigRangeChanged.connect(self.update_spectrum_region)
-        self.peakPlot.scene().sigMouseClicked.connect(self.openPopUp)
+        self.peakPlot.scene().sigMouseClicked.connect(self.open_popup)
         self.spectrumRegion.setClipItem(self.spectrumPlot)
         self.spectrumRegion.setBounds((0, max(self.px)))
         self.spectrumRegion.setRegion([0, 100])
         self.peakPlot.addItem(self.vLine, ignoreBounds=True)
         self.peakPlot.addItem(self.hLine, ignoreBounds=True)
-        self.peakPlotVB = self.peakPlot.vb
-        self.sepctrumPlotVB = self.spectrumPlot.vb
         self.peakPlotVB.scaleBy(center=(0, 0))
         self.peakPlotVB.menu.clear()
         self.mainLayout.addWidget(self.form)
         self.mainLayout.addWidget(self.graph)
-        self.mainLayout.addWidget(self.cordinateLabel)
+        self.mainLayout.addWidget(self.coordinateLabel)
 
         self.mainWidget.setLayout(self.mainLayout)
         self.setCentralWidget(self.mainWidget)
-
-    # @runtime_monitor
 
     def item_clicked(self, item):
         """
@@ -185,11 +206,11 @@ class Window(QtWidgets.QMainWindow):
             if not self.items[current_row]['active']:
                 self.set_region(self.items[current_row])
             else:
-                message_box = QtWidgets.QMessageBox()
-                message_box.setIcon(QtWidgets.QMessageBox.NoIcon)
-                message_box.setText(
-                    "To use the scaling system, you need to deactivate the element first.")
-                message_box.setWindowTitle("Element is Active")
+                message_box = MessegeBox.Dialog(
+                    QtWidgets.QMessageBox.NoIcon,
+                    "Element is Active",
+                    "To use the scaling system, you need to deactivate the element first."
+                )
                 message_box.exec_()
 
     # @runtime_monitor
@@ -257,7 +278,6 @@ class Window(QtWidgets.QMainWindow):
         """
         high_px = self.peakRegion.getRegion()[1]
         low_kev = float(item.text())
-        high_kev = Calculation.px_to_ev(high_px)
         self.peakRegion.setRegion([Calculation.ev_to_px(low_kev), high_px])
         self.update_item()
 
@@ -281,7 +301,6 @@ class Window(QtWidgets.QMainWindow):
             - The calculated intensity is updated and displayed in the corresponding table cell.
         """
         low_px = self.peakRegion.getRegion()[0]
-        low_kev = Calculation.px_to_ev(low_px)
         high_kev = float(item.text())
         self.peakRegion.setRegion([low_px, Calculation.ev_to_px(high_kev)])
         self.update_item()
@@ -322,19 +341,19 @@ class Window(QtWidgets.QMainWindow):
         """
         pos = event
         if self.peakPlot.sceneBoundingRect().contains(pos):
-            self.mousePoint = self.peakPlotVB.mapSceneToView(pos)
-            self.cordinateLabel.setText(
+            mouse_point = self.peakPlotVB.mapSceneToView(pos)
+            self.coordinateLabel.setText(
                 """<span style='font-size: 2rem'>
                         x=%0.1f,y=%0.1f,kEV= %0.2f
                     </span>"""
                 % (
-                    int(self.mousePoint.x()),
-                    int(self.mousePoint.y()),
-                    Calculation.px_to_ev(int(self.mousePoint.x())),
+                    int(mouse_point.x()),
+                    int(mouse_point.y()),
+                    Calculation.px_to_ev(int(mouse_point.x())),
                 )
             )
-            self.vLine.setPos(self.mousePoint.x())
-            self.hLine.setPos(self.mousePoint.y())
+            self.vLine.setPos(mouse_point.x())
+            self.hLine.setPos(mouse_point.y())
 
     def update_spectrum_region(self, window, viewRange):
         """
@@ -402,7 +421,7 @@ class Window(QtWidgets.QMainWindow):
             self.form.item(current_row, 7).text())
 
     # @runtime_monitor
-    def openPopUp(self, event):
+    def open_popup(self, event):
         """
         Handle the event when the user opens a pop-up menu in response to a mouse event.
 
@@ -415,17 +434,16 @@ class Window(QtWidgets.QMainWindow):
         Returns:
             None
         """
-        ev = Calculation.px_to_ev(int(self.mousePoint.x()))
+        ev = Calculation.px_to_ev(
+            int(self.peakPlotVB.mapSceneToView(event.pos()).x()))
         if event.button() == QtCore.Qt.RightButton:
             self.peakPlotVB.menu.clear()
-            greater_than_low = self.dfElements['low_Kev'] < ev
-            smaller_than_high = ev < self.dfElements['high_Kev']
+            greater_than_low = self.dfElements["low_Kev"] < ev
+            smaller_than_high = ev < self.dfElements["high_Kev"]
             msk = np.logical_and(greater_than_low, smaller_than_high)
             df = self.dfElements[msk]
-            # print(df)
             for radiation_type in ["Ka", "KB", "La", "LB", "Ly", "Ma", "Bg"]:
                 new = df[df["radiation_type"] == radiation_type]
-                # print(f"{type} df:\n{new}")
                 if new.empty is False:
                     menu = self.peakPlotVB.menu.addMenu(radiation_type)
                     menu.triggered.connect(self.action_clicked)
@@ -444,16 +462,14 @@ class Window(QtWidgets.QMainWindow):
             None
         """
         if not self.dfElements[self.dfElements["active"] == 1].empty:
-            self.loading_dialog = LoadingDialog.Window()
-            self.loading_dialog.setup_ui()
-            self.loading_dialog.show()
-            self.form.setColumnCount(10)
-            self.setup_form()
-            size_df = self.dfElements[self.dfElements["active"] == 1].shape[0]
-            count = 0
+            loading_dialog = LoadingDialogue.Window()
+            loading_dialog.use_animation(0.5)
+            loading_dialog.setup_ui(title="Please wait", label="Collecting elements")
+            loading_dialog.show()
+            self.form.setup_ui(self.form_extended_labels)
             for i in self.dfElements[self.dfElements["active"] == 1].index:
                 element_id = self.dfElements.at[i, "element_id"]
-                self.addedElements.append(element_id)
+                self.addedIds.append(element_id)
                 item = dict()
                 item["symbol"] = self.dfElements.at[i, "symbol"]
                 item["radiation_type"] = self.dfElements.at[i, "radiation_type"]
@@ -482,12 +498,9 @@ class Window(QtWidgets.QMainWindow):
                 self.spectrumPlot.addItem(item['specLine'])
                 self.peakPlot.addItem(item['peakLine'])
                 self.set_item(item)
-                count += 1
-                if count > size_df / 2:
-                    self.loading_dialog.label.setText("Almost done!")
-                QtWidgets.QApplication.processEvents()
-                time.sleep(0.05)
-            self.loading_dialog.close()
+                loading_dialog.animate_text()
+            loading_dialog.processFinished = True
+            loading_dialog.close()
 
     # @runtime_monitor
     def action_clicked(self, action):
@@ -508,27 +521,22 @@ class Window(QtWidgets.QMainWindow):
         mask = np.logical_and(
             self.dfElements["symbol"] == symbol, self.dfElements["radiation_type"] == radiation_type)
         element_id = self.dfElements[mask]["element_id"].iloc[0]
-        if element_id in self.addedElements:
-            self.deleteMessageBox = QtWidgets.QMessageBox()
-            self.deleteMessageBox.setIcon(QtWidgets.QMessageBox.Information)
-            self.deleteMessageBox.setText(
+        if element_id in self.addedIds:
+            message_box = MessegeBox.Dialog(
+                QtWidgets.QMessageBox.Information,
+                "Duplicate  element!",
                 f"{symbol} - {radiation_type} is already added to the table."
             )
-            self.deleteMessageBox.setWindowTitle("Duplicate  element!")
-            self.deleteMessageBox.setStandardButtons(
-                QtWidgets.QMessageBox.Ok
-            )
-            self.deleteMessageBox.exec()
+            message_box.exec()
         else:
-            self.addedElements.append(element_id)
+            self.addedIds.append(element_id)
             item = dict()  # init the item dictionary
             item["symbol"] = symbol
             item["radiation_type"] = radiation_type
             index = self.dfElements[self.dfElements["symbol"]
                                     == item["symbol"]].index
             if self.form.columnCount() == 7:
-                self.form.setColumnCount(10)
-                self.setup_form()
+                self.form.setup_ui(self.form_extended_labels)
             self.init_item(item, index)
 
     # @runtime_monitor
@@ -568,98 +576,64 @@ class Window(QtWidgets.QMainWindow):
         for line in item["peakLines"]:
             line.setPen(self.deactivePen)
             self.peakPlot.addItem(line)
-
         self.set_item(item)
         self.set_region(item)
 
     # @runtime_monitor
     def set_item(self, item):
-        """
-        Set an item in the table with information about an element.
-
-        This function creates and displays a new item in the table with information about
-        an element, including its symbol, radiation type, energy values, and status.
-
-        Args:
-            item: A dictionary containing information about the element.
-
-        Returns:
-            None
-        """
-        self.removeButton = QtWidgets.QPushButton(
+        items = list()
+        remove_button = QtWidgets.QPushButton(
             icon=QtGui.QIcon(icon["cross"]))
-        self.removeButton.clicked.connect(self.remove_row)
-        self.hideButton = QtWidgets.QPushButton(
+        items.append(remove_button)
+        remove_button.clicked.connect(self.remove_row)
+        hide_button = QtWidgets.QPushButton(
             icon=QtGui.QIcon(icon["unhide"]))
-        self.hideButton.clicked.connect(self.change_visibility)
-        self.elementItem = QtWidgets.QTableWidgetItem(item["symbol"])
-        self.elementItem.setTextAlignment(QtCore.Qt.AlignCenter)
-        self.elementItem.setFlags(
-            self.elementItem.flags() ^ QtCore.Qt.ItemIsEditable)
-        self.typeItem = QtWidgets.QTableWidgetItem(item["radiation_type"])
-        self.typeItem.setTextAlignment(QtCore.Qt.AlignCenter)
-        self.typeItem.setFlags(self.typeItem.flags() ^
-                               QtCore.Qt.ItemIsEditable)
-        self.KevItem = QtWidgets.QTableWidgetItem(str(item["Kev"]))
-        self.KevItem.setTextAlignment(QtCore.Qt.AlignCenter)
-        self.KevItem.setFlags(self.KevItem.flags() ^ QtCore.Qt.ItemIsEditable)
-        self.lowItem = QtWidgets.QTableWidgetItem(str(item["low_Kev"]))
-        self.lowItem.setTextAlignment(QtCore.Qt.AlignCenter)
-        self.highItem = QtWidgets.QTableWidgetItem(str(item["high_Kev"]))
-        self.highItem.setTextAlignment(QtCore.Qt.AlignCenter)
-        self.intensityItem = QtWidgets.QTableWidgetItem(str(item["intensity"]))
-        self.intensityItem.setTextAlignment(QtCore.Qt.AlignCenter)
-        self.intensityItem.setFlags(
-            self.intensityItem.flags() ^ QtCore.Qt.ItemIsEditable
+        hide_button.clicked.connect(self.change_visibility)
+        items.append(hide_button)
+        element_item = QtWidgets.QTableWidgetItem(item["symbol"])
+        element_item.setTextAlignment(QtCore.Qt.AlignCenter)
+        element_item.setFlags(
+            element_item.flags() ^ QtCore.Qt.ItemIsEditable)
+        items.append(element_item)
+        type_item = QtWidgets.QTableWidgetItem(item["radiation_type"])
+        type_item.setTextAlignment(QtCore.Qt.AlignCenter)
+        type_item.setFlags(type_item.flags() ^
+                           QtCore.Qt.ItemIsEditable)
+        items.append(type_item)
+        kev_item = QtWidgets.QTableWidgetItem(str(item["Kev"]))
+        kev_item.setTextAlignment(QtCore.Qt.AlignCenter)
+        kev_item.setFlags(kev_item.flags() ^ QtCore.Qt.ItemIsEditable)
+        items.append(kev_item)
+        low_item = QtWidgets.QTableWidgetItem(str(item["low_Kev"]))
+        low_item.setTextAlignment(QtCore.Qt.AlignCenter)
+        items.append(low_item)
+        high_item = QtWidgets.QTableWidgetItem(str(item["high_Kev"]))
+        high_item.setTextAlignment(QtCore.Qt.AlignCenter)
+        items.append(high_item)
+        intensity_item = QtWidgets.QTableWidgetItem(str(item["intensity"]))
+        intensity_item.setTextAlignment(QtCore.Qt.AlignCenter)
+        intensity_item.setFlags(
+            intensity_item.flags() ^ QtCore.Qt.ItemIsEditable
         )
-        self.statusItem = QtWidgets.QTableWidgetItem()
-        self.statusItem.setTextAlignment(QtCore.Qt.AlignCenter)
-        self.statusItem.setFlags(
-            self.statusItem.flags() ^ QtCore.Qt.ItemIsEditable)
-        self.statusButton = QtWidgets.QPushButton()
+        items.append(intensity_item)
+        status_item = QtWidgets.QTableWidgetItem()
+        status_item.setTextAlignment(QtCore.Qt.AlignCenter)
+        status_item.setFlags(
+            status_item.flags() ^ QtCore.Qt.ItemIsEditable)
+        items.append(status_item)
+        status_button = QtWidgets.QPushButton()
         if item["active"]:
-            self.statusItem.setText("Activated")
-            self.statusButton.setText("Deactivate")
+            status_item.setText("Activated")
+            status_button.setText("Deactivate")
         else:
-            self.statusItem.setText("Deactivated")
-            self.statusButton.setText("Activate")
-        self.statusButton.clicked.connect(self.status_changed)
-
-        item["lowItem"] = self.lowItem
-        item["highItem"] = self.highItem
-        item["intensityItem"] = self.intensityItem
+            status_item.setText("Deactivated")
+            status_button.setText("Activate")
+        items.append(status_button)
+        status_button.clicked.connect(self.status_changed)
+        item["items"] = items
         self.items.append(item)
+        self.form.add_row(items)
 
-        self.add_item_to_form()
-
-    # @runtime_monitor
-    def add_item_to_form(self):
-        """
-        Add an item to the table in the user interface.
-
-        This function adds a new item to the table in the user interface, updating the table
-        with information about active elements.
-
-        Returns:
-            None
-        """
-        self.form.blockSignals(True)
-        self.form.setRowCount(self.form.rowCount() + 1)
-        index = self.form.rowCount() - 1
-        self.form.setCellWidget(index, 1, self.hideButton)
-        self.form.setCellWidget(index, 0, self.removeButton)
-        self.form.setItem(index, 2, self.elementItem)
-        self.form.setItem(index, 3, self.typeItem)
-        self.form.setItem(index, 4, self.KevItem)
-        self.form.setItem(index, 5, self.lowItem)
-        self.form.setItem(index, 6, self.highItem)
-        self.form.setItem(index, 7, self.intensityItem)
-        self.form.setItem(index, 8, self.statusItem)
-        self.form.setCellWidget(index, 9, self.statusButton)
-        self.form.setCurrentItem(self.elementItem)
-        self.form.blockSignals(False)
-
-    # @runtime_monitor
     def set_region(self, item):
         """
         Set the region in the peak plot.
@@ -673,12 +647,12 @@ class Window(QtWidgets.QMainWindow):
         Returns:
             None
         """
-        lowPx = Calculation.ev_to_px(item["low_Kev"])
-        highPx = Calculation.ev_to_px(item["high_Kev"])
+        low_px = Calculation.ev_to_px(item["low_Kev"])
+        high_px = Calculation.ev_to_px(item["high_Kev"])
         self.peakPlot.removeItem(self.peakRegion)
-        self.peakRegion.setRegion([lowPx, highPx])
+        self.peakRegion.setRegion([low_px, high_px])
         self.peakPlot.addItem(self.peakRegion, ignoreBounds=True)
-        self.spectrumRegion.setRegion([lowPx - 10, highPx + 10])
+        self.spectrumRegion.setRegion([low_px - 10, high_px + 10])
 
     def status_changed(self):
         """
@@ -698,17 +672,17 @@ class Window(QtWidgets.QMainWindow):
         if status_item.text() == "Deactivated":
             status_item.setText("Activated")
             status_button.setText("Deactivate")
-            self.activate_Item(item)
+            self.activate_item(item)
             self.peakPlot.removeItem(self.peakRegion)
         else:
             status_item.setText("Deactivated")
             status_button.setText("Activate")
-            self.deactiveItem(item)
+            self.deactivate_item(item)
             self.set_region(item)
         self.form.blockSignals(False)
 
     # @runtime_monitor
-    def activate_Item(self, item):
+    def activate_item(self, item):
         """
         Activate an element and update its appearance.
 
@@ -726,19 +700,19 @@ class Window(QtWidgets.QMainWindow):
         item["active"] = True
         for line in item["specLines"]:
             self.spectrumPlot.removeItem(line)
-            if line.value() == item['px']:
+            if line.value() == item["px"]:
                 line.setPen(self.activePen)
-                item['specLine'] = line
+                item["specLine"] = line
                 self.spectrumPlot.addItem(line)
         for line in item["peakLines"]:
             self.peakPlot.removeItem(line)
-            if line.value() == item['px']:
+            if line.value() == item["px"]:
                 line.setPen(self.activePen)
-                item['peakLine'] = line
+                item["peakLine"] = line
                 self.peakPlot.addItem(line)
 
     # @runtime_monitor
-    def deactiveItem(self, item):
+    def deactivate_item(self, item):
         """
         Deactivate an element and update its appearance.
 
@@ -839,16 +813,14 @@ class Window(QtWidgets.QMainWindow):
         """
         row = self.form.currentRow()
         item = self.items[row]
-        self.deleteMessageBox = QtWidgets.QMessageBox()
-        self.deleteMessageBox.setIcon(QtWidgets.QMessageBox.Warning)
-        self.deleteMessageBox.setText(
+        message_box = MessegeBox.Dialog(
+            QtWidgets.QMessageBox.Warning,
+            "Warning!",
             f"{item['symbol']} will be removed."
         )
-        self.deleteMessageBox.setWindowTitle("Warning!")
-        self.deleteMessageBox.setStandardButtons(
-            QtWidgets.QMessageBox.Ok | QtWidgets.QMessageBox.Cancel
-        )
-        return_value = self.deleteMessageBox.exec()
+        message_box.setStandardButtons(
+            QtWidgets.QMessageBox.Ok | QtWidgets.QMessageBox.Cancel)
+        return_value = message_box.exec()
         if return_value == QtWidgets.QMessageBox.Ok:
             self.form.removeRow(row)
             Sqlite.deactivate_element(item)
@@ -856,8 +828,7 @@ class Window(QtWidgets.QMainWindow):
             self.items.pop(row)
             if self.form.rowCount() == 0:
                 self.peakPlot.removeItem(self.peakRegion)
-                self.form.setColumnCount(7)
-                self.setup_form()
+                self.form.setup_ui(self.form_headers_labels)
 
     def remove_all(self):
         """
@@ -866,26 +837,26 @@ class Window(QtWidgets.QMainWindow):
         Returns:
             None
         """
-        self.deleteMessageBox = QtWidgets.QMessageBox()
-        self.deleteMessageBox.setIcon(QtWidgets.QMessageBox.Warning)
-        self.deleteMessageBox.setText(
-            f"All records will be removed. Note that all of the activated elements will also be deactivated.\nPress OK if you want to continue."
+        message_box = MessegeBox.Dialog(
+            QtWidgets.QMessageBox.Warning,
+            "Warning!",
+            "All records will be removed.\nNote that all of the activated elements will also be deactivated.\n"
+            "Press OK if you want to continue."
         )
-        self.deleteMessageBox.setWindowTitle("Warning!")
-        self.deleteMessageBox.setStandardButtons(
-            QtWidgets.QMessageBox.Ok | QtWidgets.QMessageBox.Cancel
-        )
-        return_value = self.deleteMessageBox.exec()
+        message_box.setStandardButtons(
+            QtWidgets.QMessageBox.Ok | QtWidgets.QMessageBox.Cancel)
+        return_value = message_box.exec()
+        print(return_value)
         if return_value == QtWidgets.QMessageBox.Ok:
+            print("wtf")
             for i in range(len(self.items)):
                 item = self.items[i]
                 self.remove_item(item)
             self.items.clear()
             self.form.setRowCount(0)
-        Sqlite.deactivate_all()
-        self.peakPlot.removeItem(self.peakRegion)
-        self.form.setColumnCount(7)
-        self.setup_form()
+            Sqlite.deactivate_all()
+            self.peakPlot.removeItem(self.peakRegion)
+            self.form.setup_ui(self.form_headers_labels)
 
     def add_item(self, item):
         if item["active"]:
@@ -906,46 +877,6 @@ class Window(QtWidgets.QMainWindow):
                 self.spectrumPlot.removeItem(line)
             for line in item["peakLines"]:
                 self.peakPlot.removeItem(line)
-
-    # @runtime_monitor
-    def setup_form(self):
-        """
-        Set up the table in the user interface.
-
-        This function configures the appearance and headers of the table in the user
-        interface, adjusting the column headers based on the current state of the table.
-
-        Returns:
-            None
-        """
-        headers = [
-            "",
-            "",
-            "Element",
-            "Type",
-            "Kev",
-            "Low Kev",
-            "High Kev",
-            "Intensity",
-            "Status",
-            "",
-        ]
-        if self.form.columnCount() == 10:
-            self.form.setHorizontalHeaderLabels(headers)
-            for i, header in enumerate(headers):
-                if header == "":
-                    self.form.horizontalHeader().setSectionResizeMode(
-                        i, QtWidgets.QHeaderView.ResizeToContents
-                    )
-                else:
-                    self.form.horizontalHeader().setSectionResizeMode(
-                        i, QtWidgets.QHeaderView.Stretch
-                    )
-        else:
-            self.form.setHorizontalHeaderLabels(headers[2:-1])
-            self.form.horizontalHeader().setSectionResizeMode(
-                QtWidgets.QHeaderView.Stretch
-            )
 
     # @runtime_monitor
     def find_lines(self, index):

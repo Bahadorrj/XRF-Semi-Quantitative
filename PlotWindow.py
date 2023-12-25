@@ -12,6 +12,7 @@ import TextReader
 from Backend import icon
 
 
+# noinspection PyUnresolvedReferences
 class Window(QtWidgets.QMainWindow):
     """
     This class represents the main user interface for a plot window.
@@ -19,7 +20,6 @@ class Window(QtWidgets.QMainWindow):
     Attributes:
         xLim (int): The x-axis limit for the plot.
         yLim (int): The y-axis limit for the plot.
-        colorIndex (float): The index for color selection.
         addedFiles (dict): A dictionary to store information about added files.
         windowSize (QSize): The size of the main window.
         toolbar (QToolBar): The toolbar for user actions.
@@ -34,7 +34,7 @@ class Window(QtWidgets.QMainWindow):
         customMenu (QMenu): Custom context menu for the tree widget.
         actionDelete (QAction): Action to delete items.
         actionDirectory (QAction): Action to open the file location.
-        cordinateLabel (QLabel): Label to display cursor coordinates on the plot.
+        coordinateLabel (QLabel): Label to display cursor coordinates on the plot.
 
     Methods:
         setupUi(self): Set up the user interface components and their configurations.
@@ -70,11 +70,14 @@ class Window(QtWidgets.QMainWindow):
         self.mainLayout = QtWidgets.QGridLayout()
         self.mainWidget = QtWidgets.QWidget()
         self.curvePlot = PlotWidget()
+        self.proxy = SignalProxy(
+            self.curvePlot.scene().sigMouseMoved, rateLimit=60, slot=self.mouse_moved
+        )
         self.form = QtWidgets.QTreeWidget()
         self.customMenu = QtWidgets.QMenu(self.form)
         self.actionDelete = QtWidgets.QAction()
         self.actionDirectory = QtWidgets.QAction()
-        self.cordinateLabel = QtWidgets.QLabel()
+        self.coordinateLabel = QtWidgets.QLabel()
 
     def setup_ui(self):
         # window config
@@ -141,9 +144,6 @@ class Window(QtWidgets.QMainWindow):
                                 """,
         )
         self.curvePlot.showGrid(x=True, y=True)
-        self.proxy = SignalProxy(
-            self.curvePlot.scene().sigMouseMoved, rateLimit=60, slot=self.mouse_moved
-        )
 
         # form config
         self.form.setFixedWidth(int(self.windowSize.width() * 0.25))
@@ -159,7 +159,7 @@ class Window(QtWidgets.QMainWindow):
 
         self.mainLayout.addWidget(self.curvePlot, 0, 0)
         self.mainLayout.addWidget(self.form, 0, 1)
-        self.mainLayout.addWidget(self.cordinateLabel, 1, 0)
+        self.mainLayout.addWidget(self.coordinateLabel, 1, 0)
 
         self.mainWidget.setLayout(self.mainLayout)
         self.setCentralWidget(self.mainWidget)
@@ -214,12 +214,11 @@ class Window(QtWidgets.QMainWindow):
         Args:
             file (str): The path of the selected file.
         """
+        conditions_dictionary = TextReader.condition_dictionary(file)
         file_item = QtWidgets.QTreeWidgetItem()
         file_name = Path(file).stem
         file_item.setText(0, file_name)
         file_item.setCheckState(0, QtCore.Qt.Unchecked)
-
-        conditions_dictionary = TextReader.condition_dictionary(file)
         color_buttons = list()
         for index, condition in enumerate(list(conditions_dictionary.keys())):
             condition_item = QtWidgets.QTreeWidgetItem()
@@ -302,12 +301,9 @@ class Window(QtWidgets.QMainWindow):
         self.elementsWindow.setup_ui()
         self.elementsWindow.show()
 
-    def item_clicked(self, item):
+    def item_clicked(self):
         """
         Handle item selection in the form and enable or disable the 'Peak Search' action accordingly.
-
-        Args:
-            item (QTreeWidgetItem): The selected item in the form.
         """
         for i in range(self.form.topLevelItemCount()):
             item = self.form.topLevelItem(i)
@@ -371,7 +367,7 @@ class Window(QtWidgets.QMainWindow):
         pos = e[0]
         if self.curvePlot.sceneBoundingRect().contains(pos):
             mouse_point = self.curvePlot.getPlotItem().vb.mapSceneToView(pos)
-            self.cordinateLabel.setText(
+            self.coordinateLabel.setText(
                 "<span style='font-size: 2rem'>x=%0.1f,y=%0.1f</span>"
                 % (mouse_point.x(), mouse_point.y())
             )

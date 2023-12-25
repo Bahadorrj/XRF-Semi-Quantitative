@@ -1,7 +1,11 @@
-A0 = -0.0255
-A1 = 0.01491
+# A0 = -0.0255
+# A1 = 0.01491
+A0 = -0.0442
+A1 = 0.02121
+
 
 def ev_to_px(ev):
+    print(round((ev + A0) / A1))
     return round((ev + A0) / A1)
 
 
@@ -11,7 +15,10 @@ def px_to_ev(px):
 
 def calculate_intensity_in_range(low, high, intensity_range):
     intensity = 0
-    for px in range(ev_to_px(low), ev_to_px(high)):
+    low_px = ev_to_px(low)
+    high_px = ev_to_px(high)
+    for px in range(low_px, high_px):
+        # print(px)
         intensity += intensity_range[px]
     return intensity
 
