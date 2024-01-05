@@ -1,81 +1,110 @@
 import sqlite3
 import pandas as pd
-from Backend import addr
+from Backend import addresses
+from pathlib import Path
 
 
-def read(database_address, table_name, column='*', where=''):
-    con = sqlite3.connect(database_address)
+class Database:
+    def __init__(self, address):
+        self.__address = address
+        self.__name = None
+        self.set_name(Path(address).stem)
+        self.__connection = None
+        self.initialize_connection()
+
+    def get_address(self):
+        return self.__address
+
+    def get_name(self):
+        return self.__name
+
+    def set_name(self, name):
+        self.__name = name
+
+    def get_connection(self):
+        return self.__connection
+
+    def set_connection(self, connection):
+        self.__connection = connection
+
+    def initialize_connection(self):
+        if self.get_connection() is None:
+            self.set_connection(sqlite3.connect(self.get_address()))
+
+    def close_connection(self):
+        if self.get_connection() is not None:
+            self.get_connection().close()
+
+
+databases = {"fundamentals": Database(addresses["fundamentals"])}
+
+
+def get_column_labels(database_name, table_name):
+    # Connect to the SQLite database
+    connection = databases.get(database_name).get_connection()
+    cursor = connection.cursor()
+    # Get column labels from the specified table
+    cursor.execute(f"PRAGMA table_info({table_name})")
+    columns = cursor.fetchall()
+    # Extract column labels
+    column_labels = [col[1] for col in columns]
+    return column_labels
+
+
+def get_value(database_name, table_name, column_name="*", where=""):
+    connection = databases.get(database_name).get_connection()
+    cur = connection.cursor()
+    query = "SELECT " + column_name + " FROM " + table_name + " " + where + ";"
+    cur.execute(query)
+    result = cur.fetchone()
+    return list(result)
+
+
+def get_values(database_name, table_name, column_name="*", where=""):
+    connection = databases.get(database_name).get_connection()
+    cur = connection.cursor()
+    query = "SELECT " + column_name + " FROM " + table_name + " " + where + ";"
+    cur.execute(query)
+    result = cur.fetchall()
+    return result
+
+
+def dataframe_of_database(database_name, table_name, column='*', where=''):
+    connection = databases.get(database_name).get_connection()
     if where == '':
-        df = pd.read_sql_query(f"SELECT {column} FROM {table_name}", con)
+        df = pd.read_sql_query(f"SELECT {column} FROM {table_name}", connection)
     else:
         df = pd.read_sql_query(
-            f"SELECT {column} FROM {table_name} WHERE {where}", con)
-    con.close()
+            f"SELECT {column} FROM {table_name} WHERE {where}", connection)
     return df
 
 
-def write(db_addr, table_name, dataframe):
-    conn = sqlite3.connect(db_addr)
-    dataframe.to_sql(table_name, conn, if_exists='replace', index=False)
-    conn.commit()
-    conn.close()
-
-
-def activate_element(condition, item):
-    conn = sqlite3.connect(addr['dbFundamentals'])
-    cur = conn.cursor()
-    query = f"""
-            UPDATE elements
-            SET low_Kev = {item['low_Kev']},
-                high_Kev = {item['high_Kev']},
-                intensity = {item['intensity']},
-                active = 1,
-                condition_id =
-                    (SELECT condition_id
-                    FROM conditions
-                    WHERE conditions.name = '{condition}')
-            WHERE symbol = '{item['symbol']}'
-                    AND radiation_type = '{item['radiation_type']}';
+def write_elements_to_table(elements, condition):
+    connection = databases.get("fundamentals").get_connection()
+    cur = connection.cursor()
+    for element in elements:
+        if element.is_activated():
+            query = f"""
+                UPDATE elements
+                SET low_Kev = {element.get_low_kev()},
+                    high_Kev = {element.get_high_kev()},
+                    intensity = {element.get_intensity()},
+                    active = 1,
+                    condition_id =
+                        (SELECT condition_id
+                        FROM conditions
+                        WHERE conditions.name = '{condition.get_name()}')
+                WHERE symbol = '{element.get_attribute("symbol")}'
+                AND radiation_type = '{element.get_attribute("radiation_type")}';
             """
-    cur.execute(query)
-    conn.commit()
-
-
-def deactivate_element(item):
-    conn = sqlite3.connect(addr['dbFundamentals'])
-    cur = conn.cursor()
-    query = f"""
-            UPDATE elements \
-            SET active = 0 \
-            WHERE symbol = '{item['symbol']}' \
-            AND radiation_type = '{item['radiation_type']}'
-        """
-    cur.execute(query)
-    conn.commit()
-
-
-def deactivate_all():
-    conn = sqlite3.connect(addr['dbFundamentals'])
-    cur = conn.cursor()
-    query = f"""
-            UPDATE elements
-            SET active = 0;
-        """
-    cur.execute(query)
-    conn.commit()
-
-
-def get_condition_name_where(element_id):
-    if pd.isnull(element_id):
-        return 'Not Activated'
-    conn = sqlite3.connect(addr['dbFundamentals'])
-    cur = conn.cursor()
-    query = f"""
-            SELECT name
-            FROM conditions
-            WHERE condition_id = {element_id};
-        """
-    cur.execute(query)
-    name = cur.fetchone()[0]
-    conn.commit()
-    return name
+        else:
+            query = f"""
+                UPDATE elements
+                SET intensity = NULL,
+                    active = NULL,
+                    condition_id = NULL
+                WHERE symbol = '{element.get_attribute("symbol")}'
+                AND radiation_type = '{element.get_attribute("radiation_type")}'
+            """
+        cur.execute(query)
+    connection.commit()

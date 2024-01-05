@@ -1,6 +1,7 @@
+import time
+
 import pyqtspinner
 from PyQt5 import QtWidgets, QtCore
-import time
 
 
 class Window(QtWidgets.QDialog):

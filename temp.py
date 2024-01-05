@@ -62,7 +62,6 @@ class Window(QtWidgets.QMainWindow):
     def set_condition(self, condition):
         self.__condition = condition
         self.init_condition()
-        self.set_elements(condition.get_elements())
 
     def get_elements(self):
         return self.__elements
@@ -279,20 +278,20 @@ class Window(QtWidgets.QMainWindow):
         kev_item = QtWidgets.QTableWidgetItem(str(element.get_attribute("Kev")))
         kev_item.setTextAlignment(QtCore.Qt.AlignCenter)
         kev_item.setFlags(kev_item.flags() ^ QtCore.Qt.ItemIsEditable)
-        low_item = QtWidgets.QTableWidgetItem(str(element.get_low_kev()))
+        low_item = QtWidgets.QTableWidgetItem(str(element.get_attribute("low_Kev")))
         low_item.setTextAlignment(QtCore.Qt.AlignCenter)
         low_item.setFlags(low_item.flags() ^ QtCore.Qt.ItemIsEditable)
-        high_item = QtWidgets.QTableWidgetItem(str(element.get_high_kev()))
+        high_item = QtWidgets.QTableWidgetItem(str(element.get_attribute("high_Kev")))
         high_item.setTextAlignment(QtCore.Qt.AlignCenter)
         high_item.setFlags(high_item.flags() ^ QtCore.Qt.ItemIsEditable)
-        intensity_item = QtWidgets.QTableWidgetItem(str(element.get_intensity()))
+        intensity_item = QtWidgets.QTableWidgetItem(str(element.get_attribute("intensity")))
         intensity_item.setTextAlignment(QtCore.Qt.AlignCenter)
         intensity_item.setFlags(intensity_item.flags() ^ QtCore.Qt.ItemIsEditable)
         status_item = QtWidgets.QTableWidgetItem()
         status_item.setTextAlignment(QtCore.Qt.AlignCenter)
         status_item.setFlags(status_item.flags() ^ QtCore.Qt.ItemIsEditable)
         status_button = QtWidgets.QPushButton()
-        if element.is_activated():
+        if element.get_attribute("active"):
             status_item.setText("Activated")
             status_button.setText("Deactivate")
         else:
@@ -405,11 +404,11 @@ class Window(QtWidgets.QMainWindow):
         row_index = self.form.currentRow()
         element = self.get_element(row_index)
         if element.is_hidden():
-            self.hide_element(element, row_index)
+            self.hide_elemment(element, row_index)
         else:
             self.un_hide_element(element, row_index)
 
-    def hide_element(self, element, index):
+    def hide_elemment(self, element, index):
         row = self.form.get_row(index)
         element.set_hidden(False)
         row.get("Hide Widget").setIcon(QtGui.QIcon(icons["unhide"]))
@@ -440,7 +439,7 @@ class Window(QtWidgets.QMainWindow):
             hidden = self.get_element(0).is_hidden()
             if hidden:
                 for index, element in enumerate(self.get_elements()):
-                    self.hide_element(element, index)
+                    self.hide_elemment(element, index)
             else:
                 for index, element in enumerate(self.get_elements()):
                     self.un_hide_element(element, index)
@@ -460,20 +459,23 @@ class Window(QtWidgets.QMainWindow):
 
     def closeEvent(self, a0):
         Sqlite.write_elements_to_table(self.get_form_elements(), self.get_condition())
-        self.form.clear()
-        self.peakPlot.clear()
-        self.spectrumPlot.clear()
         super().closeEvent(a0)
 
     def show(self):
-        for element in self.get_condition().get_elements():
-            self.plot_element_line(element)
-            self.add_element_to_form(element)
-        # loading_dialog = LoadingDialogue.Window()
-        # loading_dialog.use_animation(0.5)
-        # loading_dialog.setup_ui(title="Please wait", label="Collecting elements")
-        # loading_dialog.show()
-        # loading_dialog.animate_text()
-        # loading_dialog.processFinished = True
-        # loading_dialog.close()
+        active_elements = self.get_elements_dataframe()[self.get_elements_dataframe()["active"] == 1]
+        if not active_elements.empty:
+            # loading_dialog = LoadingDialogue.Window()
+            # loading_dialog.use_animation(0.5)
+            # loading_dialog.setup_ui(
+            #     title="Please wait", label="Collecting elements")
+            # loading_dialog.show()
+            for i in active_elements.index:
+                element = Element(active_elements.at[i, "element_id"])
+                element.set_activated(True)
+                self.get_elements().append(element)
+                self.plot_element_line(element)
+                self.add_element_to_form(element)
+            #     loading_dialog.animate_text()
+            # loading_dialog.processFinished = True
+            # loading_dialog.close()
         super().show()

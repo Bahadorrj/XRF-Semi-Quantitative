@@ -1,5 +1,4 @@
 import os
-from pathlib import Path
 
 import numpy as np
 from PyQt5 import QtWidgets, QtCore, QtGui
@@ -8,56 +7,18 @@ from pyqtgraph import PlotWidget, SignalProxy, ColorButton, mkPen
 import ConditionWindow
 import ElementWindow
 import PeakSearchWindow
-import TextReader
-from Backend import icon
+from Backend import icons
+from FileClass import File
 
 
-# noinspection PyUnresolvedReferences
 class Window(QtWidgets.QMainWindow):
-    """
-    This class represents the main user interface for a plot window.
-
-    Attributes:
-        xLim (int): The x-axis limit for the plot.
-        yLim (int): The y-axis limit for the plot.
-        addedFiles (dict): A dictionary to store information about added files.
-        windowSize (QSize): The size of the main window.
-        toolbar (QToolBar): The toolbar for user actions.
-        statusbar (QStatusBar): The status bar for messages.
-        actionOpen (QAction): Action to open files.
-        actionPeakSearch (QAction): Action to perform peak search.
-        actionConditions (QAction): Action to manage conditions.
-        mainLayout (QGridLayout): The main layout of the user interface.
-        mainWidget (QWidget): The main widget for the window.
-        curvePlot (PlotWidget): The plot widget for displaying data.
-        form (QTreeWidget): The tree widget to display file and condition information.
-        customMenu (QMenu): Custom context menu for the tree widget.
-        actionDelete (QAction): Action to delete items.
-        actionDirectory (QAction): Action to open the file location.
-        coordinateLabel (QLabel): Label to display cursor coordinates on the plot.
-
-    Methods:
-        setupUi(self): Set up the user interface components and their configurations.
-        openDirectory(self): Open the file location of a selected item.
-        remove(self): Remove selected items from the tree widget and update the plot.
-        showContextMenu(self, position): Display a context menu at a specified position.
-        openFilesDialog(self): Open a file dialog to select and initialize new items.
-        initItem(self, file): Initialize a new item based on the selected file.
-        plotFiles(self): Plot the selected files and conditions on the plot widget.
-        openPeakSearch(self, item): Open a peak search window for a selected item.
-        openConditions(self): Open a conditions window for managing conditions.
-        itemClicked(self, item): Handle item selection in the tree widget.
-        itemChanged(self, item): Handle changes in item check states.
-        mouseMoved(self, e): Update the cursor coordinates when the mouse is moved over the plot.
-    """
-
     def __init__(self, size):
         super().__init__()
         self.xLim = 0
         self.yLim = 0
         self.colors = ["#FF0000", "#FFD700", "#00FF00", "#00FFFF", "#000080", "#0000FF", "#8B00FF",
                        "#FF1493", "#FFC0CB", "#FF4500", "#FFFF00", "#FF00FF", "#00FF7F", "#FF7F00"]
-        self.addedFiles = {}
+        self.addedFiles = list()
         self.windowSize = QtCore.QSize(
             int(size.width() * 0.75), int(size.height() * 0.75)
         )
@@ -78,6 +39,9 @@ class Window(QtWidgets.QMainWindow):
         self.actionDelete = QtWidgets.QAction()
         self.actionDirectory = QtWidgets.QAction()
         self.coordinateLabel = QtWidgets.QLabel()
+        self.conditionsWindow = ConditionWindow.Window(size)
+        self.elementsWindow = ElementWindow.Window(size)
+        self.peakSearchWindow = PeakSearchWindow.Window(size)
 
     def setup_ui(self):
         # window config
@@ -86,25 +50,23 @@ class Window(QtWidgets.QMainWindow):
         self.showMaximized()
 
         # actions config
-        self.actionOpen.setIcon(QtGui.QIcon(icon["open"]))
+        self.actionOpen.setIcon(QtGui.QIcon(icons["open"]))
         self.actionOpen.setText("Open")
-        self.actionOpen.triggered.connect(lambda: self.open_files_dialog())
-        self.actionPeakSearch.setIcon(QtGui.QIcon(icon["peak_search"]))
+        self.actionOpen.triggered.connect(self.open_files_dialog)
+        self.actionPeakSearch.setIcon(QtGui.QIcon(icons["peak_search"]))
         self.actionPeakSearch.setText("Peak Search")
         self.actionPeakSearch.setStatusTip("Find elements in spectrum")
         self.actionPeakSearch.setDisabled(True)
-        self.actionPeakSearch.triggered.connect(
-            lambda: self.open_peak_search(self.form.currentItem())
-        )
-        self.actionConditions.setIcon(QtGui.QIcon(icon["conditions"]))
+        self.actionPeakSearch.triggered.connect(self.open_peak_search)
+        self.actionConditions.setIcon(QtGui.QIcon(icons["conditions"]))
         self.actionConditions.setText("Conditions")
-        self.actionConditions.triggered.connect(lambda: self.open_conditions())
-        self.actionElements.setIcon(QtGui.QIcon(icon['elements']))
+        self.actionConditions.triggered.connect(self.open_conditions)
+        self.actionElements.setIcon(QtGui.QIcon(icons['elements']))
         self.actionElements.setText("Elements")
         self.actionElements.triggered.connect(self.open_elements)
 
         self.actionDelete.setText("Delete")
-        self.actionDelete.setIcon(QtGui.QIcon(icon["cross"]))
+        self.actionDelete.setIcon(QtGui.QIcon(icons["cross"]))
         self.actionDelete.triggered.connect(self.remove)
         self.actionDirectory.setText("Open file location")
         self.actionDirectory.triggered.connect(self.open_directory)
@@ -146,7 +108,7 @@ class Window(QtWidgets.QMainWindow):
         self.curvePlot.showGrid(x=True, y=True)
 
         # form config
-        self.form.setFixedWidth(int(self.windowSize.width() * 0.25))
+        self.form.setFixedWidth(int(self.size().width() * 0.25))
         self.form.setColumnCount(3)
         self.form.setHeaderLabels(["File", "Condition", "Color"])
         self.form.setFrameShape(QtWidgets.QFrame.Box)
@@ -164,187 +126,57 @@ class Window(QtWidgets.QMainWindow):
         self.mainWidget.setLayout(self.mainLayout)
         self.setCentralWidget(self.mainWidget)
 
-    def open_directory(self):
-        """
-        Open the file location of a selected item from the form.
-        """
-        item = self.form.selectedItems()[0]
-        path = self.addedFiles[self.form.indexOfTopLevelItem(item)]["path"]
-        while True:
-            path = path[:-1]
-            if path[-1] == "/":
-                break
-        os.startfile(path)
-
-    def remove(self):
-        """
-        Remove a selected item from the form and update the plot.
-        """
-        item = self.form.selectedItems()[0]
-        index = self.form.indexOfTopLevelItem(item)
-        self.form.takeTopLevelItem(index)
-        self.addedFiles.pop(index)
-        self.plot_files()
-
-    def show_context_menu(self, position):
-        """
-        Display a context menu for the selected item at the specified position.
-
-        Args:
-            position (QPoint): The position where the context menu should be displayed.
-        """
-        item = self.form.itemAt(position)
-        if self.form.indexOfTopLevelItem(item) >= 0:
-            self.customMenu.exec_(self.form.mapToGlobal(position))
+    def mouse_moved(self, e):
+        pos = e[0]
+        if self.curvePlot.sceneBoundingRect().contains(pos):
+            mouse_point = self.curvePlot.getPlotItem().vb.mapSceneToView(pos)
+            self.coordinateLabel.setText(
+                "<span style='font-size: 2rem'>x=%0.1f,y=%0.1f</span>"
+                % (mouse_point.x(), mouse_point.y())
+            )
 
     def open_files_dialog(self):
-        """
-        Open a file dialog for selecting and initializing new items in the form.
-        """
-        self.fileDialog = QtWidgets.QFileDialog()
-        self.fileDialog.setFileMode(QtWidgets.QFileDialog.AnyFile)
-        self.fileDialog.setNameFilter("Texts (*.txt)")
-        self.fileDialog.show()
-        self.fileDialog.fileSelected.connect(self.init_item)
+        file_dialog = QtWidgets.QFileDialog(self)
+        file_dialog.setFileMode(QtWidgets.QFileDialog.AnyFile)
+        file_dialog.setNameFilter("Texts (*.txt)")
+        file_dialog.show()
+        file_dialog.fileSelected.connect(self.init_item)
 
-    def init_item(self, file):
-        """
-        Initialize a new item based on the selected file, including adding conditions and color buttons.
-
-        Args:
-            file (str): The path of the selected file.
-        """
-        conditions_dictionary = TextReader.condition_dictionary(file)
+    def init_item(self, path):
+        f = File(path)
         file_item = QtWidgets.QTreeWidgetItem()
-        file_name = Path(file).stem
-        file_item.setText(0, file_name)
+        file_item.setText(0, f.get_name())
         file_item.setCheckState(0, QtCore.Qt.Unchecked)
-        color_buttons = list()
-        for index, condition in enumerate(list(conditions_dictionary.keys())):
+        for index, condition in enumerate(f.get_conditions()):
             condition_item = QtWidgets.QTreeWidgetItem()
-            condition_item.setText(1, condition)
+            condition_item.setText(1, condition.get_name())
             condition_item.setCheckState(1, QtCore.Qt.Unchecked)
-
             file_item.addChild(condition_item)
             self.form.addTopLevelItem(file_item)
+            color_button = ColorButton()
+            color_button.setColor(self.colors[index])
+            color_button.sigColorChanged.connect(self.update_color)
+            self.form.setItemWidget(condition_item, 2, color_button)
+            color_button.sigColorChanged.connect(self.update_color)
+        self.addedFiles.append(f)
 
-            button = ColorButton()
-            button.setColor(self.colors[index])
-            button.sigColorChanged.connect(self.plot_files)
-            color_buttons.append(button)
-            self.form.setItemWidget(condition_item, 2, button)
-
-        properties = {
-            "path": file,
-            "conditions": conditions_dictionary,
-            "colorButtons": color_buttons,
-        }
-        self.addedFiles[file_name] = properties
-
-    def plot_files(self):
-        """
-        Plot the selected files and conditions on the curve plot.
-        """
-        self.curvePlot.clear()
-        for properties in self.addedFiles.values():
-            for index, condition in enumerate(properties["conditions"].values()):
-                if condition["active"]:
-                    intensity = TextReader.list_items(
-                        properties["path"], condition["range"], int
-                    )
-                    px = np.arange(0, len(intensity), 1)
-                    if max(intensity) > self.yLim:
-                        self.yLim = max(intensity)
-                    if len(intensity) > self.xLim:
-                        self.xLim = len(intensity)
-                    self.curvePlot.setLimits(
-                        xMin=0, xMax=self.xLim, yMin=0, yMax=1.1 * self.yLim
-                    )
-                    color = properties["colorButtons"][index].color()
-                    pen = mkPen(color, width=2)
-                    self.curvePlot.plot(x=px, y=intensity, pen=pen)
-
-    def open_peak_search(self, item):
-        """
-        Open a peak search window for the selected item.
-
-        Args:
-            item (QTreeWidgetItem): The selected item in the form.
-        """
-        if self.form.indexOfTopLevelItem(item) == -1:
-            item_text = item.text(1)
-            top_level_text = item.parent().text(0)
-            self.peakSearchWindow = PeakSearchWindow.Window(
-                self.size(),
-                self.addedFiles[top_level_text]["path"],
-                self.addedFiles[top_level_text]["conditions"][item_text]["range"],
-                item_text,
-            )
-            self.peakSearchWindow.setup_ui()
-            self.peakSearchWindow.show()
-            QtWidgets.QApplication.processEvents()
-            self.peakSearchWindow.write_to_table()
-
-    def open_conditions(self):
-        """
-        Open Conditions window for managing conditions.
-        """
-        self.conditionsWindow = ConditionWindow.Window(super().size())
-        self.conditionsWindow.setup_ui()
-        self.conditionsWindow.show()
-
-    def open_elements(self):
-        """
-        Open Elements window for managing elements.
-        """
-        self.elementsWindow = ElementWindow.Window(super().size())
-        self.elementsWindow.setup_ui()
-        self.elementsWindow.show()
-
-    def item_clicked(self):
-        """
-        Handle item selection in the form and enable or disable the 'Peak Search' action accordingly.
-        """
-        for i in range(self.form.topLevelItemCount()):
-            item = self.form.topLevelItem(i)
-            if item.isSelected():
-                self.actionPeakSearch.setDisabled(True)
-                break
-            for j in range(item.childCount()):
-                child = item.child(j)
-                if child.isSelected():
-                    self.actionPeakSearch.setDisabled(False)
-                    break
+    def update_color(self):
+        self.plot_files()
 
     def item_changed(self, item):
-        """
-        Handle changes in item check states and update the plot accordingly.
-
-        Args:
-            item (QTreeWidgetItem): The item for which the check state has changed.
-        """
-        self.form.blockSignals(True)
         self.form.setCurrentItem(item)
+        self.form.blockSignals(True)
         top_level_index = self.form.indexOfTopLevelItem(item)
         if top_level_index != -1:
-            if item.checkState(0) != 0:
-                for index, state in enumerate(self.addedFiles[item.text(0)]["conditions"].values()):
-                    state["active"] = True
-                    item.child(index).setCheckState(1, QtCore.Qt.Checked)
+            if item.checkState(0) == 0:
+                for child_index in range(self.form.topLevelItem(top_level_index).childCount()):
+                    item.child(child_index).setCheckState(
+                        1, QtCore.Qt.Unchecked)
             else:
-                for index, state in enumerate(self.addedFiles[item.text(0)]["conditions"].values()):
-                    state["active"] = False
-                    item.child(index).setCheckState(1, QtCore.Qt.Unchecked)
+                for child_index in range(self.form.topLevelItem(top_level_index).childCount()):
+                    item.child(child_index).setCheckState(1, QtCore.Qt.Checked)
         else:
             top_level = item.parent()
-            if item.checkState(1) != 0:
-                self.addedFiles[top_level.text(0)]["conditions"][item.text(1)][
-                    "active"
-                ] = True
-            else:
-                self.addedFiles[top_level.text(0)]["conditions"][item.text(1)][
-                    "active"
-                ] = False
             flag = False
             for i in range(top_level.childCount()):
                 if top_level.child(i).checkState(1) == 0:
@@ -353,21 +185,67 @@ class Window(QtWidgets.QMainWindow):
                     break
             if not flag:
                 top_level.setCheckState(0, QtCore.Qt.Checked)
-
-        self.plot_files()
         self.form.blockSignals(False)
+        self.plot_files()
 
-    def mouse_moved(self, e):
-        """
-        Update the cursor coordinates when the mouse is moved over the plot.
+    def plot_files(self):
+        self.curvePlot.clear()
+        for top_level_index in range(self.form.topLevelItemCount()):
+            top_level_item = self.form.topLevelItem(top_level_index)
+            f = self.addedFiles[top_level_index]
+            for child_index in range(top_level_item.childCount()):
+                if top_level_item.child(child_index).checkState(1) != 0:
+                    intensity = f.get_counts()[child_index]
+                    px = np.arange(0, len(intensity), 1)
+                    if max(intensity) > self.yLim:
+                        self.yLim = max(intensity)
+                    if len(intensity) > self.xLim:
+                        self.xLim = len(intensity)
+                    self.curvePlot.setLimits(
+                        xMin=0, xMax=self.xLim, yMin=0, yMax=1.1 * self.yLim
+                    )
+                    color = self.form.itemWidget(
+                        top_level_item.child(child_index), 2).color()
+                    self.curvePlot.plot(x=px, y=intensity,
+                                        pen=mkPen(color=color, width=2))
 
-        Args:
-            e (list): A list containing information about the mouse event.
-        """
-        pos = e[0]
-        if self.curvePlot.sceneBoundingRect().contains(pos):
-            mouse_point = self.curvePlot.getPlotItem().vb.mapSceneToView(pos)
-            self.coordinateLabel.setText(
-                "<span style='font-size: 2rem'>x=%0.1f,y=%0.1f</span>"
-                % (mouse_point.x(), mouse_point.y())
-            )
+    def item_clicked(self, item):
+        if self.form.indexOfTopLevelItem(item) == -1:
+            self.actionPeakSearch.setDisabled(False)
+        else:
+            self.actionPeakSearch.setDisabled(True)
+
+    def open_peak_search(self):
+        if self.actionPeakSearch.isEnabled():
+            top_level_index = self.form.indexOfTopLevelItem(
+                self.form.currentItem().parent())
+            child_index = self.form.currentIndex().row()
+            self.peakSearchWindow.set_condition(self.addedFiles[top_level_index].get_condition(child_index))
+            self.peakSearchWindow.setup_ui()
+            self.peakSearchWindow.show()
+
+    def open_conditions(self):
+        self.conditionsWindow.setup_ui()
+        self.conditionsWindow.show()
+
+    def open_elements(self):
+        self.elementsWindow.setup_ui()
+        self.elementsWindow.show()
+
+    def show_context_menu(self, position):
+        item = self.form.itemAt(position)
+        if self.form.indexOfTopLevelItem(item) >= 0:
+            self.customMenu.exec_(self.form.mapToGlobal(position))
+
+    def remove(self):
+        item = self.form.currentItem()
+        top_level_index = self.form.indexOfTopLevelItem(item)
+        if top_level_index != -1:
+            self.form.takeTopLevelItem(top_level_index)
+            self.addedFiles.pop(top_level_index)
+            self.plot_files()
+
+    def open_directory(self):
+        f = self.addedFiles[self.form.currentIndex().row()]
+        path = f.get_path().rstrip("/" + f.get_name() + ".txt")
+        os.startfile(path)

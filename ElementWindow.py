@@ -1,7 +1,7 @@
 from PyQt5 import QtCore, QtWidgets
 
-import Sqlite
-from Backend import addr
+from Sqlite import dataframe_of_database
+from TableWidget import Form
 
 
 class Window(QtWidgets.QWidget):
@@ -17,39 +17,6 @@ class Window(QtWidgets.QWidget):
         self.spacerItem = QtWidgets.QSpacerItem(
             0, 0, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum
         )
-        self.form = QtWidgets.QTableWidget()
-        self.dfElements = Sqlite.read(addr["dbFundamentals"], "elements")
-        query = "element_id IN (SELECT element_id FROM UQ ORDER BY element_id)"
-        self.dfUQ = Sqlite.read(
-            addr["dbFundamentals"], "elements", where=query)
-        self.rows = self.dfElements.shape[0]
-
-    def setup_ui(self):
-        self.setMinimumSize(self.windowSize)
-        self.setWindowTitle("Elements")
-        self.showMaximized()
-
-        self.filterLabel.setText('Filter by: ')
-
-        self.filter.addItems(['all elements', 'active elements', 'UQR'])
-        self.filter.currentIndexChanged.connect(self.filter_table)
-
-        self.filterLayout.addWidget(self.filterLabel)
-        self.filterLayout.addWidget(self.filter)
-        self.filterLayout.addItem(self.spacerItem)
-
-        self.mainLayout.addLayout(self.filterLayout)
-
-        self.form.setFrameShape(QtWidgets.QFrame.Box)
-        self.form.setFrameShadow(QtWidgets.QFrame.Plain)
-        self.form.setColumnCount(10)
-
-        self.setup_table(range(self.rows))
-
-        self.mainLayout.addWidget(self.form)
-        self.setLayout(self.mainLayout)
-
-    def setup_table(self, row_list):
         headers = [
             'Atomic No',
             'Name',
@@ -62,93 +29,122 @@ class Window(QtWidgets.QWidget):
             'Active',
             'Activated in'
         ]
-        self.form.setHorizontalHeaderLabels(headers)
-        self.form.setRowCount(len(row_list))
-        self.form.horizontalHeader().setSectionResizeMode(QtWidgets.QHeaderView.Stretch)
-        for index, row in enumerate(row_list):
-            self.atomicNoItem = QtWidgets.QTableWidgetItem(
-                str(self.dfElements.at[row, 'atomic_number'])
-            )
-            self.atomicNoItem.setTextAlignment(QtCore.Qt.AlignCenter)
-            self.atomicNoItem.setFlags(QtCore.Qt.ItemIsEnabled)
-            self.nameItem = QtWidgets.QTableWidgetItem(
-                self.dfElements.at[row, 'name']
-            )
-            self.nameItem.setTextAlignment(QtCore.Qt.AlignCenter)
-            self.nameItem.setFlags(QtCore.Qt.ItemIsEnabled)
-            self.symbolItem = QtWidgets.QTableWidgetItem(
-                self.dfElements.at[row, 'symbol']
-            )
-            self.symbolItem.setTextAlignment(QtCore.Qt.AlignCenter)
-            self.symbolItem.setFlags(QtCore.Qt.ItemIsEnabled)
-            self.radiationItem = QtWidgets.QTableWidgetItem(
-                self.dfElements.at[row, 'radiation_type']
-            )
-            self.radiationItem.setTextAlignment(QtCore.Qt.AlignCenter)
-            self.radiationItem.setFlags(QtCore.Qt.ItemIsEnabled)
-            self.KevItem = QtWidgets.QTableWidgetItem(
-                str(self.dfElements.at[row, 'Kev'])
-            )
-            self.KevItem.setTextAlignment(QtCore.Qt.AlignCenter)
-            self.KevItem.setFlags(QtCore.Qt.ItemIsEnabled)
-            self.lowItem = QtWidgets.QTableWidgetItem(
-                str(self.dfElements.at[row, 'low_Kev'])
-            )
-            self.lowItem.setTextAlignment(QtCore.Qt.AlignCenter)
-            self.lowItem.setFlags(QtCore.Qt.ItemIsEnabled)
-            self.highItem = QtWidgets.QTableWidgetItem(
-                str(self.dfElements.at[row, 'high_Kev'])
-            )
-            self.highItem.setTextAlignment(QtCore.Qt.AlignCenter)
-            self.highItem.setFlags(QtCore.Qt.ItemIsEnabled)
-            self.intensityItem = QtWidgets.QTableWidgetItem(
-                str(self.dfElements.at[row, 'intensity'])
-            )
-            self.intensityItem.setTextAlignment(QtCore.Qt.AlignCenter)
-            self.intensityItem.setFlags(QtCore.Qt.ItemIsEnabled)
-            active = self.dfElements.at[row, 'active']
+        self.form = Form(headers)
+        self.__df_elements = dataframe_of_database("fundamentals", "elements")
+        query = "element_id IN (SELECT element_id FROM UQ ORDER BY element_id)"
+        self.__df_uq = dataframe_of_database(
+            "fundamentals", "elements", where=query)
+        self.__df_conditions = dataframe_of_database("fundamentals", "conditions")
+        self.__row_count = self.__df_elements.shape[0]
+        
+    def get_elements_dataframe(self):
+        return self.__df_elements
+    
+    def get_uq_dataframe(self):
+        return self.__df_uq
+    
+    def get_conditions_dataframe(self):
+        return self.__df_conditions
+    
+    def get_row_count(self):
+        return self.__row_count
 
+    def setup_ui(self):
+        self.setMinimumSize(self.windowSize)
+        self.setWindowTitle("Elements")
+        self.showMaximized()
+        self.form.setup_ui()
+
+        self.filterLabel.setText('Filter by: ')
+
+        self.filter.addItems(['all elements', 'active elements', 'UQR'])
+        self.filter.currentIndexChanged.connect(self.filter_table)
+
+        self.filterLayout.addWidget(self.filterLabel)
+        self.filterLayout.addWidget(self.filter)
+        self.filterLayout.addItem(self.spacerItem)
+
+        self.mainLayout.addLayout(self.filterLayout)
+
+        self.setup_table(range(self.get_row_count()))
+
+        self.mainLayout.addWidget(self.form)
+        self.setLayout(self.mainLayout)
+
+    def setup_table(self, row_list):
+        for row in row_list:
+            atomic_number_item = QtWidgets.QTableWidgetItem(
+                str(self.get_elements_dataframe().at[row, 'atomic_number'])
+            )
+            atomic_number_item.setTextAlignment(QtCore.Qt.AlignCenter)
+            atomic_number_item.setFlags(QtCore.Qt.ItemIsEnabled)
+            name_item = QtWidgets.QTableWidgetItem(
+                self.get_elements_dataframe().at[row, 'name']
+            )
+            name_item.setTextAlignment(QtCore.Qt.AlignCenter)
+            name_item.setFlags(QtCore.Qt.ItemIsEnabled)
+            symbol_item = QtWidgets.QTableWidgetItem(
+                self.get_elements_dataframe().at[row, 'symbol']
+            )
+            symbol_item.setTextAlignment(QtCore.Qt.AlignCenter)
+            symbol_item.setFlags(QtCore.Qt.ItemIsEnabled)
+            radiation_item = QtWidgets.QTableWidgetItem(
+                self.get_elements_dataframe().at[row, 'radiation_type']
+            )
+            radiation_item.setTextAlignment(QtCore.Qt.AlignCenter)
+            radiation_item.setFlags(QtCore.Qt.ItemIsEnabled)
+            kev_item = QtWidgets.QTableWidgetItem(
+                str(self.get_elements_dataframe().at[row, 'Kev'])
+            )
+            kev_item.setTextAlignment(QtCore.Qt.AlignCenter)
+            kev_item.setFlags(QtCore.Qt.ItemIsEnabled)
+            low_item = QtWidgets.QTableWidgetItem(
+                str(self.get_elements_dataframe().at[row, 'low_Kev'])
+            )
+            low_item.setTextAlignment(QtCore.Qt.AlignCenter)
+            low_item.setFlags(QtCore.Qt.ItemIsEnabled)
+            high_item = QtWidgets.QTableWidgetItem(
+                str(self.get_elements_dataframe().at[row, 'high_Kev'])
+            )
+            high_item.setTextAlignment(QtCore.Qt.AlignCenter)
+            high_item.setFlags(QtCore.Qt.ItemIsEnabled)
+            intensity_item = QtWidgets.QTableWidgetItem(
+                str(self.get_elements_dataframe().at[row, 'intensity'])
+            )
+            intensity_item.setTextAlignment(QtCore.Qt.AlignCenter)
+            intensity_item.setFlags(QtCore.Qt.ItemIsEnabled)
+            active = self.get_elements_dataframe().at[row, 'active']
             if active == 1:
-                self.activeItem = QtWidgets.QTableWidgetItem(
+                active_item = QtWidgets.QTableWidgetItem(
                     str(True)
                 )
-                self.activeItem.setForeground(QtCore.Qt.green)
+                active_item.setForeground(QtCore.Qt.green)
             else:
-                self.activeItem = QtWidgets.QTableWidgetItem(
+                active_item = QtWidgets.QTableWidgetItem(
                     str(False)
                 )
-                self.activeItem.setForeground(QtCore.Qt.red)
-            self.activeItem.setTextAlignment(QtCore.Qt.AlignCenter)
-            self.activeItem.setFlags(QtCore.Qt.ItemIsEnabled)
-            self.conditionItem = QtWidgets.QTableWidgetItem(
-                Sqlite.get_condition_name_where(
-                    self.dfElements.at[row, 'condition_id']
-                )
-            )
-            self.conditionItem.setTextAlignment(QtCore.Qt.AlignCenter)
-            self.conditionItem.setFlags(QtCore.Qt.ItemIsEnabled)
-            self.form.setItem(index, 0, self.atomicNoItem)
-            self.form.setItem(index, 1, self.nameItem)
-            self.form.setItem(index, 2, self.symbolItem)
-            self.form.setItem(index, 3, self.radiationItem)
-            self.form.setItem(index, 4, self.KevItem)
-            self.form.setItem(index, 5, self.lowItem)
-            self.form.setItem(index, 6, self.highItem)
-            self.form.setItem(index, 7, self.intensityItem)
-            self.form.setItem(index, 8, self.activeItem)
-            self.form.setItem(index, 9, self.conditionItem)
+                active_item.setForeground(QtCore.Qt.red)
+            active_item.setTextAlignment(QtCore.Qt.AlignCenter)
+            active_item.setFlags(QtCore.Qt.ItemIsEnabled)
+            condition_id = self.get_elements_dataframe().at[row, 'condition_id']
+            condition_name = self.get_conditions_dataframe()['name'].get(condition_id)
+            condition_item = QtWidgets.QTableWidgetItem(condition_name)
+            condition_item.setTextAlignment(QtCore.Qt.AlignCenter)
+            condition_item.setFlags(QtCore.Qt.ItemIsEnabled)
+            items = [atomic_number_item, name_item, symbol_item, radiation_item, kev_item,
+                     low_item, high_item, intensity_item, active_item, condition_item]
+            self.form.add_row(items, self.get_elements_dataframe().at[row, "element_id"])
 
     def filter_table(self, index):
         self.form.clear()
         if index == 0:
-            self.setup_table(range(self.rows))
+            self.setup_table(range(self.get_row_count()))
         elif index == 1:
-            # print(self.dfElements[self.dfElements['active'] == 1].index)
             self.setup_table(
-                self.dfElements[self.dfElements['active'] == 1].index
+                self.get_elements_dataframe()[self.get_elements_dataframe()['active'] == 1].index
             )
         else:
-            indexes = self.dfUQ["element_id"].to_list()
+            indexes = self.get_uq_dataframe()["element_id"].to_list()
             for i in range(len(indexes)):
                 indexes[i] -= 1
             self.setup_table(indexes)

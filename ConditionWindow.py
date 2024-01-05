@@ -1,7 +1,7 @@
 from PyQt5 import QtWidgets, QtCore
 
-import Sqlite
-from Backend import addr
+from Sqlite import dataframe_of_database
+from TableWidget import Form
 
 
 class Window(QtWidgets.QWidget):
@@ -11,80 +11,65 @@ class Window(QtWidgets.QWidget):
             int(size.width() * 0.5), int(size.height() * 0.3)
         )
         self.mainLayout = QtWidgets.QHBoxLayout()
-        self.form = QtWidgets.QTableWidget()
-        self.dfConditions = Sqlite.read(addr["dbFundamentals"], "conditions")
-
-    def setup_ui(self):
-        # window config
-        self.setFixedSize(self.windowSize)
-        self.setWindowTitle("Conditions")
-
-        self.form.setFrameShape(QtWidgets.QFrame.Box)
-        self.form.setFrameShadow(QtWidgets.QFrame.Plain)
-        self.form.setColumnCount(10)
         headers = [
-            "ID",
             "Name",
             "Kv",
             "mA",
             "Time",
             "Rotation",
-            "Enviroment",
+            "Environment",
             "Filter",
             "Mask",
             "Active",
         ]
-        self.form.setHorizontalHeaderLabels(headers)
-        self.form.horizontalHeader().setSectionResizeMode(QtWidgets.QHeaderView.Stretch)
-        self.form.setRowCount(self.dfConditions.shape[0])
+        self.form = Form(headers)
+        self.__df_conditions = dataframe_of_database("fundamentals", "conditions")
+
+    def get_dataframe(self):
+        return self.__df_conditions
+
+    def setup_ui(self):
+        # window config
+        self.setFixedSize(self.windowSize)
+        self.setWindowTitle("Conditions")
         self.mainLayout.addWidget(self.form)
         self.setLayout(self.mainLayout)
+        self.form.setup_ui()
 
-        for i in self.dfConditions.index:
-            self.idItem = QtWidgets.QTableWidgetItem(
-                str(self.dfConditions.at[i, "condition_id"])
+        for i in self.get_dataframe().index:
+            name_item = QtWidgets.QTableWidgetItem(
+                self.get_dataframe().at[i, "name"])
+            name_item.setTextAlignment(QtCore.Qt.AlignCenter)
+            kv_item = QtWidgets.QTableWidgetItem(
+                str(self.get_dataframe().at[i, "Kv"]))
+            kv_item.setTextAlignment(QtCore.Qt.AlignCenter)
+            ma_item = QtWidgets.QTableWidgetItem(
+                str(self.get_dataframe().at[i, "Kv"]))
+            ma_item.setTextAlignment(QtCore.Qt.AlignCenter)
+            time_item = QtWidgets.QTableWidgetItem(
+                str(self.get_dataframe().at[i, "time"])
             )
-            self.idItem.setTextAlignment(QtCore.Qt.AlignCenter)
-            self.nameItem = QtWidgets.QTableWidgetItem(
-                self.dfConditions.at[i, "name"])
-            self.nameItem.setTextAlignment(QtCore.Qt.AlignCenter)
-            self.KvItem = QtWidgets.QTableWidgetItem(
-                str(self.dfConditions.at[i, "Kv"]))
-            self.KvItem.setTextAlignment(QtCore.Qt.AlignCenter)
-            self.mAItem = QtWidgets.QTableWidgetItem(
-                str(self.dfConditions.at[i, "Kv"]))
-            self.mAItem.setTextAlignment(QtCore.Qt.AlignCenter)
-            self.timeItem = QtWidgets.QTableWidgetItem(
-                str(self.dfConditions.at[i, "time"])
+            time_item.setTextAlignment(QtCore.Qt.AlignCenter)
+            rotation_item = QtWidgets.QTableWidgetItem(
+                str(self.get_dataframe().at[i, "rotation"])
             )
-            self.timeItem.setTextAlignment(QtCore.Qt.AlignCenter)
-            self.rotationItem = QtWidgets.QTableWidgetItem(
-                str(self.dfConditions.at[i, "rotation"])
+            rotation_item.setTextAlignment(QtCore.Qt.AlignCenter)
+            environment_item = QtWidgets.QTableWidgetItem(
+                self.get_dataframe().at[i, "environment"]
             )
-            self.rotationItem.setTextAlignment(QtCore.Qt.AlignCenter)
-            self.environmentItem = QtWidgets.QTableWidgetItem(
-                self.dfConditions.at[i, "environment"]
+            environment_item.setTextAlignment(QtCore.Qt.AlignCenter)
+            filter_item = QtWidgets.QTableWidgetItem(
+                str(self.get_dataframe().at[i, "filter"])
             )
-            self.environmentItem.setTextAlignment(QtCore.Qt.AlignCenter)
-            self.filterItem = QtWidgets.QTableWidgetItem(
-                str(self.dfConditions.at[i, "filter"])
+            filter_item.setTextAlignment(QtCore.Qt.AlignCenter)
+            mask_item = QtWidgets.QTableWidgetItem(
+                str(self.get_dataframe().at[i, "mask"])
             )
-            self.filterItem.setTextAlignment(QtCore.Qt.AlignCenter)
-            self.maskItem = QtWidgets.QTableWidgetItem(
-                str(self.dfConditions.at[i, "mask"])
+            mask_item.setTextAlignment(QtCore.Qt.AlignCenter)
+            active_item = QtWidgets.QTableWidgetItem(
+                str(bool(self.get_dataframe().at[i, "active"]))
             )
-            self.maskItem.setTextAlignment(QtCore.Qt.AlignCenter)
-            self.activeItem = QtWidgets.QTableWidgetItem(
-                str(bool(self.dfConditions.at[i, "active"]))
-            )
-            self.activeItem.setTextAlignment(QtCore.Qt.AlignCenter)
-            self.form.setItem(i, 0, self.idItem)
-            self.form.setItem(i, 1, self.nameItem)
-            self.form.setItem(i, 2, self.KvItem)
-            self.form.setItem(i, 3, self.mAItem)
-            self.form.setItem(i, 4, self.timeItem)
-            self.form.setItem(i, 5, self.rotationItem)
-            self.form.setItem(i, 6, self.environmentItem)
-            self.form.setItem(i, 7, self.filterItem)
-            self.form.setItem(i, 8, self.maskItem)
-            self.form.setItem(i, 9, self.activeItem)
+            active_item.setTextAlignment(QtCore.Qt.AlignCenter)
+            items = [name_item, kv_item, ma_item, time_item, rotation_item, environment_item, filter_item, mask_item,
+                     active_item]
+            self.form.add_row(items, self.get_dataframe().at[i, "condition_id"])
