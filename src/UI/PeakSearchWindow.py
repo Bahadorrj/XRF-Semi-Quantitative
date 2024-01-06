@@ -1,13 +1,13 @@
 import numpy as np
 from PyQt5 import QtWidgets, QtCore, QtGui
 from pyqtgraph import mkPen, GraphicsLayoutWidget, LinearRegionItem, InfiniteLine
-import Sqlite
-import Calculation
-import MessegeBox
-import LoadingDialogue
-from Backend import icons
-from ElementClass import Element
-from TableWidget import Form
+
+from src.Logic import Calculation
+from src.Logic import Sqlite
+from src.Logic.Backend import icons
+from src.Types.ElementClass import Element
+from src.UI import MessegeBox
+from src.UI.TableWidget import Form
 
 
 class Window(QtWidgets.QMainWindow):
@@ -62,10 +62,12 @@ class Window(QtWidgets.QMainWindow):
     def set_condition(self, condition):
         self.__condition = condition
         self.init_condition()
-        self.set_elements(condition.get_elements())
 
     def get_elements(self):
         return self.__elements
+
+    def set_elements(self, elements):
+        self.__elements = elements
 
     def get_element_by_id(self, id):
         for element in self.get_elements():
@@ -85,9 +87,6 @@ class Window(QtWidgets.QMainWindow):
             elements.append(self.get_element_by_id(element_id))
         return elements
 
-    def set_elements(self, elements):
-        self.__elements = elements
-
     def get_element(self, index):
         return self.get_elements()[index]
 
@@ -97,6 +96,7 @@ class Window(QtWidgets.QMainWindow):
         self.set_kilo_electron_volts(
             [Calculation.px_to_ev(i) for i in self.get_px()])
         self.plot_condition()
+        self.set_elements(self.get_condition().get_elements())
 
     def get_kilo_electron_volt_value(self, px):
         return self.get_kilo_electron_volts()[px]
@@ -124,12 +124,6 @@ class Window(QtWidgets.QMainWindow):
 
     def set_kev(self, kev):
         self.__Kev = kev
-
-    def get_added_ids(self):
-        return self.__added_ids
-
-    def set_added_ids(self, ids):
-        self.__added_ids = ids
 
     def get_elements_dataframe(self):
         return self.__dfElements
@@ -230,7 +224,7 @@ class Window(QtWidgets.QMainWindow):
             self.get_elements_dataframe()["symbol"] == element_symbol,
             self.get_elements_dataframe()["radiation_type"] == radiation_type)
         element_id = self.get_elements_dataframe()[mask]["element_id"].iloc[0]
-        if element_id in self.get_added_ids():
+        if element_id in self.form.get_row_ids():
             message_box = MessegeBox.Dialog(
                 QtWidgets.QMessageBox.Information,
                 "Duplicate  element!",
@@ -238,7 +232,6 @@ class Window(QtWidgets.QMainWindow):
             )
             message_box.exec()
         else:
-            self.get_added_ids().append(element_id)
             element = Element(element_id)
             self.init_element(element)
             self.add_element_to_form(element)
@@ -460,6 +453,7 @@ class Window(QtWidgets.QMainWindow):
 
     def closeEvent(self, a0):
         Sqlite.write_elements_to_table(self.get_form_elements(), self.get_condition())
+        self.get_condition().set_elements(self.get_active_elements())
         self.form.clear()
         self.peakPlot.clear()
         self.spectrumPlot.clear()

@@ -1,8 +1,8 @@
 from pyqtgraph import InfiniteLine, InfLineLabel, mkPen, LinearRegionItem
 
-from DataClass import Data
-from Sqlite import get_column_labels, get_value
-import Calculation
+from src.Logic import Calculation
+from src.Logic.Sqlite import get_column_labels, get_value
+from src.Types.DataClass import Data
 
 
 class Element(Data):
@@ -16,7 +16,7 @@ class Element(Data):
         self.__range = [Calculation.ev_to_px(self.get_attribute("low_Kev")),
                         Calculation.ev_to_px(self.get_attribute("high_Kev"))]
         self.__intensity = self.get_attribute("intensity")
-        self.__activated = self.get_attribute("active")
+        self.__activated = bool(self.get_attribute("active"))
         self.__spectrum_line = self.init_line()
         self.__peak_line = self.init_line()
         self.__region = self.init_region()

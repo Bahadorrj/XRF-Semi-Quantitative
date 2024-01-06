@@ -1,7 +1,7 @@
 from pathlib import Path
 
-from ConditionClass import Condition
-from TextReader import set_counts
+from src.Logic.TextReader import set_counts
+from src.Types.ConditionClass import Condition
 
 
 class File:

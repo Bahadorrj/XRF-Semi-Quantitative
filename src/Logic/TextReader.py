@@ -1,4 +1,4 @@
-from ConditionClass import Condition
+from src.Types.ConditionClass import Condition
 
 
 def set_counts(sample_file) -> None:

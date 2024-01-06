@@ -4,11 +4,11 @@ import numpy as np
 from PyQt5 import QtWidgets, QtCore, QtGui
 from pyqtgraph import PlotWidget, SignalProxy, ColorButton, mkPen
 
-import ConditionWindow
-import ElementWindow
-import PeakSearchWindow
-from Backend import icons
-from FileClass import File
+from src.Logic.Backend import icons
+from src.Types.FileClass import File
+from src.UI import ConditionWindow
+from src.UI import ElementWindow
+from src.UI import PeakSearchWindow
 
 
 class Window(QtWidgets.QMainWindow):
@@ -18,7 +18,7 @@ class Window(QtWidgets.QMainWindow):
         self.yLim = 0
         self.colors = ["#FF0000", "#FFD700", "#00FF00", "#00FFFF", "#000080", "#0000FF", "#8B00FF",
                        "#FF1493", "#FFC0CB", "#FF4500", "#FFFF00", "#FF00FF", "#00FF7F", "#FF7F00"]
-        self.addedFiles = list()
+        self.__files = list()
         self.windowSize = QtCore.QSize(
             int(size.width() * 0.75), int(size.height() * 0.75)
         )
@@ -42,6 +42,12 @@ class Window(QtWidgets.QMainWindow):
         self.conditionsWindow = ConditionWindow.Window(size)
         self.elementsWindow = ElementWindow.Window(size)
         self.peakSearchWindow = PeakSearchWindow.Window(size)
+
+    def get_files(self):
+        return self.__files
+
+    def get_file(self, index):
+        return self.__files[index]
 
     def setup_ui(self):
         # window config
@@ -158,7 +164,7 @@ class Window(QtWidgets.QMainWindow):
             color_button.sigColorChanged.connect(self.update_color)
             self.form.setItemWidget(condition_item, 2, color_button)
             color_button.sigColorChanged.connect(self.update_color)
-        self.addedFiles.append(f)
+        self.get_files().append(f)
 
     def update_color(self):
         self.plot_files()
@@ -192,7 +198,7 @@ class Window(QtWidgets.QMainWindow):
         self.curvePlot.clear()
         for top_level_index in range(self.form.topLevelItemCount()):
             top_level_item = self.form.topLevelItem(top_level_index)
-            f = self.addedFiles[top_level_index]
+            f = self.get_file(top_level_index)
             for child_index in range(top_level_item.childCount()):
                 if top_level_item.child(child_index).checkState(1) != 0:
                     intensity = f.get_counts()[child_index]
@@ -220,7 +226,7 @@ class Window(QtWidgets.QMainWindow):
             top_level_index = self.form.indexOfTopLevelItem(
                 self.form.currentItem().parent())
             child_index = self.form.currentIndex().row()
-            self.peakSearchWindow.set_condition(self.addedFiles[top_level_index].get_condition(child_index))
+            self.peakSearchWindow.set_condition(self.get_file(top_level_index).get_condition(child_index))
             self.peakSearchWindow.setup_ui()
             self.peakSearchWindow.show()
 
@@ -242,10 +248,10 @@ class Window(QtWidgets.QMainWindow):
         top_level_index = self.form.indexOfTopLevelItem(item)
         if top_level_index != -1:
             self.form.takeTopLevelItem(top_level_index)
-            self.addedFiles.pop(top_level_index)
+            self.get_files().pop(top_level_index)
             self.plot_files()
 
     def open_directory(self):
-        f = self.addedFiles[self.form.currentIndex().row()]
+        f = self.get_file(self.form.currentIndex().row())
         path = f.get_path().rstrip("/" + f.get_name() + ".txt")
         os.startfile(path)

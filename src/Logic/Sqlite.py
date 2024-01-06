@@ -1,7 +1,9 @@
 import sqlite3
-import pandas as pd
-from Backend import addresses
 from pathlib import Path
+
+import pandas as pd
+
+from src.Logic.Backend import addresses
 
 
 class Database:

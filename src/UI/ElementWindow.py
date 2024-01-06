@@ -1,7 +1,7 @@
 from PyQt5 import QtCore, QtWidgets
 
-from Sqlite import dataframe_of_database
-from TableWidget import Form
+from src.Logic.Sqlite import dataframe_of_database
+from src.UI.TableWidget import Form
 
 
 class Window(QtWidgets.QWidget):
