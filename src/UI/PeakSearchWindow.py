@@ -284,29 +284,19 @@ class Window(QtWidgets.QMainWindow):
     def add_element_to_form(self, element):
         remove_button = QtWidgets.QPushButton(icon=QtGui.QIcon(icons["cross"]))
         remove_button.clicked.connect(self.remove_row)
-        hide_button = QtWidgets.QPushButton(icon=QtGui.QIcon(icons["unhide"]))
+        hide_button = QtWidgets.QPushButton()
+        if element.is_hidden():
+            hide_button.setIcon(QtGui.QIcon(icons["hide"]))
+        else:
+            hide_button.setIcon(QtGui.QIcon(icons["show"]))
         hide_button.clicked.connect(self.visibility)
         element_item = QtWidgets.QTableWidgetItem(element.get_attribute("symbol"))
-        element_item.setTextAlignment(QtCore.Qt.AlignCenter)
-        element_item.setFlags(element_item.flags() ^ QtCore.Qt.ItemIsEditable)
         type_item = QtWidgets.QTableWidgetItem(element.get_attribute("radiation_type"))
-        type_item.setTextAlignment(QtCore.Qt.AlignCenter)
-        type_item.setFlags(type_item.flags() ^ QtCore.Qt.ItemIsEditable)
         kev_item = QtWidgets.QTableWidgetItem(str(element.get_attribute("Kev")))
-        kev_item.setTextAlignment(QtCore.Qt.AlignCenter)
-        kev_item.setFlags(kev_item.flags() ^ QtCore.Qt.ItemIsEditable)
         low_item = QtWidgets.QTableWidgetItem(str(element.get_low_kev()))
-        low_item.setTextAlignment(QtCore.Qt.AlignCenter)
-        low_item.setFlags(low_item.flags() ^ QtCore.Qt.ItemIsEditable)
         high_item = QtWidgets.QTableWidgetItem(str(element.get_high_kev()))
-        high_item.setTextAlignment(QtCore.Qt.AlignCenter)
-        high_item.setFlags(high_item.flags() ^ QtCore.Qt.ItemIsEditable)
         intensity_item = QtWidgets.QTableWidgetItem(str(element.get_intensity()))
-        intensity_item.setTextAlignment(QtCore.Qt.AlignCenter)
-        intensity_item.setFlags(intensity_item.flags() ^ QtCore.Qt.ItemIsEditable)
         status_item = QtWidgets.QTableWidgetItem()
-        status_item.setTextAlignment(QtCore.Qt.AlignCenter)
-        status_item.setFlags(status_item.flags() ^ QtCore.Qt.ItemIsEditable)
         status_button = QtWidgets.QPushButton()
         if element.is_activated():
             status_item.setText("Activated")
@@ -421,7 +411,7 @@ class Window(QtWidgets.QMainWindow):
     def un_hide_element(self, element, id):
         row = self.form.get_row_by_id(id)
         element.set_hidden(False)
-        row.get("Hide Widget").setIcon(QtGui.QIcon(icons["unhide"]))
+        row.get("Hide Widget").setIcon(QtGui.QIcon(icons["show"]))
         self.plot_all_lines_of_element(element)
 
     def header_clicked(self, column):
@@ -472,6 +462,5 @@ class Window(QtWidgets.QMainWindow):
         for element in self.get_elements():
             if element.is_activated():
                 self.get_added_elements().append(element)
-                self.plot_element_line(element)
                 self.add_element_to_form(element)
         super().show()

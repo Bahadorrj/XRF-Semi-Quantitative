@@ -76,43 +76,27 @@ class Window(QtWidgets.QWidget):
             atomic_number_item = QtWidgets.QTableWidgetItem(
                 str(self.get_elements_dataframe().at[row, 'atomic_number'])
             )
-            atomic_number_item.setTextAlignment(QtCore.Qt.AlignCenter)
-            atomic_number_item.setFlags(QtCore.Qt.ItemIsEnabled)
             name_item = QtWidgets.QTableWidgetItem(
                 self.get_elements_dataframe().at[row, 'name']
             )
-            name_item.setTextAlignment(QtCore.Qt.AlignCenter)
-            name_item.setFlags(QtCore.Qt.ItemIsEnabled)
             symbol_item = QtWidgets.QTableWidgetItem(
                 self.get_elements_dataframe().at[row, 'symbol']
             )
-            symbol_item.setTextAlignment(QtCore.Qt.AlignCenter)
-            symbol_item.setFlags(QtCore.Qt.ItemIsEnabled)
             radiation_item = QtWidgets.QTableWidgetItem(
                 self.get_elements_dataframe().at[row, 'radiation_type']
             )
-            radiation_item.setTextAlignment(QtCore.Qt.AlignCenter)
-            radiation_item.setFlags(QtCore.Qt.ItemIsEnabled)
             kev_item = QtWidgets.QTableWidgetItem(
                 str(self.get_elements_dataframe().at[row, 'Kev'])
             )
-            kev_item.setTextAlignment(QtCore.Qt.AlignCenter)
-            kev_item.setFlags(QtCore.Qt.ItemIsEnabled)
             low_item = QtWidgets.QTableWidgetItem(
                 str(self.get_elements_dataframe().at[row, 'low_Kev'])
             )
-            low_item.setTextAlignment(QtCore.Qt.AlignCenter)
-            low_item.setFlags(QtCore.Qt.ItemIsEnabled)
             high_item = QtWidgets.QTableWidgetItem(
                 str(self.get_elements_dataframe().at[row, 'high_Kev'])
             )
-            high_item.setTextAlignment(QtCore.Qt.AlignCenter)
-            high_item.setFlags(QtCore.Qt.ItemIsEnabled)
             intensity_item = QtWidgets.QTableWidgetItem(
                 str(self.get_elements_dataframe().at[row, 'intensity'])
             )
-            intensity_item.setTextAlignment(QtCore.Qt.AlignCenter)
-            intensity_item.setFlags(QtCore.Qt.ItemIsEnabled)
             active = self.get_elements_dataframe().at[row, 'active']
             if active == 1:
                 active_item = QtWidgets.QTableWidgetItem(
@@ -124,13 +108,9 @@ class Window(QtWidgets.QWidget):
                     str(False)
                 )
                 active_item.setForeground(QtCore.Qt.red)
-            active_item.setTextAlignment(QtCore.Qt.AlignCenter)
-            active_item.setFlags(QtCore.Qt.ItemIsEnabled)
             condition_id = self.get_elements_dataframe().at[row, 'condition_id']
             condition_name = self.get_conditions_dataframe()['name'].get(condition_id)
             condition_item = QtWidgets.QTableWidgetItem(condition_name)
-            condition_item.setTextAlignment(QtCore.Qt.AlignCenter)
-            condition_item.setFlags(QtCore.Qt.ItemIsEnabled)
             items = [atomic_number_item, name_item, symbol_item, radiation_item, kev_item,
                      low_item, high_item, intensity_item, active_item, condition_item]
             self.form.add_row(items, self.get_elements_dataframe().at[row, "element_id"])

@@ -4,7 +4,7 @@ from numpy import zeros, int32
 from src.Types.ConditionClass import Condition
 
 
-class File:
+class File(object):
     def __init__(self, path: str):
         self.__path = path
         self.__name = Path(path).stem

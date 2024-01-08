@@ -8,7 +8,7 @@ from src.Types.DataClass import Data
 class Element(Data):
     def __init__(self, id):
         super().__init__()
-        self.__hidden = False
+        self.__hidden = True
         self.set_database_labels(get_column_labels("fundamentals", "elements"))
         self.set_database_values(get_value("fundamentals", "elements", where=f"WHERE element_id = {id}"))
         self.__low_kev = self.get_attribute("low_Kev")
