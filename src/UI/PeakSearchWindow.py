@@ -44,24 +44,20 @@ class Window(QtWidgets.QMainWindow):
         self.mainWidget = QtWidgets.QWidget()
         # variables
         self.__dfElements = Sqlite.dataframe_of_database("fundamentals", "elements")
+        self.set_elements_dataframe(Sqlite.dataframe_of_database("fundamentals", "elements"))
         self.__condition = None
         self.__elements = list()
-        self.__intensity_range = None
-        self.__px = None
-        self.__kilo_electron_volts = None
-        self.__Kev = None
-        self.__added_ids = list()
-        self.set_elements_dataframe(Sqlite.dataframe_of_database("fundamentals", "elements"))
-
-        # pens
-        self.plotPen = mkPen("w", width=2)
+        self.__added_elements = list()
+        self.__counts = np.zeros(2048, dtype=np.int32)
+        self.__px = np.zeros(2048, dtype=np.int16)
+        self.__kilo_electron_volts = list()
+        self.__Kev = float()
 
     def get_condition(self):
         return self.__condition
 
     def set_condition(self, condition):
         self.__condition = condition
-        self.init_condition()
 
     def get_elements(self):
         return self.__elements
@@ -69,37 +65,30 @@ class Window(QtWidgets.QMainWindow):
     def set_elements(self, elements):
         self.__elements = elements
 
+    def get_element(self, index):
+        return self.get_elements()[index]
+
     def get_element_by_id(self, id):
         for element in self.get_elements():
             if element.get_attribute("element_id") == id:
                 return element
 
-    def get_active_elements(self):
+    def get_added_elements(self):
+        return self.__added_elements
+
+    def set_added_elements(self, elements):
+        self.__added_elements = elements
+
+    def init_elements(self):
         elements = list()
-        for e in self.get_elements():
-            if e.is_activated():
-                elements.append(e)
-        return elements
-
-    def get_form_elements(self):
-        elements = list()
-        for element_id in self.form.get_row_ids():
-            elements.append(self.get_element_by_id(element_id))
-        return elements
-
-    def get_element(self, index):
-        return self.get_elements()[index]
-
-    def init_condition(self):
-        self.set_intensity_range(self.get_condition().get_counts())
-        self.set_px(np.arange(0, len(self.__intensity_range), 1))
-        self.set_kilo_electron_volts(
-            [Calculation.px_to_ev(i) for i in self.get_px()])
-        self.plot_condition()
-        self.set_elements(self.get_condition().get_elements())
-
-    def get_kilo_electron_volt_value(self, px):
-        return self.get_kilo_electron_volts()[px]
+        values = Sqlite.get_values(
+            "fundamentals",
+            "elements",
+        )
+        for value in values:
+            e = Element(value[0])
+            elements.append(e)
+        self.set_elements(elements)
 
     def get_kilo_electron_volts(self):
         return self.__kilo_electron_volts
@@ -107,17 +96,20 @@ class Window(QtWidgets.QMainWindow):
     def set_kilo_electron_volts(self, kilo_electron_volts):
         self.__kilo_electron_volts = kilo_electron_volts
 
+    def get_kilo_electron_volt_value(self, px):
+        return self.get_kilo_electron_volts()[px]
+
     def get_px(self):
         return self.__px
 
     def set_px(self, px):
         self.__px = px
 
-    def get_intensity_range(self):
-        return self.__intensity_range
+    def get_counts(self):
+        return self.__counts
 
-    def set_intensity_range(self, intensity_range):
-        self.__intensity_range = intensity_range
+    def set_counts(self, intensity_range):
+        self.__counts = intensity_range
 
     def get_kev(self):
         return self.__Kev
@@ -131,24 +123,30 @@ class Window(QtWidgets.QMainWindow):
     def set_elements_dataframe(self, elements):
         self.__dfElements = elements
 
-    def plot_condition(self):
+    def init_plot_items(self):
         self.spectrumPlot.setLimits(
-            xMin=0, xMax=max(self.get_px()), yMin=0, yMax=1.1 * max(self.get_intensity_range())
+            xMin=0, xMax=max(self.get_px()), yMin=0, yMax=1.1 * max(self.get_counts())
         )
         self.spectrumPlot.plot(
-            x=self.get_px(), y=self.get_intensity_range(), pen=self.plotPen)
+            x=self.get_px(), y=self.get_counts(), pen=mkPen("w", width=2))
         self.peakPlot.setLimits(
-            xMin=0, xMax=max(self.get_px()), yMin=0, yMax=1.1 * max(self.get_intensity_range())
+            xMin=0, xMax=max(self.get_px()), yMin=0, yMax=1.1 * max(self.get_counts())
         )
         self.peakPlot.plot(
-            x=self.get_px(), y=self.get_intensity_range(), pen=self.plotPen)
+            x=self.get_px(), y=self.get_counts(), pen=mkPen("w", width=2))
         self.spectrumRegion.setBounds((0, max(self.get_px())))
 
-    def setup_ui(self):
+    def setup_ui(self, counts, condition):
+        self.set_counts(counts)
+        self.set_px(np.arange(0, len(self.get_counts()), 1))
+        self.set_kilo_electron_volts([Calculation.px_to_ev(i) for i in self.get_px()])
+        self.set_condition(condition)
+        self.init_plot_items()
+        self.init_elements()
         # window config
         self.setMinimumSize(self.windowSize)
         self.setWindowTitle(self.get_condition().get_attribute("name"))
-        self.showMaximized()
+        # self.showMaximized()
 
         # form config
         self.form.setup_ui()
@@ -232,31 +230,56 @@ class Window(QtWidgets.QMainWindow):
             )
             message_box.exec()
         else:
-            element = Element(element_id)
+            element = self.get_element_by_id(element_id)
             self.init_element(element)
             self.add_element_to_form(element)
 
     def init_element(self, element):
+        self.get_added_elements().append(element)
         element.get_region().sigRegionChanged.connect(lambda: self.set_range(element))
-        self.get_elements().append(element)
         all_ids = Sqlite.get_values(
             "fundamentals", "elements", column_name="element_id",
             where=f"WHERE symbol = '{element.get_attribute('symbol')}'"
         )
         for id in all_ids:
             if id[0] not in self.form.get_row_ids():
-                e = Element(id[0])
-                self.get_elements().append(e)
+                e = self.get_element_by_id(id[0])
                 self.plot_element_line(e)
         self.peakPlot.addItem(element.get_region())
 
     def plot_element_line(self, element):
+        if element.is_activated():
+            element.get_spectrum_line().setPen(mkPen("g", width=2))
+            element.get_peak_line().setPen(mkPen("g", width=2))
+        else:
+            element.get_spectrum_line().setPen(mkPen("r", width=2))
+            element.get_peak_line().setPen(mkPen("r", width=2))
         self.spectrumPlot.addItem(element.get_spectrum_line())
         self.peakPlot.addItem(element.get_peak_line())
+
+    def plot_all_lines_of_element(self, element):
+        if element.is_activated():
+            self.plot_element_line(element)
+        else:
+            for e in self.get_elements():
+                if e.get_name() == element.get_name():
+                    if e.get_attribute("element_id") not in self.form.get_row_ids() or e.get_attribute(
+                            "element_id") == element.get_attribute("element_id"):
+                        self.plot_element_line(e)
 
     def remove_element_line(self, element):
         self.spectrumPlot.removeItem(element.get_spectrum_line())
         self.peakPlot.removeItem(element.get_peak_line())
+
+    def remove_all_lines_of_element(self, element):
+        if element.is_activated():
+            self.remove_element_line(element)
+        else:
+            for e in self.get_elements():
+                if e.get_name() == element.get_name():
+                    if e.get_attribute("element_id") not in self.form.get_row_ids() or e.get_attribute(
+                            "element_id") == element.get_attribute("element_id"):
+                        self.remove_element_line(e)
 
     def add_element_to_form(self, element):
         remove_button = QtWidgets.QPushButton(icon=QtGui.QIcon(icons["cross"]))
@@ -300,9 +323,17 @@ class Window(QtWidgets.QMainWindow):
         low_px, high_px = element.get_region().getRegion()
         low_px = int(low_px)
         high_px = int(high_px)
-        low_kev = self.get_kilo_electron_volt_value(low_px)
-        high_kev = self.get_kilo_electron_volt_value(high_px)
+        try:
+            low_kev = self.get_kilo_electron_volt_value(low_px)
+        except IndexError:
+            low_kev = self.get_kilo_electron_volt_value(0)
+        try:
+            high_kev = self.get_kilo_electron_volt_value(high_px)
+        except IndexError:
+            high_kev = self.get_kilo_electron_volt_value(-1)
         row = self.form.get_row_by_id(element.get_attribute("element_id"))
+        if low_kev > high_kev:
+            low_kev = 0
         row["Low Kev"].setText(str(low_kev))
         row["High Kev"].setText(str(high_kev))
 
@@ -317,7 +348,7 @@ class Window(QtWidgets.QMainWindow):
     def activate_element(self, element, row):
         rng = [Calculation.ev_to_px(row.get("Low Kev").text()),
                Calculation.ev_to_px(row.get("High Kev").text())]
-        intensity = Calculation.calculate_intensity_in_range(rng, self.get_intensity_range())
+        intensity = Calculation.calculate_intensity_in_range(rng, self.get_counts())
 
         row.get("Status").setText("Activated")
         row.get("Activate Widget").setText("Deactivate")
@@ -340,13 +371,12 @@ class Window(QtWidgets.QMainWindow):
         row.get("Intensity").setText("None")
 
         element.set_activated(False)
-        element.set_intensity(None)
 
         self.plot_all_lines_of_element(element)
         self.peakPlot.addItem(element.get_region())
 
     def item_clicked(self):
-        element = self.get_element(self.form.currentRow())
+        element = self.get_element_by_id(self.form.get_current_row_id())
         self.go_to_px(element.get_range())
 
     def go_to_px(self, rng):
@@ -369,50 +399,30 @@ class Window(QtWidgets.QMainWindow):
             self.remove(element, row_index)
 
     def remove(self, element, index):
+        element.set_activated(False)
         self.form.removeRow(index)
         self.remove_all_lines_of_element(element)
-        if element.is_activated() is False:
-            self.peakPlot.removeItem(element.get_region())
-
-    def remove_all_lines_of_element(self, element):
-        if element.is_activated():
-            self.remove_element_line(element)
-        else:
-            for e in self.get_elements():
-                if e.get_name() == element.get_name():
-                    if e.get_attribute("element_id") not in self.form.get_row_ids() or e.get_attribute(
-                            "element_id") == element.get_attribute("element_id"):
-                        self.remove_element_line(e)
-
-    def plot_all_lines_of_element(self, element):
-        if element.is_activated():
-            self.plot_element_line(element)
-        else:
-            for e in self.get_elements():
-                if e.get_name() == element.get_name():
-                    if e.get_attribute("element_id") not in self.form.get_row_ids() or e.get_attribute(
-                            "element_id") == element.get_attribute("element_id"):
-                        self.plot_element_line(e)
+        self.peakPlot.removeItem(element.get_region())
 
     def visibility(self):
-        row_index = self.form.currentRow()
-        element = self.get_element(row_index)
+        id = self.form.get_current_row_id()
+        element = self.get_element_by_id(id)
         if element.is_hidden():
-            self.hide_element(element, row_index)
+            self.un_hide_element(element, id)
         else:
-            self.un_hide_element(element, row_index)
+            self.hide_element(element, id)
 
-    def hide_element(self, element, index):
-        row = self.form.get_row(index)
-        element.set_hidden(False)
-        row.get("Hide Widget").setIcon(QtGui.QIcon(icons["unhide"]))
-        self.plot_all_lines_of_element(element)
-
-    def un_hide_element(self, element, index):
-        row = self.form.get_row(index)
+    def hide_element(self, element, id):
+        row = self.form.get_row_by_id(id)
         element.set_hidden(True)
         row.get("Hide Widget").setIcon(QtGui.QIcon(icons["hide"]))
         self.remove_all_lines_of_element(element)
+
+    def un_hide_element(self, element, id):
+        row = self.form.get_row_by_id(id)
+        element.set_hidden(False)
+        row.get("Hide Widget").setIcon(QtGui.QIcon(icons["unhide"]))
+        self.plot_all_lines_of_element(element)
 
     def header_clicked(self, column):
         if column == 0:
@@ -426,17 +436,16 @@ class Window(QtWidgets.QMainWindow):
                 QtWidgets.QMessageBox.Ok | QtWidgets.QMessageBox.Cancel)
             return_value = message_box.exec()
             if return_value == QtWidgets.QMessageBox.Ok:
-                for element in self.get_elements():
+                for element in self.get_added_elements():
                     self.remove(element, 0)
-                    element.set_activated(False)
         elif column == 1:
-            hidden = self.get_element(0).is_hidden()
+            hidden = self.get_added_elements()[0].is_hidden()
             if hidden:
-                for index, element in enumerate(self.get_elements()):
-                    self.hide_element(element, index)
+                for id in self.form.get_row_ids():
+                    self.un_hide_element(self.get_element_by_id(id), id)
             else:
-                for index, element in enumerate(self.get_elements()):
-                    self.un_hide_element(element, index)
+                for id in self.form.get_row_ids():
+                    self.hide_element(self.get_element_by_id(id), id)
         elif column == 9:
             message_box = MessegeBox.Dialog(
                 QtWidgets.QMessageBox.Warning,
@@ -448,26 +457,21 @@ class Window(QtWidgets.QMainWindow):
                 QtWidgets.QMessageBox.Ok | QtWidgets.QMessageBox.Cancel)
             return_value = message_box.exec()
             if return_value == QtWidgets.QMessageBox.Ok:
-                for index, element in enumerate(self.get_elements()):
-                    self.activate_element(element, index)
+                for index, element in enumerate(self.get_added_elements()):
+                    self.deactivate_element(element, self.form.get_row(index))
 
     def closeEvent(self, a0):
-        Sqlite.write_elements_to_table(self.get_form_elements(), self.get_condition())
-        self.get_condition().set_elements(self.get_active_elements())
+        Sqlite.write_elements_to_table(self.get_added_elements(), self.get_condition())
+        self.get_added_elements().clear()
         self.form.clear()
         self.peakPlot.clear()
         self.spectrumPlot.clear()
         super().closeEvent(a0)
 
     def show(self):
-        for element in self.get_condition().get_elements():
-            self.plot_element_line(element)
-            self.add_element_to_form(element)
-        # loading_dialog = LoadingDialogue.Window()
-        # loading_dialog.use_animation(0.5)
-        # loading_dialog.setup_ui(title="Please wait", label="Collecting elements")
-        # loading_dialog.show()
-        # loading_dialog.animate_text()
-        # loading_dialog.processFinished = True
-        # loading_dialog.close()
+        for element in self.get_elements():
+            if element.is_activated():
+                self.get_added_elements().append(element)
+                self.plot_element_line(element)
+                self.add_element_to_form(element)
         super().show()

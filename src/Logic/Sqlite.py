@@ -96,17 +96,14 @@ def write_elements_to_table(elements, condition):
                         (SELECT condition_id
                         FROM conditions
                         WHERE conditions.name = '{condition.get_name()}')
-                WHERE symbol = '{element.get_attribute("symbol")}'
-                AND radiation_type = '{element.get_attribute("radiation_type")}';
+                WHERE element_id = {element.get_attribute("element_id")};
             """
+            cur.execute(query)
         else:
             query = f"""
                 UPDATE elements
-                SET intensity = NULL,
-                    active = NULL,
-                    condition_id = NULL
-                WHERE symbol = '{element.get_attribute("symbol")}'
-                AND radiation_type = '{element.get_attribute("radiation_type")}'
+                SET active = 0
+                WHERE element_id = {element.get_attribute("element_id")};
             """
-        cur.execute(query)
+            cur.execute(query)
     connection.commit()

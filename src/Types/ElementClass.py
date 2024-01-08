@@ -17,8 +17,8 @@ class Element(Data):
                         Calculation.ev_to_px(self.get_attribute("high_Kev"))]
         self.__intensity = self.get_attribute("intensity")
         self.__activated = bool(self.get_attribute("active"))
-        self.__spectrum_line = self.init_line()
-        self.__peak_line = self.init_line()
+        self.__spectrum_line = self.generate_line()
+        self.__peak_line = self.generate_line()
         self.__region = self.init_region()
 
     def is_hidden(self) -> bool:
@@ -39,7 +39,7 @@ class Element(Data):
     def set_peak_line(self, line):
         self.__peak_line = line
 
-    def init_line(self):
+    def generate_line(self):
         line = InfiniteLine()
         line.setAngle(90)
         line.setMovable(False)

@@ -201,18 +201,18 @@ class Window(QtWidgets.QMainWindow):
             f = self.get_file(top_level_index)
             for child_index in range(top_level_item.childCount()):
                 if top_level_item.child(child_index).checkState(1) != 0:
-                    intensity = f.get_counts()[child_index]
-                    px = np.arange(0, len(intensity), 1)
-                    if max(intensity) > self.yLim:
-                        self.yLim = max(intensity)
-                    if len(intensity) > self.xLim:
-                        self.xLim = len(intensity)
+                    counts = f.get_counts()[child_index]
+                    px = np.arange(0, len(counts), 1)
+                    if max(counts) > self.yLim:
+                        self.yLim = max(counts)
+                    if len(counts) > self.xLim:
+                        self.xLim = len(counts)
                     self.curvePlot.setLimits(
                         xMin=0, xMax=self.xLim, yMin=0, yMax=1.1 * self.yLim
                     )
                     color = self.form.itemWidget(
                         top_level_item.child(child_index), 2).color()
-                    self.curvePlot.plot(x=px, y=intensity,
+                    self.curvePlot.plot(x=px, y=counts,
                                         pen=mkPen(color=color, width=2))
 
     def item_clicked(self, item):
@@ -223,11 +223,12 @@ class Window(QtWidgets.QMainWindow):
 
     def open_peak_search(self):
         if self.actionPeakSearch.isEnabled():
-            top_level_index = self.form.indexOfTopLevelItem(
-                self.form.currentItem().parent())
+            top_level_index = self.form.indexOfTopLevelItem(self.form.currentItem().parent())
             child_index = self.form.currentIndex().row()
-            self.peakSearchWindow.set_condition(self.get_file(top_level_index).get_condition(child_index))
-            self.peakSearchWindow.setup_ui()
+            self.peakSearchWindow.setup_ui(
+                self.get_file(top_level_index).get_counts()[child_index],
+                self.get_file(top_level_index).get_condition(child_index)
+            )
             self.peakSearchWindow.show()
 
     def open_conditions(self):
