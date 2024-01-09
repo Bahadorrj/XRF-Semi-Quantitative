@@ -336,8 +336,9 @@ class Window(QtWidgets.QMainWindow):
             self.deactivate_element(element, row)
 
     def activate_element(self, element, row):
-        rng = [Calculation.ev_to_px(row.get("Low Kev").text()),
-               Calculation.ev_to_px(row.get("High Kev").text())]
+        # -1 is for conflict
+        rng = [Calculation.ev_to_px(row.get("Low Kev").text()) - 1,
+               Calculation.ev_to_px(row.get("High Kev").text()) - 1]
         intensity = Calculation.calculate_intensity_in_range(rng, self.get_counts())
 
         row.get("Status").setText("Activated")

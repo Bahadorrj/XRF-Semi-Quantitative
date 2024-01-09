@@ -45,6 +45,8 @@ class Element(Data):
         line.setMovable(False)
         kev = self.get_attribute("Kev")
         px = Calculation.ev_to_px(kev)
+        # -1 is for conflict
+        px = px - 1
         line.setValue(px)
         sym_label = InfLineLabel(
             line, self.get_attribute("symbol"), movable=False, position=0.9
@@ -103,6 +105,5 @@ class Element(Data):
             self.get_spectrum_line().setPen(mkPen("r", width=2))
             self.get_peak_line().setPen(mkPen("r", width=2))
 
-
-
-
+    def __str__(self):
+        return f"Low Kev: {self.get_low_kev()} - High Kev: {self.get_high_kev()} - Intensity: {self.get_intensity()}"

@@ -102,7 +102,9 @@ def write_elements_to_table(elements, condition):
         else:
             query = f"""
                 UPDATE elements
-                SET active = 0
+                SET intensity = null,
+                    active = 0,
+                    condition_id = null
                 WHERE element_id = {element.get_attribute("element_id")};
             """
             cur.execute(query)

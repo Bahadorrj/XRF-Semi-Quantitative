@@ -4,7 +4,7 @@ from PyQt5 import QtWidgets, QtGui
 
 from src.Logic.Backend import icons
 from src.UI import PlotWindow
-
+# from src.Types.FileClass import File
 
 if __name__ == "__main__":
     app = QtWidgets.QApplication(sys.argv)
@@ -15,3 +15,6 @@ if __name__ == "__main__":
     main_window.setup_ui()
     main_window.show()
     sys.exit(app.exec())
+    # counts = File(r"F:\CSAN\main\Test -Int\S.txt").get_counts()[7]
+    # for index, count in enumerate(counts):
+    #     print(f"{index}- {count}")

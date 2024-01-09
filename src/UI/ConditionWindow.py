@@ -11,7 +11,7 @@ class Window(QtWidgets.QWidget):
             int(size.width() * 0.5), int(size.height() * 0.3)
         )
         self.mainLayout = QtWidgets.QHBoxLayout()
-        headers = [
+        __header_labels = [
             "Name",
             "Kv",
             "mA",
@@ -22,7 +22,7 @@ class Window(QtWidgets.QWidget):
             "Mask",
             "Active",
         ]
-        self.form = Form(headers)
+        self.form = Form(__header_labels)
         self.__df_conditions = dataframe_of_database("fundamentals", "conditions")
 
     def get_dataframe(self):

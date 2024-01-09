@@ -20,10 +20,11 @@ def px_to_ev(px):
 
 
 def calculate_intensity_in_range(rng, intensity_range):
+    # -1 is for conflict
     start = rng[0]
     stop = rng[1]
     intensity = 0
-    for px in range(start, stop):
+    for px in range(start, stop + 1):
         intensity += intensity_range[px]
     return intensity
 

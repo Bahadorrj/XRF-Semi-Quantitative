@@ -47,3 +47,4 @@ class File(object):
                 except ValueError:
                     pass
                 line = file.readline()
+

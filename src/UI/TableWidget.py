@@ -73,11 +73,15 @@ class Form(QtWidgets.QTableWidget):
         self.setRowCount(index + 1)
         for i, item in enumerate(items):
             try:
-                item.setTextAlignment(QtCore.Qt.AlignCenter)
-                item.setFlags(QtCore.Qt.ItemIsEnabled)
                 self.setItem(index, i, item)
             except TypeError:
                 self.setCellWidget(index, i, item)
+
+            try:
+                item.setTextAlignment(QtCore.Qt.AlignCenter)
+                item.setFlags(QtCore.Qt.ItemIsEnabled)
+            except AttributeError:
+                pass
         self.blockSignals(False)
         self.setCurrentCell(self.rowCount() - 1, 0)
 
