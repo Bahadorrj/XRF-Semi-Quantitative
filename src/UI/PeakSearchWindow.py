@@ -178,6 +178,7 @@ class Window(QtWidgets.QMainWindow):
 
         self.mainWidget.setLayout(self.mainLayout)
         self.setCentralWidget(self.mainWidget)
+        # finished
 
     def mouse_moved(self, event):
         if self.peakPlot.sceneBoundingRect().contains(event):
