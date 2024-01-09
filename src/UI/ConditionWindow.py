@@ -64,3 +64,5 @@ class Window(QtWidgets.QWidget):
             items = [name_item, kv_item, ma_item, time_item, rotation_item,
                      environment_item, filter_item, mask_item, active_item]
             self.form.add_row(items, self.get_dataframe().at[i, "condition_id"])
+        self.form.setCurrentItem(self.form.item(0, 0))
+

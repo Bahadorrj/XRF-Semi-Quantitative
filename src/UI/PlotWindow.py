@@ -225,10 +225,12 @@ class Window(QtWidgets.QMainWindow):
         if self.actionPeakSearch.isEnabled():
             top_level_index = self.form.indexOfTopLevelItem(self.form.currentItem().parent())
             child_index = self.form.currentIndex().row()
-            self.peakSearchWindow.setup_ui(
-                self.get_file(top_level_index).get_counts()[child_index],
-                self.get_file(top_level_index).get_condition(child_index)
-            )
+            self.peakSearchWindow.set_condition(self.get_file(top_level_index).get_condition(child_index))
+            self.peakSearchWindow.init_counts(self.get_file(top_level_index).get_counts()[child_index])
+            self.peakSearchWindow.setWindowTitle(
+                self.get_file(top_level_index).get_name() + " - " +
+                self.get_file(top_level_index).get_condition(child_index).get_attribute("name"))
+            self.peakSearchWindow.setup_ui()
             self.peakSearchWindow.show()
 
     def open_conditions(self):
@@ -236,6 +238,7 @@ class Window(QtWidgets.QMainWindow):
         self.conditionsWindow.show()
 
     def open_elements(self):
+        self.elementsWindow = ElementWindow.Window(self.size())
         self.elementsWindow.setup_ui()
         self.elementsWindow.show()
 

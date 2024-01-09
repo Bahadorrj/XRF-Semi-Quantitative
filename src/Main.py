@@ -12,9 +12,9 @@ if __name__ == "__main__":
     size = screen.size()
     app.setWindowIcon(QtGui.QIcon(icons["CSAN"]))
     main_window = PlotWindow.Window(size)
-    main_window.setup_ui()
     main_window.show()
-    sys.exit(app.exec())
+    main_window.setup_ui()
+    sys.exit(app.exec_())
     # counts = File(r"F:\CSAN\main\Test -Int\S.txt").get_counts()[7]
     # for index, count in enumerate(counts):
     #     print(f"{index}- {count}")

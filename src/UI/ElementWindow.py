@@ -114,6 +114,7 @@ class Window(QtWidgets.QWidget):
             items = [atomic_number_item, name_item, symbol_item, radiation_item, kev_item,
                      low_item, high_item, intensity_item, active_item, condition_item]
             self.form.add_row(items, self.get_elements_dataframe().at[row, "element_id"])
+        self.form.setCurrentItem(self.form.item(0, 0))
 
     def filter_table(self, index):
         self.form.clear()

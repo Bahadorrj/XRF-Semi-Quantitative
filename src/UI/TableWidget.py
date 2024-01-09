@@ -11,6 +11,7 @@ class Form(QtWidgets.QTableWidget):
         self.__headers = headers
         self.__non_widget_headers = self.init_non_widget_headers()
         self.__row_ids = list()
+        self.setup_ui()
 
     def get_headers(self):
         return self.__headers

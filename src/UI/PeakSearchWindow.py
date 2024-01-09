@@ -41,17 +41,19 @@ class Window(QtWidgets.QMainWindow):
         self.vLine = InfiniteLine(angle=90, movable=False)
         self.hLine = InfiniteLine(angle=0, movable=False)
         self.coordinateLabel = QtWidgets.QLabel()
+        self.statusLabel = QtWidgets.QLabel()
         self.mainWidget = QtWidgets.QWidget()
         # variables
         self.__dfElements = Sqlite.dataframe_of_database("fundamentals", "elements")
         self.set_elements_dataframe(Sqlite.dataframe_of_database("fundamentals", "elements"))
-        self.__condition = None
         self.__elements = list()
         self.__added_elements = list()
+        self.__condition = None
         self.__counts = np.zeros(2048, dtype=np.int32)
         self.__px = np.zeros(2048, dtype=np.int16)
         self.__kilo_electron_volts = list()
         self.__Kev = float()
+        self.init_elements()
 
     def get_condition(self):
         return self.__condition
@@ -81,10 +83,7 @@ class Window(QtWidgets.QMainWindow):
 
     def init_elements(self):
         elements = list()
-        values = Sqlite.get_values(
-            "fundamentals",
-            "elements",
-        )
+        values = Sqlite.get_values("fundamentals", "elements")
         for value in values:
             e = Element(value[0])
             elements.append(e)
@@ -108,8 +107,14 @@ class Window(QtWidgets.QMainWindow):
     def get_counts(self):
         return self.__counts
 
-    def set_counts(self, intensity_range):
-        self.__counts = intensity_range
+    def set_counts(self, counts):
+        self.__counts = counts
+
+    def init_counts(self, counts):
+        self.set_counts(counts)
+        self.set_px(np.arange(0, len(self.get_counts()), 1))
+        self.set_kilo_electron_volts(([Calculation.px_to_ev(i) for i in self.get_px()]))
+        self.init_plot_items()
 
     def get_kev(self):
         return self.__Kev
@@ -136,26 +141,17 @@ class Window(QtWidgets.QMainWindow):
             x=self.get_px(), y=self.get_counts(), pen=mkPen("w", width=2))
         self.spectrumRegion.setBounds((0, max(self.get_px())))
 
-    def setup_ui(self, counts, condition):
-        self.set_counts(counts)
-        self.set_px(np.arange(0, len(self.get_counts()), 1))
-        self.set_kilo_electron_volts([Calculation.px_to_ev(i) for i in self.get_px()])
-        self.set_condition(condition)
-        self.init_plot_items()
-        self.init_elements()
+    def setup_ui(self):
         # window config
         self.setMinimumSize(self.windowSize)
-        self.setWindowTitle(self.get_condition().get_attribute("name"))
         # self.showMaximized()
 
         # form config
-        self.form.setup_ui()
         self.form.setMaximumHeight(int(self.size().height() * 0.3))
         self.form.itemClicked.connect(self.item_clicked)
         self.form.horizontalHeader().sectionClicked.connect(self.header_clicked)
 
         # graphics config
-        self.spectrumRegion.setZValue(10)
         self.spectrumRegion.sigRegionChanged.connect(self.scale_peak_plot)
         self.spectrumPlot.showGrid(x=True, y=True)
         self.spectrumPlot.addItem(self.spectrumRegion, ignoreBounds=True)
@@ -165,15 +161,20 @@ class Window(QtWidgets.QMainWindow):
         self.peakPlot.setMinimumHeight(int(self.size().height() * 0.4))
         self.peakPlot.showGrid(x=True, y=True)
         self.peakPlot.scene().sigMouseClicked.connect(self.open_popup)
+        self.peakPlot.sigRangeChanged.connect(self.update_spec_region)
         self.spectrumRegion.setClipItem(self.spectrumPlot)
         self.spectrumRegion.setRegion([0, 100])
         self.peakPlot.addItem(self.vLine, ignoreBounds=True)
         self.peakPlot.addItem(self.hLine, ignoreBounds=True)
         self.peakPlotVB.scaleBy(center=(0, 0))
         self.peakPlotVB.menu.clear()
+
+        layout = QtWidgets.QHBoxLayout()
+        layout.addWidget(self.coordinateLabel)
+        layout.addWidget(self.statusLabel)
         self.mainLayout.addWidget(self.form)
         self.mainLayout.addWidget(self.graph)
-        self.mainLayout.addWidget(self.coordinateLabel)
+        self.mainLayout.addLayout(layout)
 
         self.mainWidget.setLayout(self.mainLayout)
         self.setCentralWidget(self.mainWidget)
@@ -196,6 +197,10 @@ class Window(QtWidgets.QMainWindow):
     def scale_peak_plot(self):
         min_x, max_x = self.spectrumRegion.getRegion()
         self.peakPlot.setXRange(min_x, max_x, padding=0)
+
+    def update_spec_region(self, window, viewRange):
+        rng = viewRange[0]
+        self.spectrumRegion.setRegion(rng)
 
     def open_popup(self, event):
         pos = event.pos()
@@ -233,6 +238,7 @@ class Window(QtWidgets.QMainWindow):
             element = self.get_element_by_id(element_id)
             self.init_element(element)
             self.add_element_to_form(element)
+            self.statusLabel.setText(f"Added {element.get_name()} - {element.get_attribute('radiation_type')}")
 
     def init_element(self, element):
         self.get_added_elements().append(element)
@@ -427,16 +433,25 @@ class Window(QtWidgets.QMainWindow):
                 QtWidgets.QMessageBox.Ok | QtWidgets.QMessageBox.Cancel)
             return_value = message_box.exec()
             if return_value == QtWidgets.QMessageBox.Ok:
+                self.statusLabel.setText(f"This may take a few seconds...")
                 for element in self.get_added_elements():
                     self.remove(element, 0)
+                    QtWidgets.QApplication.processEvents()
+            self.statusLabel.setText(f"Removed all elements")
         elif column == 1:
+            self.statusLabel.setText(f"This may take a few seconds...")
             hidden = self.get_added_elements()[0].is_hidden()
             if hidden:
                 for id in self.form.get_row_ids():
                     self.un_hide_element(self.get_element_by_id(id), id)
+                    QtWidgets.QApplication.processEvents()
+                self.statusLabel.setText(f"Hide all elements")
             else:
                 for id in self.form.get_row_ids():
                     self.hide_element(self.get_element_by_id(id), id)
+                    QtWidgets.QApplication.processEvents()
+                self.statusLabel.setText(f"Show all elements")
+
         elif column == 9:
             message_box = MessegeBox.Dialog(
                 QtWidgets.QMessageBox.Warning,

@@ -31,6 +31,7 @@ class Window(QtWidgets.QDialog):
         self.layout.addItem(self.spacerOne)
         self.layout.addWidget(self.label)
         self.layout.addItem(self.spacerTwo)
+        self.setup_ui()
 
     def get_label(self) -> str:
         return self.label.text()
