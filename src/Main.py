@@ -14,7 +14,7 @@ if __name__ == "__main__":
     main_window = PlotWindow.Window(size)
     main_window.show()
     main_window.setup_ui()
-    sys.exit(app.exec_())
+    sys.exit(app.exec())
     # counts = File(r"F:\CSAN\main\Test -Int\S.txt").get_counts()[7]
     # for index, count in enumerate(counts):
     #     print(f"{index}- {count}")

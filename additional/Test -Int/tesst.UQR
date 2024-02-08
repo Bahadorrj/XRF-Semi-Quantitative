@@ -1,0 +1,128 @@
+﻿
+.result_data
+"S                         Cal.000"
+122
+"_UQ     .1....,....2....,....3...."
+"  1 BaKa         0  12"
+"  2 CsKa         0  12"
+"  3 BgXe         0  12"
+"  4 I Ka      6062    Low : 1872    High : 1894
+"  5 TeKa      5446    Low : 1800    High : 1819
+"  6 SbKa     11106    Low : 1724    High : 1763
+"  7 SnKa      5572    Low : 1654    High : 1674
+"  8 InKa         0  12"
+"  9 CdKa     10943    Low : 1499    High : 1551
+" 10 AgKa      6313    Low : 1446    High : 1469
+" 11 PdKa      2549    Low : 1383    High : 1402
+" 12 RhKa      3896    Low : 1320    High : 1340
+" 13 RuKa      3322    Low : 1252    High : 1292
+" 14 BgTc         0  12"
+" 15 MoKa       334    Low : 1143    High : 1159
+" 16 NbKa       195    Low : 1086    High : 1102
+" 17 ThLb         0  12"
+" 18 ZrKa        94    Low : 1031    High : 1047
+" 19 BgY          0  12"
+" 20 Y Ka        72    Low : 979    High : 991
+" 21 AmLa         0  12"
+" 22 PuLa         0  12"
+" 23 SrKa         0  12"
+" 24 U La         0  12"
+" 25 RbKa        21    Low : 875    High : 889
+" 26 ThLa         0  12"
+" 27 PbLb         0  12"
+" 28 TlLb         0  12"
+" 29 BrKa        18    Low : 780    High : 792
+" 30 AsKb        11    Low : 768    High : 779
+" 31 AuLb        42    Low : 749    High : 763
+" 32 SeKa        11    Low : 734    High : 746
+" 33 PtLb        43    Low : 725    High : 739
+" 34 BiLa       745    Low : 708    High : 722
+" 35 PbLa         0  12"
+" 36 AsKa        44    Low : 690    High : 701
+" 37 OsLb         0  12"
+" 38 ReLb         0  12"
+" 39 HgLa        54    Low : 653    High : 665
+" 40 GeKa       620    Low : 633    High : 672
+" 41 AuLa       193    Low : 635    High : 646
+" 42 W Lb       333    Low : 632    High : 645
+" 43 PtLa        73    Low : 617    High : 629
+" 44 TaLb       170    Low : 611    High : 622
+" 45 GaKa      1868    Low : 592    High : 631
+" 46 IrLa      1217    Low : 599    High : 619
+" 47 HfLb      2296    Low : 589    High : 603
+" 48 LuLb         0  12"
+" 49 ZnKa      5002    Low : 541    High : 580
+" 50 W La       819    Low : 549    High : 560
+" 51 NiKb      3227    Low : 540    High : 552
+" 52 TaLa      2046    Low : 533    High : 543
+" 53 CuKa        25    Low : 527    High : 536
+" 54 LuLa         0  12"
+" 55 HoLb      2548    Low : 492    High : 503
+" 56 NiKa       667    Low : 489    High : 498
+" 57 YbLa      1781    Low : 485    High : 495
+" 58 DyLb      1630    Low : 474    High : 484
+" 59 TmLa       589    Low : 455    High : 494
+" 60 ErLa       278    Low : 440    High : 479
+" 61 CoKa       330    Low : 453    High : 462
+" 62 EuLb      1948    Low : 422    High : 432
+" 63 FeKa         0  12"
+" 64 TbLa         0  12"
+" 65 SmLb       305    Low : 406    High : 415
+" 66 GdLa       541    Low : 396    High : 404
+" 67 MnKa         0  12"
+" 68 EuLa       147    Low : 382    High : 390
+" 69 SmLa       184    Low : 368    High : 377
+" 70 PrLb       215    Low : 360    High : 366
+" 71 V Kb       479    Low : 354    High : 363
+" 72 CrKa         0  12"
+" 73 CeLb        77    Low : 344    High : 353
+" 74 NdLa        57    Low : 342    High : 349
+" 75 PrLa        82    Low : 329    High : 337
+" 76 V Ka       234    Low : 323    High : 331
+" 77 TiKb       214    Low : 322    High : 330
+" 78 CeLa       123    Low : 316    High : 324
+" 79 BaLb        14    Low : 315    High : 334
+" 80 LaLa       375    Low : 304    High : 311
+" 81 TiKa       152    Low : 295    High : 302
+" 82 CsLa       412    Low : 280    High : 288
+" 83 I Lb       416    Low : 276    High : 284
+" 84 ScKa       351    Low : 277    High : 296
+" 85 CaKb     60834    Low : 262    High : 269
+" 86 SbLb       357    Low : 251    High : 261
+" 87 TeLa       591    Low : 246    High : 253
+" 88 CaKa     63560    Low : 240    High : 248
+" 89 InLb         0  12"
+" 90 SnLa       291    Low : 225    High : 231
+" 91 K Ka         0  12"
+" 92 AgLb         0  12"
+" 93 CdLa       110    Low : 205    High : 211
+" 94 ArKa         0  12"
+" 95 PdLa         0  12"
+" 96 RhLa       235    Low : 174    High : 182
+" 97 ClKa     53533    Low : 171    High : 177
+" 98 RuLa         0  12"
+" 99 MoLb      9753    Low : 157    High : 161
+"100 SXKa   1440778    Low : 149    High : 156
+"101 S Ka   1440778    Low : 149    High : 156
+"102 BgP          0  12"
+"103 NbLa        59    Low : 143    High : 146
+"104 ZrLa        60    Low : 135    High : 138
+"105 PXKa      7092    Low : 130    High : 136
+"106 P Ka      7092    Low : 130    High : 136
+"107 Y Lb        57    Low : 128    High : 131
+"108 SrLa         0  12"
+"109 SiKa      3571    Low : 112    High : 120
+"110 BgSi         0  12"
+"111 BrLb        52    Low : 101    High : 103
+"112 AlKa      2563    Low : 96    High : 101
+"113 SeLa        42    Low : 90    High : 93
+"114 MgKa      1417    Low : 81    High : 86
+"115 GaLb         0  12"
+"116 NaKa      1400    Low : 67    High : 72
+"117 CuLb        15    Low : 63    High : 65
+"118 BgCo         0  12"
+"119 CoLb         0  12"
+"120 BgFe         0  12"
+"121 FeLb         0  12"
+"122 F Ka      3777    Low : 45    High : 53
+
