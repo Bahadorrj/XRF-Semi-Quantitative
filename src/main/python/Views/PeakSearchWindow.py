@@ -1,4 +1,7 @@
 import numpy as np
+
+from dataclasses import field
+
 from PyQt6 import QtWidgets, QtCore, QtGui
 from pyqtgraph import mkPen, GraphicsLayoutWidget, LinearRegionItem, InfiniteLine
 
@@ -30,9 +33,9 @@ class Window(QtWidgets.QMainWindow):
         QtWidgets.QApplication.processEvents()
 
         self._elementsDf = Sqlite.getDatabaseDataframe("fundamentals", "elements")
-        self._condition = None
-        self._counts = np.zeros(2048, dtype=np.int32)
-        self._px = np.zeros(2048, dtype=np.int16)
+        self._conditionID = int()
+        self._counts = np.zeros(2048, dtype=np.uint32)
+        self._px = np.zeros(2048, dtype=np.uint16)
         self._kiloElectronVolts = list()
         self._kev = float()
         self._initElements()
@@ -88,13 +91,13 @@ class Window(QtWidgets.QMainWindow):
         for value in values:
             e = Element(value[0])
             self._elements.append(e)
-            if e.isActivated():
+            if e.activated:
                 self._addedElements.append(e)
 
     def configureWindow(self):
         self._configureGraph()
         for element in self._addedElements:
-            element.setHidden(True)
+            element.hidden = True
             self._addElementToForm(element)
             self.elementAdded.emit(element)
 
@@ -103,7 +106,7 @@ class Window(QtWidgets.QMainWindow):
         self._counts = counts
         self._px = np.arange(0, len(self._counts), 1)
         self._kiloElectronVolts = [Calculation.px_to_ev(i) for i in self._px]
-        self._condition = condition
+        self._conditionID = condition.getAttribute("condition_id")
         self.spectrumPlot.setLimits(
             xMin=0, xMax=max(self._px), yMin=0, yMax=1.1 * max(self._counts)
         )
@@ -122,19 +125,19 @@ class Window(QtWidgets.QMainWindow):
     def _addElementToForm(self, element):
         removeButton = QtWidgets.QPushButton(icon=QtGui.QIcon(ICONS["Cross"]))
         hideButton = QtWidgets.QPushButton()
-        if element.isHidden():
+        if element.hidden:
             hideButton.setIcon(QtGui.QIcon(ICONS["Hide"]))
         else:
             hideButton.setIcon(QtGui.QIcon(ICONS["Show"]))
         elementItem = QtWidgets.QTableWidgetItem(element.getAttribute("symbol"))
         typeItem = QtWidgets.QTableWidgetItem(element.getAttribute("radiation_type"))
         kevItem = QtWidgets.QTableWidgetItem(str(element.getAttribute("Kev")))
-        lowItem = QtWidgets.QTableWidgetItem(str(element.getLowKev()))
-        highItem = QtWidgets.QTableWidgetItem(str(element.getHighKev()))
-        intensityItem = QtWidgets.QTableWidgetItem(str(element.getIntensity()))
+        lowItem = QtWidgets.QTableWidgetItem(str(element.lowKev))
+        highItem = QtWidgets.QTableWidgetItem(str(element.highKev))
+        intensityItem = QtWidgets.QTableWidgetItem(str(element.intensity))
         statusItem = QtWidgets.QTableWidgetItem()
         statusButton = QtWidgets.QPushButton()
-        if element.isActivated():
+        if element.activated:
             statusItem.setText("Activated")
             statusItem.setForeground(QtCore.Qt.GlobalColor.green)
             statusButton.setText("Deactivate")
@@ -172,7 +175,7 @@ class Window(QtWidgets.QMainWindow):
 
     def itemClicked(self):
         element = self.getElementById(self.form.getCurrentRowId())
-        self._goToPx(element.getRange())
+        self._goToPx(element.range)
 
     def _goToPx(self, rng):
         if self.peakPlot.viewRange()[0][0] > rng[0] or self.peakPlot.viewRange()[0][1] < rng[1]:
@@ -229,14 +232,14 @@ class Window(QtWidgets.QMainWindow):
             self.elementAdded.emit(element)
 
     def _plotLineOfElement(self, element):
-        if element.isActivated():
-            element.getSpectrumLine().setPen(mkPen("g", width=2))
-            element.getPeakLine().setPen(mkPen("g", width=2))
+        if element.activated:
+            element.spectrumLine.setPen(mkPen("g", width=2))
+            element.peakLine.setPen(mkPen("g", width=2))
         else:
-            element.getSpectrumLine().setPen(mkPen("r", width=2))
-            element.getPeakLine().setPen(mkPen("r", width=2))
-        self.spectrumPlot.addItem(element.getSpectrumLine())
-        self.peakPlot.addItem(element.getPeakLine())
+            element.spectrumLine.setPen(mkPen("r", width=2))
+            element.peakLine.setPen(mkPen("r", width=2))
+        self.spectrumPlot.addItem(element.spectrumLine)
+        self.peakPlot.addItem(element.peakLine)
 
     def _showAllLinesOfElement(self, element):
         relatedElements = list(
@@ -252,8 +255,8 @@ class Window(QtWidgets.QMainWindow):
                 self._plotLineOfElement(e)
 
     def _removeLineOfElement(self, element):
-        self.spectrumPlot.removeItem(element.getSpectrumLine())
-        self.peakPlot.removeItem(element.getPeakLine())
+        self.spectrumPlot.removeItem(element.spectrumLine)
+        self.peakPlot.removeItem(element.peakLine)
 
     def _hideAllLinesOfElement(self, element):
         relatedElements = list(
@@ -305,15 +308,15 @@ class Window(QtWidgets.QMainWindow):
         row.get("Activate Widget").setText("Deactivate")
         row.get("Intensity").setText(str(intensity))
 
-        element.setActivated(True)
-        element.setLowKev(float(row.get("Low Kev").text()))
-        element.setHighKev(float(row.get("High Kev").text()))
-        element.setRange(rng)
-        element.setIntensity(intensity)
+        element.activated = True
+        element.lowKev = float(row.get("Low Kev").text())
+        element.highKev = float(row.get("High Kev").text())
+        element.range = rng
+        element.intensity = intensity
 
-        if element.isHidden() is False:
+        if element.hidden is False:
             self._hideAllLinesOfElement(element)
-            self.peakPlot.removeItem(element.getRegion())
+            self.peakPlot.removeItem(element.region)
         self._showElement(element)
 
     def _deactivateElement(self, element, row):
@@ -322,9 +325,9 @@ class Window(QtWidgets.QMainWindow):
         row.get("Activate Widget").setText("Activate")
         row.get("Intensity").setText("None")
 
-        element.setActivated(False)
+        element.activated = False
 
-        if element.isHidden() is False:
+        if element.hidden is False:
             self._showAllLinesOfElement(element)
         else:
             self._showElement(element)
@@ -346,19 +349,19 @@ class Window(QtWidgets.QMainWindow):
     def _remove(self, element, index):
         self._hideAllLinesOfElement(element)
         self.form.removeRow(index)
-        element.setHidden(True)
-        element.setActivated(False)
+        element.hidden = True
+        element.activated = False
 
     def visibility(self):
         id = self.form.getCurrentRowId()
         element = self.getElementById(id)
-        if element.isHidden():
-            if element.isActivated():
+        if element.hidden:
+            if element.activated:
                 self._showElement(element)
             else:
                 self._showAllLinesOfElement(element)
         else:
-            if element.isActivated():
+            if element.activated:
                 self._hideElement(element)
             else:
                 self._hideAllLinesOfElement(element)
@@ -366,20 +369,20 @@ class Window(QtWidgets.QMainWindow):
     def _hideElement(self, element):
         row = self.form.getRowById(element.getAttribute("element_id"))
         row.get("Hide Widget").setIcon(QtGui.QIcon(ICONS["Hide"]))
-        if element.isActivated() is False:
-            self.peakPlot.removeItem(element.getRegion())
+        if element.activated is False:
+            self.peakPlot.removeItem(element.region)
 
         self._removeLineOfElement(element)
-        element.setHidden(True)
+        element.hidden = True
 
     def _showElement(self, element):
         row = self.form.getRowById(element.getAttribute("element_id"))
         row.get("Hide Widget").setIcon(QtGui.QIcon(ICONS["Show"]))
-        if element.isActivated() is False:
-            self.peakPlot.addItem(element.getRegion())
+        if element.activated is False:
+            self.peakPlot.addItem(element.region)
         self._plotLineOfElement(element)
-        element.setHidden(False)
-        self._goToPx(element.getRange())
+        element.hidden = False
+        self._goToPx(element.range)
 
     def headerClicked(self, column):
         if column == 0:
@@ -403,7 +406,7 @@ class Window(QtWidgets.QMainWindow):
                 QtWidgets.QApplication.processEvents()
 
     def _configureHideALL(self):
-        hidden = self._addedElements[0].isHidden()
+        hidden = self._addedElements[0].hidden
         if hidden:
             for element in self._addedElements:
                 self._showElement(element)
@@ -423,7 +426,7 @@ class Window(QtWidgets.QMainWindow):
         return self._elements
 
     def getCondition(self):
-        return self._condition
+        return self._conditionID
 
     def closeEvent(self, a0):
         self.windowClosed.emit()

@@ -7,6 +7,7 @@ from src.main.python.Views import ConditionsWindow
 from src.main.python.Views import ElementsWindow
 from src.main.python.Views import PeakSearchWindow
 from src.main.python.Views.Icons import ICONS
+from src.main.python.Views.MessegeBox import Dialog
 from src.main.python.Types.FileClass import File
 from src.main.python.Controllers.ElemenetsWindowController import ElementsWindowController
 from src.main.python.Controllers.PeakSearchWindowController import PeakSearchWindowController
@@ -15,6 +16,7 @@ from src.main.python.Models import PeakSearchWindowModel
 COLORS = ["#FF0000", "#FFD700", "#00FF00", "#00FFFF", "#000080", "#0000FF", "#8B00FF",
           "#FF1493", "#FFC0CB", "#FF4500", "#FFFF00", "#FF00FF", "#00FF7F", "#FF7F00"]
 PX_COUNT = 2048
+
 
 class Window(QtWidgets.QMainWindow):
     def __init__(self, size):
@@ -135,21 +137,30 @@ class Window(QtWidgets.QMainWindow):
     def createFile(self, path):
         f = File(path)
         fileItem = QtWidgets.QTreeWidgetItem()
-        fileItem.setText(0, f.getName())
+        fileItem.setText(0, f.name)
         fileItem.setCheckState(0, QtCore.Qt.CheckState.Unchecked)
         buttons = list()
-        for index, condition in enumerate(f.getConditions()):
-            conditionItem = QtWidgets.QTreeWidgetItem()
-            conditionItem.setText(1, condition.getName())
-            conditionItem.setCheckState(1, QtCore.Qt.CheckState.Unchecked)
-            fileItem.addChild(conditionItem)
-            self.form.addTopLevelItem(fileItem)
-            colorButton = ColorButton()
-            colorButton.setColor(COLORS[index])
-            self.form.setItemWidget(conditionItem, 2, colorButton)
-            buttons.append(colorButton)
-        self._files.append(f)
-        self._colorButtonMap[f.getName()] = buttons
+        if f.conditions:
+            for index, condition in enumerate(f.conditions):
+                conditionItem = QtWidgets.QTreeWidgetItem()
+                conditionItem.setText(1, condition.getName())
+                conditionItem.setCheckState(1, QtCore.Qt.CheckState.Unchecked)
+                fileItem.addChild(conditionItem)
+                self.form.addTopLevelItem(fileItem)
+                colorButton = ColorButton()
+                colorButton.setColor(COLORS[index])
+                self.form.setItemWidget(conditionItem, 2, colorButton)
+                buttons.append(colorButton)
+            self._files.append(f)
+            self._colorButtonMap[f.name] = buttons
+        else:
+            messageBox = Dialog(
+                QtWidgets.QMessageBox.Icon.Warning,
+                "Warning!",
+                "The selected file is not registered properly!"
+            )
+            messageBox.setStandardButtons(QtWidgets.QMessageBox.StandardButton.Ok)
+            messageBox.exec()
 
     def getColorButtonsMap(self):
         return self._colorButtonMap
@@ -192,15 +203,15 @@ class Window(QtWidgets.QMainWindow):
             f = self._files[top_level_index]
             for child_index in range(top_level_item.childCount()):
                 if top_level_item.child(child_index).checkState(1) == QtCore.Qt.CheckState.Checked:
-                    counts = f.getCounts()[child_index]
+                    counts = f.counts[child_index]
                     px = np.arange(0, len(counts), 1)
-                    color = self._colorButtonMap.get(f.getName())[child_index].color()
+                    color = self._colorButtonMap.get(f.name)[child_index].color()
                     self.plotWidget.plot(x=px, y=counts, pen=mkPen(color=color, width=3))
 
     def setLimits(self):
         y = 0
         for file in self._files:
-            for counts in file.getCounts():
+            for counts in file.counts:
                 if y < max(counts):
                     y = max(counts)
         self.plotWidget.setLimits(xMin=0, xMax=PX_COUNT, yMin=0, yMax=1.1 * y)
@@ -216,6 +227,6 @@ class Window(QtWidgets.QMainWindow):
         childIndex = self.form.currentIndex().row()
         if topLevelIndex != -1:
             file = self._files[topLevelIndex]
-            self.peakSearchWindow.init(file.getCount(childIndex), file.getCondition(childIndex))
+            self.peakSearchWindow.init(file.counts[childIndex], file.conditions[childIndex])
             self.peakSearchWindow.windowOpened.emit()
             self.peakSearchWindow.showMaximized()

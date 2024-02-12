@@ -1,20 +1,17 @@
 from src.main.python.Logic.Sqlite import DATABASES
 
-def writeElementToTable(elements, condition):
+def writeElementToTable(elements, conditionID):
     connection = DATABASES.get("fundamentals").getConnection()
     cur = connection.cursor()
     for element in elements:
-        if element.isActivated():
+        if element.activated:
             query = f"""
                 UPDATE elements
-                SET low_Kev = {element.getLowKev()},
-                    high_Kev = {element.getHighKev()},
-                    intensity = {element.getIntensity()},
+                SET low_Kev = {element.lowKev},
+                    high_Kev = {element.highKev},
+                    intensity = {element.intensity},
                     active = 1,
-                    condition_id =
-                        (SELECT condition_id
-                        FROM conditions
-                        WHERE conditions.name = '{condition.getName()}')
+                    condition_id = {conditionID}
                 WHERE element_id = {element.getAttribute("element_id")};
             """
             cur.execute(query)

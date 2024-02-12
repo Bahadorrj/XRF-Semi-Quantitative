@@ -34,6 +34,6 @@ class PeakSearchWindowController:
         buttons[2].clicked.connect(self._view.statusChanged)
 
     def _connectRegionSignalAndSlot(self, element):
-        element.getRegion().sigRegionChanged.connect(partial(self._view.setRange, element))
-        element.getSpectrumLine().sigClicked.connect(partial(self._view.selectRow, element))
-        element.getPeakLine().sigClicked.connect(partial(self._view.selectRow, element))
+        element.region.sigRegionChanged.connect(partial(self._view.setRange, element))
+        element.spectrumLine.sigClicked.connect(partial(self._view.selectRow, element))
+        element.peakLine.sigClicked.connect(partial(self._view.selectRow, element))
