@@ -1,9 +1,11 @@
 from dataclasses import dataclass, field
-
 from pathlib import Path
+
 from numpy import zeros, uint32, ndarray
+
 from src.main.python.Logic import Sqlite
 from src.main.python.Types.ConditionClass import Condition
+
 
 @dataclass(order=True)
 class File:

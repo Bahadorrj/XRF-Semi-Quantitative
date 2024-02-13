@@ -3,6 +3,7 @@ from PyQt6 import QtWidgets, QtCore
 from src.main.python.Logic.Sqlite import getDatabaseDataframe
 from src.main.python.Views.TableWidget import Form
 
+
 class Window(QtWidgets.QWidget):
     def __init__(self, size):
         super().__init__()

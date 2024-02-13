@@ -1,8 +1,9 @@
 # echo-Client.py
 
 import socket
-import numpy as np
 import struct
+
+import numpy as np
 
 
 def initFile(path):

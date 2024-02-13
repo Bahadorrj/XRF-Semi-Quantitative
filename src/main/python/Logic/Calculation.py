@@ -11,15 +11,15 @@ def truncate(f, n):
     return math.floor(f * 10 ** n) / 10 ** n
 
 
-def ev_to_px(ev):
+def evToPx(ev):
     return round((float(ev) - A0) / A1)
 
 
-def px_to_ev(px):
+def pxToEv(px):
     return truncate((int(px) * A1) + A0, 4)
 
 
-def calculate_intensity_in_range(rng, intensity_range):
+def calculateIntensityInRange(rng, intensity_range):
     # -1 is for conflict
     start = rng[0]
     stop = rng[1]

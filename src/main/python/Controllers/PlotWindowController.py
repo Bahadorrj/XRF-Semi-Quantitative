@@ -23,7 +23,7 @@ class PlotWindowController:
 
     def _openRelatedComponent(self, label):
         if label == "Open":
-            fileDialog = self._view.openFileDialog()
+            fileDialog = self._view.openFileDialog(".txt")
             fileDialog.fileSelected.connect(self._view.createFile)
         elif label == "Conditions":
             self._view.openConditionsWindow()

@@ -1,12 +1,11 @@
 from dataclasses import dataclass, field
 
+from numpy import uint32
 from pyqtgraph import InfiniteLine, InfLineLabel, mkPen, LinearRegionItem
 
 from src.main.python.Logic import Calculation
 from src.main.python.Logic.Sqlite import getColumnLabels, getValue
 from src.main.python.Types.DataClass import Data
-
-from numpy import uint32
 
 
 @dataclass(order=True)
@@ -29,8 +28,8 @@ class Element(Data):
         self.highKev = self.getAttribute("high_Kev")
         self.intensity = self.getAttribute("intensity")
         self.activated = bool(self.getAttribute("active"))
-        self.range = [Calculation.ev_to_px(self.lowKev),
-                      Calculation.ev_to_px(self.highKev)]
+        self.range = [Calculation.evToPx(self.lowKev),
+                      Calculation.evToPx(self.highKev)]
         self.region = self._initRegion()
         self.spectrumLine = self._generateLine()
         self.peakLine = self._generateLine()
@@ -46,7 +45,7 @@ class Element(Data):
         line.setAngle(90)
         line.setMovable(False)
         kev = self.getAttribute("Kev")
-        px = Calculation.ev_to_px(kev)
+        px = Calculation.evToPx(kev)
         # -1 is for conflict
         # px = px - 1
         line.setValue(px)

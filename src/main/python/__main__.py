@@ -6,6 +6,7 @@ from src.main.python.Controllers.PlotWindowController import PlotWindowControlle
 from src.main.python.Views.Icons import ICONS
 from src.main.python.Views.PlotWindow import Window
 
+
 def main():
     app = QtWidgets.QApplication(sys.argv)
     screen = app.primaryScreen()

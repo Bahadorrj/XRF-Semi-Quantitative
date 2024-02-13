@@ -1,7 +1,4 @@
 import numpy as np
-
-from dataclasses import field
-
 from PyQt6 import QtWidgets, QtCore, QtGui
 from pyqtgraph import mkPen, GraphicsLayoutWidget, LinearRegionItem, InfiniteLine
 
@@ -105,7 +102,7 @@ class Window(QtWidgets.QMainWindow):
         self.setWindowTitle(condition.getName())
         self._counts = counts
         self._px = np.arange(0, len(self._counts), 1)
-        self._kiloElectronVolts = [Calculation.px_to_ev(i) for i in self._px]
+        self._kiloElectronVolts = [Calculation.pxToEv(i) for i in self._px]
         self._conditionID = condition.getAttribute("condition_id")
         self.spectrumPlot.setLimits(
             xMin=0, xMax=max(self._px), yMin=0, yMax=1.1 * max(self._counts)
@@ -299,9 +296,9 @@ class Window(QtWidgets.QMainWindow):
 
     def _activateElement(self, element, row):
         # -1 is for conflict
-        rng = [Calculation.ev_to_px(row.get("Low Kev").text()) - 1,
-               Calculation.ev_to_px(row.get("High Kev").text()) - 1]
-        intensity = Calculation.calculate_intensity_in_range(rng, self._counts)
+        rng = [Calculation.evToPx(row.get("Low Kev").text()) - 1,
+               Calculation.evToPx(row.get("High Kev").text()) - 1]
+        intensity = Calculation.calculateIntensityInRange(rng, self._counts)
 
         row.get("Status").setText("Activated")
         row.get("Status").setForeground(QtCore.Qt.GlobalColor.green)

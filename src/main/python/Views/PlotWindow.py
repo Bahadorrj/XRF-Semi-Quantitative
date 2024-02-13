@@ -1,17 +1,16 @@
+import numpy as np
 from PyQt6 import QtWidgets, QtCore, QtGui
 from pyqtgraph import PlotWidget, ColorButton, mkPen
 
-import numpy as np
-
+from src.main.python.Controllers.ElemenetsWindowController import ElementsWindowController
+from src.main.python.Controllers.PeakSearchWindowController import PeakSearchWindowController
+from src.main.python.Models import PeakSearchWindowModel
+from src.main.python.Types.FileClass import File
 from src.main.python.Views import ConditionsWindow
 from src.main.python.Views import ElementsWindow
 from src.main.python.Views import PeakSearchWindow
 from src.main.python.Views.Icons import ICONS
 from src.main.python.Views.MessegeBox import Dialog
-from src.main.python.Types.FileClass import File
-from src.main.python.Controllers.ElemenetsWindowController import ElementsWindowController
-from src.main.python.Controllers.PeakSearchWindowController import PeakSearchWindowController
-from src.main.python.Models import PeakSearchWindowModel
 
 COLORS = ["#FF0000", "#FFD700", "#00FF00", "#00FFFF", "#000080", "#0000FF", "#8B00FF",
           "#FF1493", "#FFC0CB", "#FF4500", "#FFFF00", "#FF00FF", "#00FF7F", "#FF7F00"]
@@ -121,10 +120,10 @@ class Window(QtWidgets.QMainWindow):
             mousePoint = self.plotWidget.getPlotItem().vb.mapSceneToView(pos)
             self.setCoordinate(mousePoint)
 
-    def openFileDialog(self):
+    def openFileDialog(self, fileFormat):
         fileDialog = QtWidgets.QFileDialog(self)
         fileDialog.setFileMode(QtWidgets.QFileDialog.FileMode.AnyFile)
-        fileDialog.setNameFilter("Texts (*.txt)")
+        fileDialog.setNameFilter(f"Texts (*{fileFormat})")
         fileDialog.show()
         return fileDialog
 
