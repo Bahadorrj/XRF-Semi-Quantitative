@@ -1,9 +1,24 @@
+import time
 from functools import partial
+from PyQt6.QtCore import QObject, pyqtSignal, QThread
 
+class Worker(QObject):
+    finished = pyqtSignal()
+    progress = pyqtSignal(int)
+
+    def run(self, size):
+        for i in range(size):
+            time.sleep(0.1)
+            self.progress.emit(i)
+        self.finished.emit()
 
 class PeakSearchWindowController:
     def __init__(self, view, model):
         self._view = view
+        self.thread = QThread()
+        self.worker = Worker()
+        self.worker.moveToThread(self.thread)
+
         self._model = model
         self._connectSignalsAndSlots()
 
@@ -19,6 +34,7 @@ class PeakSearchWindowController:
         # self defined signals
         self._view.rowAdded.connect(partial(self._connectButtonsSignalsAnsSlots))
         self._view.elementAdded.connect(partial(self._connectRegionSignalAndSlot))
+        self._view.windowOpened.connect(lambda: self.thread.start())
         self._view.windowClosed.connect(
             lambda:
             self._model.writeElementToTable(
@@ -27,6 +43,10 @@ class PeakSearchWindowController:
             )
         )
         self._view.windowOpened.connect(self._view.configureWindow)
+        # self._view.hideAll.connect(partial(self.worker.run, self._view.getNumberOfAddedElements()))
+        self._view.showAll.connect(partial(self.worker.run, self._view.getNumberOfAddedElements()))
+        # thread
+        self.worker.progress.connect(self._view.showElement)
 
     def _connectButtonsSignalsAnsSlots(self, buttons):
         buttons[0].clicked.connect(self._view.removeRow)
