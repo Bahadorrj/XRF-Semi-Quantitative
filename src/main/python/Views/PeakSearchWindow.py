@@ -1,6 +1,7 @@
 import numpy as np
 from PyQt6 import QtWidgets, QtCore, QtGui
 from pyqtgraph import mkPen, GraphicsLayoutWidget, LinearRegionItem, InfiniteLine
+from multipledispatch import dispatch
 
 from src.main.python.Logic import Calculation
 from src.main.python.Logic import Sqlite
@@ -9,12 +10,13 @@ from src.main.python.Views import MessegeBox
 from src.main.python.Views.Icons import ICONS
 from src.main.python.Views.TableWidget import Form
 
-
 class Window(QtWidgets.QMainWindow):
     elementAdded = QtCore.pyqtSignal(Element)
     rowAdded = QtCore.pyqtSignal(list)
     windowOpened = QtCore.pyqtSignal()
     windowClosed = QtCore.pyqtSignal()
+    hideAll = QtCore.pyqtSignal()
+    showAll = QtCore.pyqtSignal()
 
     def __init__(self, size):
         super().__init__()
@@ -247,7 +249,8 @@ class Window(QtWidgets.QMainWindow):
         )
         for e in relatedElements:
             if e.getAttribute("element_id") in self.form.getRowIds():
-                self._showElement(e)
+                self.showElement(e)
+                self._goToPx(element.range)
             else:
                 self._plotLineOfElement(e)
 
@@ -264,7 +267,7 @@ class Window(QtWidgets.QMainWindow):
         )
         for e in relatedElements:
             if e.getAttribute("element_id") in self.form.getRowIds():
-                self._hideElement(e)
+                self.hideElement(e)
             else:
                 self._removeLineOfElement(e)
 
@@ -314,7 +317,8 @@ class Window(QtWidgets.QMainWindow):
         if element.hidden is False:
             self._hideAllLinesOfElement(element)
             self.peakPlot.removeItem(element.region)
-        self._showElement(element)
+        self.showElement(element)
+        self._goToPx(element.range)
 
     def _deactivateElement(self, element, row):
         row.get("Status").setText("Deactivated")
@@ -327,7 +331,8 @@ class Window(QtWidgets.QMainWindow):
         if element.hidden is False:
             self._showAllLinesOfElement(element)
         else:
-            self._showElement(element)
+            self.showElement(element)
+            self._goToPx(element.range)
 
     def removeRow(self):
         rowIndex = self.form.currentRow()
@@ -354,16 +359,17 @@ class Window(QtWidgets.QMainWindow):
         element = self.getElementById(id)
         if element.hidden:
             if element.activated:
-                self._showElement(element)
+                self.showElement(element)
+                self._goToPx(element.range)
             else:
                 self._showAllLinesOfElement(element)
         else:
             if element.activated:
-                self._hideElement(element)
+                self.hideElement(element)
             else:
                 self._hideAllLinesOfElement(element)
 
-    def _hideElement(self, element):
+    def hideElement(self, element):
         row = self.form.getRowById(element.getAttribute("element_id"))
         row.get("Hide Widget").setIcon(QtGui.QIcon(ICONS["Hide"]))
         if element.activated is False:
@@ -372,14 +378,24 @@ class Window(QtWidgets.QMainWindow):
         self._removeLineOfElement(element)
         element.hidden = True
 
-    def _showElement(self, element):
+    @dispatch(Element)
+    def showElement(self, element):
         row = self.form.getRowById(element.getAttribute("element_id"))
         row.get("Hide Widget").setIcon(QtGui.QIcon(ICONS["Show"]))
         if element.activated is False:
             self.peakPlot.addItem(element.region)
         self._plotLineOfElement(element)
         element.hidden = False
-        self._goToPx(element.range)
+
+    @dispatch(int)
+    def showElement(self, index):
+        element = self._addedElements[index]
+        row = self.form.getRowById(element.getAttribute("element_id"))
+        row.get("Hide Widget").setIcon(QtGui.QIcon(ICONS["Show"]))
+        if element.activated is False:
+            self.peakPlot.addItem(element.region)
+        self._plotLineOfElement(element)
+        element.hidden = False
 
     def headerClicked(self, column):
         if column == 0:
@@ -405,13 +421,11 @@ class Window(QtWidgets.QMainWindow):
     def _configureHideALL(self):
         hidden = self._addedElements[0].hidden
         if hidden:
-            for element in self._addedElements:
-                self._showElement(element)
-                QtWidgets.QApplication.processEvents()
+            self.showAll.emit()
+            print(1)
         else:
-            for element in self._addedElements:
-                self._hideElement(element)
-                QtWidgets.QApplication.processEvents()
+            self.hideAll.emit()
+            print(2)
 
     def selectRow(self, element):
         if element.getAttribute("element_id") in self.form.getRowIds():
@@ -424,6 +438,9 @@ class Window(QtWidgets.QMainWindow):
 
     def getCondition(self):
         return self._conditionID
+
+    def getNumberOfAddedElements(self):
+        return len(self._addedElements)
 
     def closeEvent(self, a0):
         self.windowClosed.emit()
