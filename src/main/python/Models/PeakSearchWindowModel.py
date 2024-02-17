@@ -1,7 +1,7 @@
 from src.main.python.Logic.Sqlite import DATABASES
 
 def writeElementToTable(elements, conditionID):
-    connection = DATABASES.get("fundamentals").getConnection()
+    connection = DATABASES.get("fundamentals").connection
     cur = connection.cursor()
     for element in elements:
         if element.activated:
