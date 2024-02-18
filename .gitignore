@@ -357,7 +357,6 @@ fabric.properties
 
 /Exe
 /Additional
-/DB
 *.txt
 *.ico
 *.db
