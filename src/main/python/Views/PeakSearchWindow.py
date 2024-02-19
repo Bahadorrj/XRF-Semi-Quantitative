@@ -15,8 +15,7 @@ class Window(QtWidgets.QMainWindow):
     rowAdded = QtCore.pyqtSignal(list)
     windowOpened = QtCore.pyqtSignal()
     windowClosed = QtCore.pyqtSignal()
-    hideAll = QtCore.pyqtSignal()
-    showAll = QtCore.pyqtSignal()
+    hideAll = QtCore.pyqtSignal(bool)
 
     def __init__(self, size):
         super().__init__()
@@ -79,7 +78,6 @@ class Window(QtWidgets.QMainWindow):
     def _placeComponents(self):
         self.mainLayout.addWidget(self.form)
         self.mainLayout.addWidget(self.graph)
-        self.mainLayout.addWidget(self.coordinateLabel)
         self.mainWidget.setLayout(self.mainLayout)
         self.setCentralWidget(self.mainWidget)
 
@@ -369,7 +367,19 @@ class Window(QtWidgets.QMainWindow):
             else:
                 self._hideAllLinesOfElement(element)
 
+    @dispatch(Element)
     def hideElement(self, element):
+        row = self.form.getRowById(element.getAttribute("element_id"))
+        row.get("Hide Widget").setIcon(QtGui.QIcon(ICONS["Hide"]))
+        if element.activated is False:
+            self.peakPlot.removeItem(element.region)
+
+        self._removeLineOfElement(element)
+        element.hidden = True
+
+    @dispatch(int)
+    def hideElement(self, index):
+        element = self._addedElements[index]
         row = self.form.getRowById(element.getAttribute("element_id"))
         row.get("Hide Widget").setIcon(QtGui.QIcon(ICONS["Hide"]))
         if element.activated is False:
@@ -421,11 +431,11 @@ class Window(QtWidgets.QMainWindow):
     def _configureHideALL(self):
         hidden = self._addedElements[0].hidden
         if hidden:
-            self.showAll.emit()
-            print(1)
+            self.hideAll.emit(True)
+            self.statusLabel.setText("hiding all elements...")
         else:
-            self.hideAll.emit()
-            print(2)
+            self.hideAll.emit(False)
+            self.statusLabel.setText("un-hiding all elements...")
 
     def selectRow(self, element):
         if element.getAttribute("element_id") in self.form.getRowIds():
