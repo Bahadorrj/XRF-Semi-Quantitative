@@ -27,6 +27,12 @@ class Window(QtWidgets.QMainWindow):
         self._createForm()
         self._createGraph()
         self.coordinateLabel = QtWidgets.QLabel()
+        self.coordinateLabel.setFixedWidth(200)
+        self.coordinateLabel.setText("""<span style='font-size: 2rem'>x=0, y=0, , kEV= 0</span>""")
+        self.statusLabel = QtWidgets.QLabel()
+        self.statusBar = QtWidgets.QStatusBar()
+        self.statusBar.addWidget(self.coordinateLabel)
+        self.statusBar.addWidget(self.statusLabel)
         self._placeComponents()
         QtWidgets.QApplication.processEvents()
 
@@ -78,6 +84,7 @@ class Window(QtWidgets.QMainWindow):
     def _placeComponents(self):
         self.mainLayout.addWidget(self.form)
         self.mainLayout.addWidget(self.graph)
+        self.mainLayout.addWidget(self.statusBar)
         self.mainWidget.setLayout(self.mainLayout)
         self.setCentralWidget(self.mainWidget)
 
