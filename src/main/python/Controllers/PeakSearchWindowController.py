@@ -36,6 +36,7 @@ class PeakSearchWindowController:
         self._view.elementAdded.connect(partial(self._connectRegionSignalAndSlot))
         self._view.windowOpened.connect(lambda: self.thread.start())
         self._view.windowOpened.connect(self._view.configureWindow)
+        self._view.windowClosed.connect(lambda: self.thread.quit())
         self._view.windowClosed.connect(
             lambda:
             self._model.writeElementToTable(
@@ -43,11 +44,11 @@ class PeakSearchWindowController:
                 self._view.getCondition()
             )
         )
-        self._view.windowClosed.connect(lambda: self.thread.quit())
         self._view.hideAll.connect(partial(self._checkVisibility))
         self._view.hideAll.connect(partial(self.worker.run, self._view.getNumberOfAddedElements()))
         # thread
         self.worker.progress.connect(self._connectThreadAndSlots)
+        self.worker.finished.connect(self._view.clearStatusLabel)
 
     def _connectButtonsSignalsAnsSlots(self, buttons):
         buttons[0].clicked.connect(self._view.removeRow)
