@@ -1,14 +1,14 @@
 import sqlite3
 import pandas as pd
 
-from attrs import define, field, setters
+from dataclasses import dataclass, field
 
 
-@define(order=True)
+@dataclass(order=True)
 class Database:
-    address: str = field(on_setattr=setters.frozen)
-    name: str = field(on_setattr=setters.frozen, default="main")
-    connection: sqlite3.Connection = field(init=False)
+    address: str
+    name: str = field(default="main")
+    connection: sqlite3.Connection = field(init=False, repr=False)
 
     def connect(self):
         self.connection = sqlite3.connect(self.address)
