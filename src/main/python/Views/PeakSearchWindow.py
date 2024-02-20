@@ -17,7 +17,6 @@ class Window(QtWidgets.QMainWindow):
     windowOpened = QtCore.pyqtSignal()
     windowClosed = QtCore.pyqtSignal()
     hideAll = QtCore.pyqtSignal(bool)
-    hideAll = QtCore.pyqtSignal(bool)
 
     def __init__(self, size):
         super().__init__()
@@ -38,7 +37,6 @@ class Window(QtWidgets.QMainWindow):
         self.statusBar.addWidget(self.coordinateLabel)
         self.statusBar.addWidget(self.statusLabel)
         self._placeComponents()
-        QtWidgets.QApplication.processEvents()
 
         self._elementsDf = Sqlite.getDatabaseDataframe(
             "fundamentals", "elements")
@@ -247,7 +245,6 @@ class Window(QtWidgets.QMainWindow):
             element = self.getElementById(elementId)
             self._addedElements.append(element)
             self._addElementToForm(element)
-            print(elementId in self.form.getRowIds())
             self._showAllLinesOfElement(element)
             self.elementAdded.emit(element)
 
@@ -401,7 +398,6 @@ class Window(QtWidgets.QMainWindow):
             else:
                 self._hideAllLinesOfElement(element)
 
-    @dispatch(Element)
     @dispatch(Element)
     def hideElement(self, element):
         row = self.form.getRowById(element.getAttribute("element_id"))

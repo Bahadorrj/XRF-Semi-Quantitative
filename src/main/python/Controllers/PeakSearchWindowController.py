@@ -4,7 +4,6 @@ from PyQt6.QtCore import QObject, pyqtSignal, QThread
 
 
 class Worker(QObject):
-    started = pyqtSignal()
     progress = pyqtSignal(int)
     finished = pyqtSignal()
 
