@@ -10,11 +10,13 @@ from src.main.python.Views import MessegeBox
 from src.main.python.Views.Icons import ICONS
 from src.main.python.Views.TableWidget import Form
 
+
 class Window(QtWidgets.QMainWindow):
     elementAdded = QtCore.pyqtSignal(Element)
     rowAdded = QtCore.pyqtSignal(list)
     windowOpened = QtCore.pyqtSignal()
     windowClosed = QtCore.pyqtSignal()
+    hideAll = QtCore.pyqtSignal(bool)
     hideAll = QtCore.pyqtSignal(bool)
 
     def __init__(self, size):
@@ -28,7 +30,8 @@ class Window(QtWidgets.QMainWindow):
         self._createGraph()
         self.coordinateLabel = QtWidgets.QLabel()
         self.coordinateLabel.setFixedWidth(200)
-        self.coordinateLabel.setText("""<span style='font-size: 2rem'>x=0, y=0, , kEV= 0</span>""")
+        self.coordinateLabel.setText(
+            """<span style='font-size: 2rem'>x=0, y=0, , kEV= 0</span>""")
         self.statusLabel = QtWidgets.QLabel()
         self.statusLabel.setFixedWidth(200)
         self.statusBar = QtWidgets.QStatusBar()
@@ -37,7 +40,8 @@ class Window(QtWidgets.QMainWindow):
         self._placeComponents()
         QtWidgets.QApplication.processEvents()
 
-        self._elementsDf = Sqlite.getDatabaseDataframe("fundamentals", "elements")
+        self._elementsDf = Sqlite.getDatabaseDataframe(
+            "fundamentals", "elements")
         self._conditionID = int()
         self._counts = np.zeros(2048, dtype=np.uint32)
         self._px = np.zeros(2048, dtype=np.uint16)
@@ -134,8 +138,10 @@ class Window(QtWidgets.QMainWindow):
             hideButton.setIcon(QtGui.QIcon(ICONS["Hide"]))
         else:
             hideButton.setIcon(QtGui.QIcon(ICONS["Show"]))
-        elementItem = QtWidgets.QTableWidgetItem(element.getAttribute("symbol"))
-        typeItem = QtWidgets.QTableWidgetItem(element.getAttribute("radiation_type"))
+        elementItem = QtWidgets.QTableWidgetItem(
+            element.getAttribute("symbol"))
+        typeItem = QtWidgets.QTableWidgetItem(
+            element.getAttribute("radiation_type"))
         kevItem = QtWidgets.QTableWidgetItem(str(element.getAttribute("Kev")))
         lowItem = QtWidgets.QTableWidgetItem(str(element.lowKev))
         highItem = QtWidgets.QTableWidgetItem(str(element.highKev))
@@ -208,7 +214,8 @@ class Window(QtWidgets.QMainWindow):
             mask = np.logical_and(greater, smaller)
             filteredDataframe = self._elementsDf[mask]
             for radiation_type in ["Ka", "KB", "La", "LB", "Ly", "Ma", "Bg"]:
-                type_elements = filteredDataframe[filteredDataframe["radiation_type"] == radiation_type]
+                type_elements = filteredDataframe[filteredDataframe["radiation_type"]
+                                                  == radiation_type]
                 if type_elements.empty is False:
                     menu = self.peakPlotVB.menu.addMenu(radiation_type)
                     menu.triggered.connect(self.actionClicked)
@@ -252,7 +259,8 @@ class Window(QtWidgets.QMainWindow):
             element.peakLine.setPen(mkPen("g", width=2))
         else:
             if element.getAttribute("element_id") not in self.form.getRowIds():
-                element.spectrumLine.setPen(mkPen(color=(255, 111, 0), width=2))
+                element.spectrumLine.setPen(
+                    mkPen(color=(255, 111, 0), width=2))
                 element.peakLine.setPen(mkPen(color=(255, 111, 0), width=2))
             else:
                 element.spectrumLine.setPen(mkPen("r", width=2))
@@ -263,7 +271,8 @@ class Window(QtWidgets.QMainWindow):
     def _showAllLinesOfElement(self, element):
         relatedElements = list(
             filter(
-                lambda x: x.getAttribute("symbol") == element.getAttribute("symbol"),
+                lambda x: x.getAttribute(
+                    "symbol") == element.getAttribute("symbol"),
                 self._elements
             )
         )
@@ -283,7 +292,8 @@ class Window(QtWidgets.QMainWindow):
     def _hideAllLinesOfElement(self, element):
         relatedElements = list(
             filter(
-                lambda x: x.getAttribute("symbol") == element.getAttribute("symbol"),
+                lambda x: x.getAttribute(
+                    "symbol") == element.getAttribute("symbol"),
                 self._elements
             )
         )
@@ -392,7 +402,19 @@ class Window(QtWidgets.QMainWindow):
                 self._hideAllLinesOfElement(element)
 
     @dispatch(Element)
+    @dispatch(Element)
     def hideElement(self, element):
+        row = self.form.getRowById(element.getAttribute("element_id"))
+        row.get("Hide Widget").setIcon(QtGui.QIcon(ICONS["Hide"]))
+        if element.activated is False:
+            self.peakPlot.removeItem(element.region)
+
+        self._removeLineOfElement(element)
+        element.hidden = True
+
+    @dispatch(int)
+    def hideElement(self, index):
+        element = self._addedElements[index]
         row = self.form.getRowById(element.getAttribute("element_id"))
         row.get("Hide Widget").setIcon(QtGui.QIcon(ICONS["Hide"]))
         if element.activated is False:
@@ -484,5 +506,6 @@ class Window(QtWidgets.QMainWindow):
         self.peakPlot.clear()
         self.spectrumPlot.clear()
         self.form.clear()
-        self.coordinateLabel.setText("""<span style='font-size: 2rem'>x=0, y=0, , kEV= 0</span>""")
+        self.coordinateLabel.setText(
+            """<span style='font-size: 2rem'>x=0, y=0, , kEV= 0</span>""")
         super().closeEvent(a0)
