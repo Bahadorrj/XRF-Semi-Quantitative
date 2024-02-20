@@ -30,6 +30,7 @@ class Window(QtWidgets.QMainWindow):
         self.coordinateLabel.setFixedWidth(200)
         self.coordinateLabel.setText("""<span style='font-size: 2rem'>x=0, y=0, , kEV= 0</span>""")
         self.statusLabel = QtWidgets.QLabel()
+        self.statusLabel.setFixedWidth(200)
         self.statusBar = QtWidgets.QStatusBar()
         self.statusBar.addWidget(self.coordinateLabel)
         self.statusBar.addWidget(self.statusLabel)
@@ -222,26 +223,40 @@ class Window(QtWidgets.QMainWindow):
             self._elementsDf["radiation_type"] == radiationType)
         elementId = self._elementsDf[mask]["element_id"].iloc[0]
         if elementId in self.form.getRowIds():
-            message_box = MessegeBox.Dialog(
+            messageBox = MessegeBox.Dialog(
                 QtWidgets.QMessageBox.Icon.Information,
                 "Duplicate  element!",
-                f"{elementSymbol} - {radiationType} is already added to the table."
+                f"{elementSymbol} - {radiationType} is already added to the table.\n"
+                f"Would you like this line to be shown?"
             )
-            message_box.exec()
+            messageBox.setStandardButtons(QtWidgets.QMessageBox.StandardButton.Yes |
+                                          QtWidgets.QMessageBox.StandardButton.No)
+            returnValue = messageBox.exec()
+            if returnValue == QtWidgets.QMessageBox.StandardButton.Yes:
+                e = self.getElementById(elementId)
+                self.showElement(e)
+                self.selectRow(e)
         else:
             element = self.getElementById(elementId)
             self._addedElements.append(element)
             self._addElementToForm(element)
+            print(elementId in self.form.getRowIds())
             self._showAllLinesOfElement(element)
             self.elementAdded.emit(element)
 
     def _plotLineOfElement(self, element):
+        if element.spectrumLine in self.spectrumPlot.items:
+            return
         if element.activated:
             element.spectrumLine.setPen(mkPen("g", width=2))
             element.peakLine.setPen(mkPen("g", width=2))
         else:
-            element.spectrumLine.setPen(mkPen("r", width=2))
-            element.peakLine.setPen(mkPen("r", width=2))
+            if element.getAttribute("element_id") not in self.form.getRowIds():
+                element.spectrumLine.setPen(mkPen(color=(255, 111, 0), width=2))
+                element.peakLine.setPen(mkPen(color=(255, 111, 0), width=2))
+            else:
+                element.spectrumLine.setPen(mkPen("r", width=2))
+                element.peakLine.setPen(mkPen("r", width=2))
         self.spectrumPlot.addItem(element.spectrumLine)
         self.peakPlot.addItem(element.peakLine)
 
@@ -260,6 +275,8 @@ class Window(QtWidgets.QMainWindow):
                 self._plotLineOfElement(e)
 
     def _removeLineOfElement(self, element):
+        if element.spectrumLine not in self.spectrumPlot.items:
+            return
         self.spectrumPlot.removeItem(element.spectrumLine)
         self.peakPlot.removeItem(element.peakLine)
 
@@ -277,7 +294,7 @@ class Window(QtWidgets.QMainWindow):
                 self._removeLineOfElement(e)
 
     def setRange(self, element):
-        lowPx, highPx = element.getRegion().getRegion()
+        lowPx, highPx = element.region.getRegion()
         lowPx = int(lowPx)
         highPx = int(highPx)
         try:
@@ -439,16 +456,16 @@ class Window(QtWidgets.QMainWindow):
         hidden = self._addedElements[0].hidden
         if hidden:
             self.hideAll.emit(True)
-            self.statusLabel.setText("hiding all elements...")
+            self.statusLabel.setText("showing all elements...")
         else:
             self.hideAll.emit(False)
-            self.statusLabel.setText("un-hiding all elements...")
+            self.statusLabel.setText("hiding all elements...")
 
     def selectRow(self, element):
         if element.getAttribute("element_id") in self.form.getRowIds():
             index = self.form.getRowIds().index(element.getAttribute("element_id"))
             self.form.selectRow(index)
-        self._goToPx(element.getRange())
+        self._goToPx(element.range)
 
     def getElements(self):
         return self._elements
@@ -459,9 +476,13 @@ class Window(QtWidgets.QMainWindow):
     def getNumberOfAddedElements(self):
         return len(self._addedElements)
 
+    def clearStatusLabel(self):
+        self.statusLabel.clear()
+
     def closeEvent(self, a0):
         self.windowClosed.emit()
         self.peakPlot.clear()
         self.spectrumPlot.clear()
         self.form.clear()
+        self.coordinateLabel.setText("""<span style='font-size: 2rem'>x=0, y=0, , kEV= 0</span>""")
         super().closeEvent(a0)
