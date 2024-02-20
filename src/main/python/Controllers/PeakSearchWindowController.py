@@ -12,6 +12,7 @@ class Worker(QObject):
         for i in range(size):
             time.sleep(0.05)
             self.progress.emit(i)
+        self.finished.emit()
 
 
 class PeakSearchWindowController:
@@ -49,12 +50,12 @@ class PeakSearchWindowController:
                 self._view.getCondition()
             )
         )
-        self._view.windowOpened.connect(self._view.configureWindow)
-        # self._view.hideAll.connect(partial(self.worker.run, self._view.getNumberOfAddedElements()))
-        self._view.showAll.connect(
+        self._view.hideAll.connect(partial(self._checkVisibility))
+        self._view.hideAll.connect(
             partial(self.worker.run, self._view.getNumberOfAddedElements()))
         # thread
-        self.worker.progress.connect(self._view.showElement)
+        self.worker.progress.connect(self._connectThreadAndSlots)
+        self.worker.finished.connect(self._view.clearStatusLabel)
 
     def _connectButtonsSignalsAnsSlots(self, buttons):
         buttons[0].clicked.connect(self._view.removeRow)

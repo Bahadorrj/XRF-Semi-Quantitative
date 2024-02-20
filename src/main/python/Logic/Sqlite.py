@@ -26,8 +26,6 @@ DATABASES = {
 }
 
 DATABASES["fundamentals"].connect()
-print(DATABASES)
-
 
 def getColumnLabels(databaseName, tableName):
     # Connect to the SQLite database
