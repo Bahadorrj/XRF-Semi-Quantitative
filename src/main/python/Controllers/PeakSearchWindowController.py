@@ -7,7 +7,8 @@ class Worker(QObject):
     progress = pyqtSignal(int)
     finished = pyqtSignal()
 
-    def run(self, size):
+    def run(self, view):
+        size = view.getNumberOfAddedElements()
         for i in range(size):
             time.sleep(0.05)
             self.progress.emit(i)
@@ -51,7 +52,8 @@ class PeakSearchWindowController:
         )
         self._view.hideAll.connect(partial(self._checkVisibility))
         self._view.hideAll.connect(
-            partial(self.worker.run, self._view.getNumberOfAddedElements()))
+            partial(self.worker.run, self._view)
+        )
         # thread
         self.worker.progress.connect(self._connectThreadAndSlots)
         self.worker.finished.connect(self._view.clearStatusLabel)
@@ -74,6 +76,6 @@ class PeakSearchWindowController:
 
     def _connectThreadAndSlots(self, index):
         if self._hide:
-            self._view.showElement(index)
+            self._view.configureShowing(index)
         else:
-            self._view.hideElement(index)
+            self._view.configureHiding(index)

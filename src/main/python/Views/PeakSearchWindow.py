@@ -243,13 +243,14 @@ class Window(QtWidgets.QMainWindow):
                 self.selectRow(e)
         else:
             element = self.getElementById(elementId)
+            # element.hidden = False
             self._addedElements.append(element)
             self._addElementToForm(element)
             self._showAllLinesOfElement(element)
             self.elementAdded.emit(element)
 
     def _plotLineOfElement(self, element):
-        if element.spectrumLine in self.spectrumPlot.items:
+        if element.spectrumLine in self.spectrumPlot.items or element.peakLine in self.peakPlot.items:
             return
         if element.activated:
             element.spectrumLine.setPen(mkPen("g", width=2))
@@ -398,13 +399,26 @@ class Window(QtWidgets.QMainWindow):
             else:
                 self._hideAllLinesOfElement(element)
 
+    def configureShowing(self, index):
+        element = self._addedElements[index]
+        if element.activated:
+            self.showElement(element)
+        else:
+            self._showAllLinesOfElement(element)
+
+    def configureHiding(self, index):
+        element = self._addedElements[index]
+        if element.activated:
+            self.hideElement(element)
+        else:
+            self._hideAllLinesOfElement(element)
+
     @dispatch(Element)
     def hideElement(self, element):
         row = self.form.getRowById(element.getAttribute("element_id"))
         row.get("Hide Widget").setIcon(QtGui.QIcon(ICONS["Hide"]))
         if element.activated is False:
             self.peakPlot.removeItem(element.region)
-
         self._removeLineOfElement(element)
         element.hidden = True
 
@@ -415,18 +429,6 @@ class Window(QtWidgets.QMainWindow):
         row.get("Hide Widget").setIcon(QtGui.QIcon(ICONS["Hide"]))
         if element.activated is False:
             self.peakPlot.removeItem(element.region)
-
-        self._removeLineOfElement(element)
-        element.hidden = True
-
-    @dispatch(int)
-    def hideElement(self, index):
-        element = self._addedElements[index]
-        row = self.form.getRowById(element.getAttribute("element_id"))
-        row.get("Hide Widget").setIcon(QtGui.QIcon(ICONS["Hide"]))
-        if element.activated is False:
-            self.peakPlot.removeItem(element.region)
-
         self._removeLineOfElement(element)
         element.hidden = True
 
