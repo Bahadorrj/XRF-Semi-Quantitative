@@ -1,7 +1,7 @@
 import numpy as np
 from PyQt6 import QtWidgets, QtCore, QtGui
-from pyqtgraph import mkPen, GraphicsLayoutWidget, LinearRegionItem, InfiniteLine
 from multipledispatch import dispatch
+from pyqtgraph import mkPen, GraphicsLayoutWidget, LinearRegionItem, InfiniteLine
 
 from src.main.python.Logic import Calculation
 from src.main.python.Logic import Sqlite
@@ -388,17 +388,19 @@ class Window(QtWidgets.QMainWindow):
         id = self.form.getCurrentRowId()
         element = self.getElementById(id)
         if element.hidden:
-            if element.activated:
-                self.showElement(element)
-                self._goToPx(element.range)
-            else:
-                self._showAllLinesOfElement(element)
+            self.configureShowing(element)
+            self._goToPx(element.range)
         else:
-            if element.activated:
-                self.hideElement(element)
-            else:
-                self._hideAllLinesOfElement(element)
+            self.configureHiding(element)
 
+    @dispatch(Element)
+    def configureShowing(self, element):
+        if element.activated:
+            self.showElement(element)
+        else:
+            self._showAllLinesOfElement(element)
+
+    @dispatch(int)
     def configureShowing(self, index):
         element = self._addedElements[index]
         if element.activated:
@@ -406,6 +408,14 @@ class Window(QtWidgets.QMainWindow):
         else:
             self._showAllLinesOfElement(element)
 
+    @dispatch(Element)
+    def configureHiding(self, element):
+        if element.activated:
+            self.hideElement(element)
+        else:
+            self._hideAllLinesOfElement(element)
+
+    @dispatch(int)
     def configureHiding(self, index):
         element = self._addedElements[index]
         if element.activated:
@@ -417,7 +427,7 @@ class Window(QtWidgets.QMainWindow):
     def hideElement(self, element):
         row = self.form.getRowById(element.getAttribute("element_id"))
         row.get("Hide Widget").setIcon(QtGui.QIcon(ICONS["Hide"]))
-        if element.activated is False:
+        if element.activated is False and element.region in self.peakPlot.items:
             self.peakPlot.removeItem(element.region)
         self._removeLineOfElement(element)
         element.hidden = True
@@ -427,7 +437,7 @@ class Window(QtWidgets.QMainWindow):
         element = self._addedElements[index]
         row = self.form.getRowById(element.getAttribute("element_id"))
         row.get("Hide Widget").setIcon(QtGui.QIcon(ICONS["Hide"]))
-        if element.activated is False:
+        if element.activated is False and element.region in self.peakPlot.items:
             self.peakPlot.removeItem(element.region)
         self._removeLineOfElement(element)
         element.hidden = True
@@ -436,7 +446,7 @@ class Window(QtWidgets.QMainWindow):
     def showElement(self, element):
         row = self.form.getRowById(element.getAttribute("element_id"))
         row.get("Hide Widget").setIcon(QtGui.QIcon(ICONS["Show"]))
-        if element.activated is False:
+        if element.activated is False and element.region not in self.peakPlot.items:
             self.peakPlot.addItem(element.region)
         self._plotLineOfElement(element)
         element.hidden = False
@@ -446,7 +456,7 @@ class Window(QtWidgets.QMainWindow):
         element = self._addedElements[index]
         row = self.form.getRowById(element.getAttribute("element_id"))
         row.get("Hide Widget").setIcon(QtGui.QIcon(ICONS["Show"]))
-        if element.activated is False:
+        if element.activated is False and element.region not in self.peakPlot.items:
             self.peakPlot.addItem(element.region)
         self._plotLineOfElement(element)
         element.hidden = False
