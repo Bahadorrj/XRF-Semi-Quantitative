@@ -6,10 +6,10 @@ from PyQt6.QtCore import QObject, pyqtSignal, QThread
 class Worker(QObject):
     progress = pyqtSignal(int)
     finished = pyqtSignal()
+    size: int = 0
 
-    def run(self, view):
-        size = view.getNumberOfAddedElements()
-        for i in range(size):
+    def run(self):
+        for i in range(self.size):
             time.sleep(0.05)
             self.progress.emit(i)
         self.finished.emit()
@@ -18,10 +18,10 @@ class Worker(QObject):
 class PeakSearchWindowController:
     def __init__(self, view, model):
         self._view = view
+        self._model = model
         self.thread = QThread()
         self.worker = Worker()
         self.worker.moveToThread(self.thread)
-        self._model = model
         self._connectSignalsAndSlots()
 
     def _connectSignalsAndSlots(self):
@@ -38,6 +38,7 @@ class PeakSearchWindowController:
         # self defined signals
         self._view.rowAdded.connect(
             partial(self._connectButtonsSignalsAnsSlots))
+        self._view.rowAdded.connect(lambda: setattr(self.worker, 'size', self.worker.size + 1))
         self._view.elementAdded.connect(
             partial(self._connectRegionSignalAndSlot))
         self._view.windowOpened.connect(lambda: self.thread.start())
@@ -51,9 +52,7 @@ class PeakSearchWindowController:
             )
         )
         self._view.hideAll.connect(partial(self._checkVisibility))
-        self._view.hideAll.connect(
-            partial(self.worker.run, self._view)
-        )
+        self._view.hideAll.connect(self.worker.run)
         # thread
         self.worker.progress.connect(self._connectThreadAndSlots)
         self.worker.finished.connect(self._view.clearStatusLabel)
