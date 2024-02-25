@@ -251,7 +251,8 @@ class Window(QtWidgets.QMainWindow):
 
     def _plotLineOfElement(self, element):
         if element.spectrumLine in self.spectrumPlot.items or element.peakLine in self.peakPlot.items:
-            return
+            self.spectrumPlot.removeItem(element.spectrumLine)
+            self.peakPlot.removeItem(element.peakLine)
         if element.activated:
             element.spectrumLine.setPen(mkPen("g", width=2))
             element.peakLine.setPen(mkPen("g", width=2))
