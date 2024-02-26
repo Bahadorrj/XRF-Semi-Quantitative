@@ -227,5 +227,4 @@ class Window(QtWidgets.QMainWindow):
         if topLevelIndex != -1:
             file = self._files[topLevelIndex]
             self.peakSearchWindow.init(file.counts[childIndex], file.conditions[childIndex])
-            self.peakSearchWindow.windowOpened.emit()
             self.peakSearchWindow.showMaximized()
