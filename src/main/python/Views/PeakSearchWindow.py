@@ -13,7 +13,7 @@ from src.main.python.Views.TableWidget import Form
 
 class Window(QtWidgets.QMainWindow):
     elementAdded = QtCore.pyqtSignal(Element)
-    rowAdded = QtCore.pyqtSignal(list)
+    rowAdded = QtCore.pyqtSignal(int)
     windowOpened = QtCore.pyqtSignal()
     windowClosed = QtCore.pyqtSignal()
     hideAll = QtCore.pyqtSignal(bool)
@@ -117,17 +117,16 @@ class Window(QtWidgets.QMainWindow):
         self.spectrumPlot.setLimits(
             xMin=0, xMax=max(self._px), yMin=0, yMax=1.1 * max(self._counts)
         )
-        self.spectrumPlot.plot(
-            x=self._px, y=self._counts, pen=mkPen("w", width=2))
+        self.spectrumPlot.plot(x=self._px, y=self._counts, pen=mkPen("w", width=2))
         self.peakPlot.setLimits(
             xMin=0, xMax=max(self._px), yMin=0, yMax=1.1 * max(self._counts)
         )
-        self.peakPlot.plot(
-            x=self._px, y=self._counts, pen=mkPen("w", width=2))
+        self.peakPlot.plot(x=self._px, y=self._counts, pen=mkPen("w", width=2))
         self.spectrumRegion.setClipItem(self.spectrumPlot)
         self.spectrumRegion.setRegion((0, 100))
         self.spectrumRegion.setBounds((0, max(self._px)))
         self.peakPlot.setXRange(0, 100, padding=0)
+        self.windowOpened.emit()
 
     def _addElementToForm(self, element):
         removeButton = QtWidgets.QPushButton(icon=QtGui.QIcon(ICONS["Cross"]))
@@ -156,9 +155,8 @@ class Window(QtWidgets.QMainWindow):
             statusButton.setText("Activate")
         items = [removeButton, hideButton, elementItem, typeItem, kevItem,
                  lowItem, highItem, intensityItem, statusItem, statusButton]
-        buttons = [removeButton, hideButton, statusButton]
         self.form.addRow(items, element.getAttribute("element_id"))
-        self.rowAdded.emit(buttons)
+        self.rowAdded.emit(self.form.currentRow())
 
     def getElementById(self, id):
         for element in self._elements:

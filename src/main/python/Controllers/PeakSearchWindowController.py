@@ -57,10 +57,10 @@ class PeakSearchWindowController:
         self.worker.progress.connect(self._connectThreadAndSlots)
         self.worker.finished.connect(self._view.clearStatusLabel)
 
-    def _connectButtonsSignalsAnsSlots(self, buttons):
-        buttons[0].clicked.connect(self._view.removeRow)
-        buttons[1].clicked.connect(self._view.visibility)
-        buttons[2].clicked.connect(self._view.statusChanged)
+    def _connectButtonsSignalsAnsSlots(self, row):
+        self._view.form.cellWidget(row, 0).clicked.connect(self._view.removeRow)
+        self._view.form.cellWidget(row, 1).clicked.connect(self._view.visibility)
+        self._view.form.cellWidget(row, self._view.form.columnCount() - 1).clicked.connect(self._view.statusChanged)
 
     def _connectRegionSignalAndSlot(self, element):
         element.region.sigRegionChanged.connect(
