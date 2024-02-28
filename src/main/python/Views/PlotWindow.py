@@ -1,11 +1,12 @@
 import numpy as np
 from PyQt6 import QtWidgets, QtCore, QtGui
 from pyqtgraph import PlotWidget, ColorButton, mkPen
+from multipledispatch import dispatch
 
 from src.main.python.Controllers.ElemenetsWindowController import ElementsWindowController
 from src.main.python.Controllers.PeakSearchWindowController import PeakSearchWindowController
 from src.main.python.Models import PeakSearchWindowModel
-from src.main.python.Types.FileClass import File
+from src.main.python.Types.FileClass import LocalFile, PacketFile
 from src.main.python.Views import ConditionsWindow
 from src.main.python.Views import ElementsWindow
 from src.main.python.Views import PeakSearchWindow
@@ -93,6 +94,9 @@ class Window(QtWidgets.QMainWindow):
         self.form.setHeaderLabels(["File", "Condition", "Color"])
         self.form.setFrameShape(QtWidgets.QFrame.Shape.Box)
         self.form.setFrameShadow(QtWidgets.QFrame.Shadow.Plain)
+        self.form.header().setDefaultSectionSize(int(self.size().width() * 0.1))
+        self.form.header().setHighlightSections(True)
+        self.form.setAnimated(True)
         self.form.setContextMenuPolicy(QtCore.Qt.ContextMenuPolicy.CustomContextMenu)
         self.form.setMaximumWidth(int(self.size().width() * 0.3))
 
@@ -133,8 +137,9 @@ class Window(QtWidgets.QMainWindow):
         if self.form.indexOfTopLevelItem(item) != -1:
             menu.exec(self.form.mapToGlobal(position))
 
+    @dispatch(str)
     def createFile(self, path):
-        f = File(path)
+        f = LocalFile(path)
         fileItem = QtWidgets.QTreeWidgetItem()
         fileItem.setText(0, f.name)
         fileItem.setCheckState(0, QtCore.Qt.CheckState.Unchecked)
@@ -152,6 +157,34 @@ class Window(QtWidgets.QMainWindow):
                 buttons.append(colorButton)
             self._files.append(f)
             self._colorButtonMap[f.name] = buttons
+        else:
+            messageBox = Dialog(
+                QtWidgets.QMessageBox.Icon.Warning,
+                "Warning!",
+                "The selected file is not registered properly!"
+            )
+            messageBox.setStandardButtons(QtWidgets.QMessageBox.StandardButton.Ok)
+            messageBox.exec()
+
+    @dispatch(PacketFile)
+    def createFile(self, file):
+        fileItem = QtWidgets.QTreeWidgetItem()
+        fileItem.setText(0, file.name)
+        fileItem.setCheckState(0, QtCore.Qt.CheckState.Unchecked)
+        buttons = list()
+        if file.conditions:
+            for index, condition in enumerate(file.conditions):
+                conditionItem = QtWidgets.QTreeWidgetItem()
+                conditionItem.setText(1, condition.getName())
+                conditionItem.setCheckState(1, QtCore.Qt.CheckState.Unchecked)
+                fileItem.addChild(conditionItem)
+                self.form.addTopLevelItem(fileItem)
+                colorButton = ColorButton()
+                colorButton.setColor(COLORS[index])
+                self.form.setItemWidget(conditionItem, 2, colorButton)
+                buttons.append(colorButton)
+            self._files.append(file)
+            self._colorButtonMap[file.name] = buttons
         else:
             messageBox = Dialog(
                 QtWidgets.QMessageBox.Icon.Warning,
