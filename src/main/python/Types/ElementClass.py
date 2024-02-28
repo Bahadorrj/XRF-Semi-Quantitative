@@ -23,7 +23,7 @@ class Element(Data):
 
     def __post_init__(self):
         self.labels = getColumnLabels("fundamentals", "elements")
-        self.values = getValue("fundamentals", "elements", where=f"WHERE element_id = {self.id}")
+        self.values = getValue("fundamentals", "elements", where=f"element_id = {self.id}")
         self.lowKev = self.getAttribute("low_Kev")
         self.highKev = self.getAttribute("high_Kev")
         self.intensity = self.getAttribute("intensity")

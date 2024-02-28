@@ -8,11 +8,11 @@ from src.main.python.Types.ConditionClass import Condition
 
 
 @dataclass(order=True)
-class File:
+class LocalFile:
     path: str
     name: str = field(init=False)
     conditions: list[Condition] = field(init=False, repr=False, default_factory=list)
-    counts: list[ndarray[uint32]] = field(init=False, repr=False, default_factory=list)
+    counts: list[ndarray] = field(init=False, repr=False, default_factory=list)
 
     def __post_init__(self):
         self.name = Path(self.path).stem
@@ -22,7 +22,7 @@ class File:
             index = 0
             while line:
                 if "Condition" in line:
-                    conditionID = Sqlite.getValue("fundamentals", "conditions", where=f"WHERE name = '{line.strip()}'")[0]
+                    conditionID = Sqlite.getValue("fundamentals", "conditions", where=f"name = '{line.strip()}'")[0]
                     c = Condition(conditionID)
                     self.conditions.append(c)
                 try:
@@ -31,8 +31,15 @@ class File:
                     index += 1
                     if index == 2048:
                         self.counts.append(counts)
-                        counts = zeros(2048)
+                        counts = zeros(2048, dtype=uint32)
+
                         index = 0
                 except ValueError:
                     pass
                 line = file.readline()
+
+@dataclass(order=True)
+class PacketFile:
+    name: str
+    conditions: list[Condition] = field(init=False, repr=False, default_factory=list)
+    counts: list[ndarray] = field(init=False, repr=False, default_factory=list)

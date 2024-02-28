@@ -19,12 +19,12 @@ class Database:
 
 
 ADDRESS = {
-    "fundamentals": r"DB/fundamentals.db"
+    "fundamentals": r"DB\fundamentals.db"
+    # "fundamentals": r"../../../../DB/fundamentals.db"
 }
 DATABASES = {
     "fundamentals": Database(ADDRESS["fundamentals"])
 }
-
 DATABASES["fundamentals"].connect()
 
 def getColumnLabels(databaseName, tableName):
@@ -42,19 +42,31 @@ def getColumnLabels(databaseName, tableName):
 def getValue(databaseName, tableName, columnName="*", where=""):
     connection = DATABASES.get(databaseName).connection
     cur = connection.cursor()
-    query = "SELECT " + columnName + " FROM " + tableName + " " + where + ";"
-    cur.execute(query)
-    result = cur.fetchone()
-    return list(result)
+    if where:
+        query = f"SELECT {columnName} FROM {tableName} WHERE {where};"
+    else:
+        query = f"SELECT {columnName} FROM {tableName};"
+    try:
+        cur.execute(query)
+        return cur.fetchone()
+    except TypeError:
+        print("Invalid request!")
+    return None
 
 
 def getValues(databaseName, tableName, columnName="*", where=""):
     connection = DATABASES.get(databaseName).connection
     cur = connection.cursor()
-    query = "SELECT " + columnName + " FROM " + tableName + " " + where + ";"
-    cur.execute(query)
-    result = cur.fetchall()
-    return result
+    if where:
+        query = f"SELECT {columnName} FROM {tableName} WHERE {where};"
+    else:
+        query = f"SELECT {columnName} FROM {tableName};"
+    try:
+        cur.execute(query)
+        return cur.fetchall()
+    except TypeError:
+        print("Invalid request!")
+    return None
 
 
 def getDatabaseDataframe(databaseName, tableName, columnName='*', where=''):
