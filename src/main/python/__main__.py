@@ -25,6 +25,9 @@ class GuiHandler(QtCore.QObject):
     def __init__(self, mainWindow):
         super().__init__()
         self.mainWindow = mainWindow
+        self.openGuiSignal.connect(self.openGui)
+        self.closeGuiSignal.connect(self.closeGui)
+        self.addFileSignal.connect(self.addFile)
 
     def openGui(self):
         logging.info("Opening GUI")
@@ -33,6 +36,7 @@ class GuiHandler(QtCore.QObject):
     def closeGui(self):
         logging.info("Closing GUI")
         self.mainWindow.close()
+        QtWidgets.QApplication.quit()
 
     def addFile(self, data: str):
         logging.info("Adding file")
@@ -76,6 +80,7 @@ class ClientHandler(QtCore.QObject):
                     logging.info("Open action")
                     self.guiHandler.openGuiSignal.emit()
                 elif command == "-cls":
+                    # close is sent when the VB exe closes
                     logging.info("Close action")
                     self.guiHandler.closeGuiSignal.emit()
                     break
@@ -88,7 +93,7 @@ class ClientHandler(QtCore.QObject):
         except Exception as e:
             logging.error(f"Error handling client: {e}", exc_info=True)
         finally:
-            self.conn.close()
+            self.conn.close()  # Ensure connection is closed
 
 
 def main():
@@ -98,22 +103,14 @@ def main():
     size = app.primaryScreen().size()
     mainWindow = Window(size)
     PlotWindowController(mainWindow)
-    while True:
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-            s.bind((HOST, PORT))
-            s.listen(1)
-            logging.info(f"Server listening on {HOST}:{PORT}")
-
-            conn, addr = s.accept()
-            logging.info(f"Connected to {addr}")
-
-            guiHandler = GuiHandler(mainWindow)
-
-            clientHandler = ClientHandler(conn, guiHandler)
-            clientThread = threading.Thread(target=clientHandler.handleClient)
-            clientThread.start()
-
-            guiHandler.openGuiSignal.connect(guiHandler.openGui)
-            guiHandler.closeGuiSignal.connect(guiHandler.closeGui)
-            guiHandler.addFileSignal.connect(guiHandler.addFile)
-        app.exec()
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.bind((HOST, PORT))
+        s.listen(1)
+        logging.info(f"Server listening on {HOST}:{PORT}")
+        conn, addr = s.accept()
+        logging.info(f"Connected to {addr}")
+        guiHandler = GuiHandler(mainWindow)
+        clientHandler = ClientHandler(conn, guiHandler)
+        clientThread = threading.Thread(target=clientHandler.handleClient)
+        clientThread.start()
+    sys.exit(app.exec())
