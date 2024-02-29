@@ -98,22 +98,22 @@ def main():
     size = app.primaryScreen().size()
     mainWindow = Window(size)
     PlotWindowController(mainWindow)
-    guiHandler = GuiHandler(mainWindow)
+    while True:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.bind((HOST, PORT))
+            s.listen(1)
+            logging.info(f"Server listening on {HOST}:{PORT}")
 
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        s.bind((HOST, PORT))
-        s.listen(1)
-        logging.info(f"Server listening on {HOST}:{PORT}")
+            conn, addr = s.accept()
+            logging.info(f"Connected to {addr}")
 
-        conn, addr = s.accept()
-        logging.info(f"Connected to {addr}")
+            guiHandler = GuiHandler(mainWindow)
 
-        clientHandler = ClientHandler(conn, guiHandler)
-        clientThread = threading.Thread(target=clientHandler.handleClient)
-        clientThread.start()
+            clientHandler = ClientHandler(conn, guiHandler)
+            clientThread = threading.Thread(target=clientHandler.handleClient)
+            clientThread.start()
 
-        guiHandler.openGuiSignal.connect(guiHandler.openGui)
-        guiHandler.closeGuiSignal.connect(guiHandler.closeGui)
-        guiHandler.addFileSignal.connect(guiHandler.addFile)
-
-    sys.exit(app.exec())
+            guiHandler.openGuiSignal.connect(guiHandler.openGui)
+            guiHandler.closeGuiSignal.connect(guiHandler.closeGui)
+            guiHandler.addFileSignal.connect(guiHandler.addFile)
+        app.exec()
