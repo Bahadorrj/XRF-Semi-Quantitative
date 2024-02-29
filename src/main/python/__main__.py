@@ -1,85 +1,119 @@
-import sys
+import logging
 import socket
+import sys
 import threading
+
 from PyQt6 import QtWidgets, QtGui, QtCore
 from numpy import ndarray, uint32
 
-from src.main.python.Types.FileClass import PacketFile
-from src.main.python.Types.ConditionClass import Condition
 from src.main.python.Controllers.PlotWindowController import PlotWindowController
+from src.main.python.Logic.Sqlite import getValue
+from src.main.python.Types.ConditionClass import Condition
+from src.main.python.Types.FileClass import PacketFile
 from src.main.python.Views.Icons import ICONS
 from src.main.python.Views.PlotWindow import Window
-from src.main.python.Logic.Sqlite import getValue
 
 HOST = "127.0.0.1"
 PORT = 16000
 
-app = QtWidgets.QApplication(sys.argv)
-app.setWindowIcon(QtGui.QIcon(ICONS["CSAN"]))
-size = app.primaryScreen().size()
-mainWindow = Window(size)
-PlotWindowController(mainWindow)
 
+class GuiHandler(QtCore.QObject):
+    openGuiSignal = QtCore.pyqtSignal()
+    closeGuiSignal = QtCore.pyqtSignal()
+    addFileSignal = QtCore.pyqtSignal(str)
 
-def openGui():
-    mainWindow.show()
-    app.exec()
+    def __init__(self, mainWindow):
+        super().__init__()
+        self.mainWindow = mainWindow
 
+    def openGui(self):
+        logging.info("Opening GUI")
+        self.mainWindow.show()
 
-def closeGui():
-    mainWindow.close()
+    def closeGui(self):
+        logging.info("Closing GUI")
+        self.mainWindow.close()
 
-
-def addFile(data):
-    pointer = 0
-    sampleFileName = data[pointer]
-    pointer += 1
-    new = PacketFile(sampleFileName)
-    while data[pointer] != "-stp":
-        conditionName = data[pointer]
+    def addFile(self, data: str):
+        logging.info("Adding file")
+        seperated = data.split('\\')
+        pointer = 0
+        sampleFileName = seperated[pointer]
         pointer += 1
-        conditionID = getValue("fundamentals", "conditions", where=f"name = '{conditionName}'")[0]
-        condition = Condition(conditionID)
-        counts = ndarray(2048, dtype=uint32)
-        for i in range(2048):
-            counts[i] = data[pointer]
+        new = PacketFile(sampleFileName)
+        while seperated[pointer] != "-stp":
+            conditionName = seperated[pointer]
             pointer += 1
-        new.conditions.append(condition)
-        new.counts.append(counts)
-    mainWindow.createFile(new)
+            conditionID = getValue("fundamentals", "conditions", where=f"name = '{conditionName}'")[0]
+            condition = Condition(conditionID)
+            counts = ndarray(2048, dtype=uint32)
+            for i in range(2048):
+                counts[i] = seperated[pointer]
+                pointer += 1
+            new.conditions.append(condition)
+            new.counts.append(counts)
+        self.mainWindow.createFile(new)
 
 
 class ClientHandler(QtCore.QObject):
-    openGuiSignal = QtCore.pyqtSignal()
-    closeGuiSignal = QtCore.pyqtSignal()
-    addFileSignal = QtCore.pyqtSignal(list)
+    dataLock = threading.Lock()
+    commandLock = threading.Lock()
 
-    def handleClient(self, connection):
-        while True:
-            command = connection.recv(4).decode("utf-8")
-            if not command:
-                return
-            if command == "-opn":
-                self.openGuiSignal.emit()
-            elif command == "-cls":
-                self.closeGuiSignal.emit()
-            elif command == "-als":
-                data = connection.recv(2048 * 128).decode("utf-8").split("\\")
-                self.addFileSignal.emit(data)
+    def __init__(self, conn, guiHandler):
+        super().__init__()
+        self.conn = conn
+        self.guiHandler = guiHandler
+
+    def handleClient(self):
+        try:
+            while True:
+                with self.commandLock:
+                    command = self.conn.recv(4).decode("utf-8")
+                    logging.info(f"Received command: {command}")
+                if not command:
+                    break
+                if command == "-opn":
+                    logging.info("Open action")
+                    self.guiHandler.openGuiSignal.emit()
+                elif command == "-cls":
+                    logging.info("Close action")
+                    self.guiHandler.closeGuiSignal.emit()
+                    break
+                elif command == "-als":
+                    logging.info("Analyse action")
+                    with self.dataLock:
+                        data = self.conn.recv(2048 * 128).decode("utf-8")
+                        self.guiHandler.addFileSignal.emit(data)
+                        logging.info(data)
+        except Exception as e:
+            logging.error(f"Error handling client: {e}", exc_info=True)
+        finally:
+            self.conn.close()
 
 
 def main():
-    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    s.bind((HOST, PORT))
-    s.listen()
-    conn, addr = s.accept()
-    print(f"Connected by: {addr}")
+    logging.basicConfig(level=logging.DEBUG)
+    app = QtWidgets.QApplication(sys.argv)
+    app.setWindowIcon(QtGui.QIcon(ICONS["CSAN"]))
+    size = app.primaryScreen().size()
+    mainWindow = Window(size)
+    PlotWindowController(mainWindow)
+    guiHandler = GuiHandler(mainWindow)
 
-    clientHandler = ClientHandler()
-    clientThread = threading.Thread(target=clientHandler.handleClient, args=(conn,))
-    clientThread.start()
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.bind((HOST, PORT))
+        s.listen(1)
+        logging.info(f"Server listening on {HOST}:{PORT}")
 
-    clientHandler.openGuiSignal.connect(openGui)
-    clientHandler.closeGuiSignal.connect(closeGui)
-    clientHandler.addFileSignal.connect(addFile)
-    clientHandler.handleClient(conn)
+        conn, addr = s.accept()
+        logging.info(f"Connected to {addr}")
+
+        clientHandler = ClientHandler(conn, guiHandler)
+        clientThread = threading.Thread(target=clientHandler.handleClient)
+        clientThread.start()
+
+        guiHandler.openGuiSignal.connect(guiHandler.openGui)
+        guiHandler.closeGuiSignal.connect(guiHandler.closeGui)
+        guiHandler.addFileSignal.connect(guiHandler.addFile)
+
+    sys.exit(app.exec())
