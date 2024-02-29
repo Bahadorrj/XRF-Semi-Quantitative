@@ -261,3 +261,7 @@ class Window(QtWidgets.QMainWindow):
             file = self._files[topLevelIndex]
             self.peakSearchWindow.init(file.counts[childIndex], file.conditions[childIndex])
             self.peakSearchWindow.showMaximized()
+
+    def closeEvent(self, a0):
+        self.hide()
+        a0.ignore()
