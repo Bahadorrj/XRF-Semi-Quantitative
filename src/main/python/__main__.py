@@ -89,7 +89,8 @@ class ClientHandler(QtCore.QObject):
                     with self.dataLock:
                         data = self.conn.recv(2048 * 128).decode("utf-8")
                         self.guiHandler.addFileSignal.emit(data)
-                        logging.info(data)
+                else:
+                    logging.info("Invalid command")
         except Exception as e:
             logging.error(f"Error handling client: {e}", exc_info=True)
         finally:
