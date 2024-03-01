@@ -30,16 +30,15 @@ class GuiHandler(QtCore.QObject):
         self.addFileSignal.connect(self.addFile)
 
     def openGui(self):
-        logging.info("Opening GUI")
         self.mainWindow.show()
+        logging.info("GUI opened")
 
     def closeGui(self):
-        logging.info("Closing GUI")
         self.mainWindow.close()
         QtWidgets.QApplication.quit()
+        logging.info("Application exit")
 
     def addFile(self, data: str):
-        logging.info("Adding file")
         seperated = data.split('\\')
         pointer = 0
         sampleFileName = seperated[pointer]
@@ -57,6 +56,7 @@ class GuiHandler(QtCore.QObject):
             new.conditions.append(condition)
             new.counts.append(counts)
         self.mainWindow.createFile(new)
+        logging.info(f"Added file: {new}")
 
 
 class ClientHandler(QtCore.QObject):
@@ -77,20 +77,17 @@ class ClientHandler(QtCore.QObject):
                 if not command:
                     break
                 if command == "-opn":
-                    logging.info("Open action")
                     self.guiHandler.openGuiSignal.emit()
                 elif command == "-cls":
                     # close is sent when the VB exe closes
-                    logging.info("Close action")
                     self.guiHandler.closeGuiSignal.emit()
                     break
                 elif command == "-als":
-                    logging.info("Analyse action")
                     with self.dataLock:
                         data = self.conn.recv(2048 * 128).decode("utf-8")
                         self.guiHandler.addFileSignal.emit(data)
                 else:
-                    logging.info("Invalid command")
+                    logging.warning(f"There is not any action related to {command}. make sure you are sending the correct command.")
         except Exception as e:
             logging.error(f"Error handling client: {e}", exc_info=True)
         finally:
