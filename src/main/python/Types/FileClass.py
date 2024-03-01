@@ -41,5 +41,5 @@ class LocalFile:
 @dataclass(order=True)
 class PacketFile:
     name: str
-    conditions: list[Condition] = field(init=False, repr=False, default_factory=list)
+    conditions: list[Condition] = field(init=False, repr=True, default_factory=list)
     counts: list[ndarray] = field(init=False, repr=False, default_factory=list)
