@@ -96,7 +96,8 @@ class Window(QtWidgets.QMainWindow):
         self.form.setFrameShadow(QtWidgets.QFrame.Shadow.Plain)
         self.form.header().setDefaultSectionSize(int(self.size().width() * 0.1))
         self.form.header().setHighlightSections(True)
-        self.form.setAnimated(True)
+        # self.form.setAnimated(True)
+        # self.form.setExpandsOnDoubleClick(False)
         self.form.setContextMenuPolicy(QtCore.Qt.ContextMenuPolicy.CustomContextMenu)
         self.form.setMaximumWidth(int(self.size().width() * 0.3))
 

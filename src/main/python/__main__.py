@@ -30,7 +30,7 @@ class GuiHandler(QtCore.QObject):
         self.addFileSignal.connect(self.addFile)
 
     def openGui(self):
-        self.mainWindow.show()
+        self.mainWindow.showMaximized()
         logging.info("GUI opened")
 
     def closeGui(self):
@@ -87,7 +87,8 @@ class ClientHandler(QtCore.QObject):
                         data = self.conn.recv(2048 * 128).decode("utf-8")
                         self.guiHandler.addFileSignal.emit(data)
                 else:
-                    logging.warning(f"There is not any action related to {command}. make sure you are sending the correct command.")
+                    logging.warning(f"There is not any action related to {command}. "
+                                    f"make sure you are sending the correct command.")
         except Exception as e:
             logging.error(f"Error handling client: {e}", exc_info=True)
         finally:
