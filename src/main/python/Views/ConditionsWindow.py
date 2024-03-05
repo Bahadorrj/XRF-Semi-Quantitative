@@ -1,16 +1,21 @@
-from PyQt6 import QtWidgets, QtCore
+from PyQt6.QtCore import Qt
+from PyQt6.QtWidgets import (
+    QWidget,
+    QHBoxLayout,
+    QTableWidgetItem
+)
 
-from src.main.python.dependencies import DATABASES
 from src.main.python.Logic.Sqlite import getDatabaseDataframe, DatabaseConnection
 from src.main.python.Views.TableWidget import Form
+from src.main.python.dependencies import DATABASES
 
 
-class Window(QtWidgets.QWidget):
+class Window(QWidget):
     def __init__(self, size):
         super().__init__()
         self.setFixedWidth(int(0.8 * size.width()))
         self.setFixedHeight(int(0.3 * size.height()))
-        self.mainLayout = QtWidgets.QHBoxLayout()
+        self.mainLayout = QHBoxLayout()
         headerLabels = [
             "Name",
             "Kv",
@@ -35,15 +40,15 @@ class Window(QtWidgets.QWidget):
         for i in self._conditionsDf.index:
             items = list()
             for label in ["name", "Kv", "mA", "time", "rotation", "environment", "filter", "mask"]:
-                item = QtWidgets.QTableWidgetItem(str(self._conditionsDf.at[i, label]))
+                item = QTableWidgetItem(str(self._conditionsDf.at[i, label]))
                 items.append(item)
-            activeItem = QtWidgets.QTableWidgetItem()
+            activeItem = QTableWidgetItem()
             if self._conditionsDf.at[i, "active"] == 1:
                 activeItem.setText("True")
-                activeItem.setForeground(QtCore.Qt.GlobalColor.green)
+                activeItem.setForeground(Qt.GlobalColor.green)
             else:
                 activeItem.setText("False")
-                activeItem.setForeground(QtCore.Qt.GlobalColor.red)
+                activeItem.setForeground(Qt.GlobalColor.red)
             items.append(activeItem)
             self.form.addRow(items, self._conditionsDf.at[i, "condition_id"])
         self.form.setCurrentItem(self.form.item(0, 0))

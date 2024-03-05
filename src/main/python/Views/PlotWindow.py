@@ -1,9 +1,25 @@
 import numpy as np
-from PyQt6 import QtWidgets, QtCore, QtGui
-from pyqtgraph import PlotWidget, ColorButton, mkPen
+from PyQt6.QtCore import QSize, Qt
+from PyQt6.QtGui import QAction, QIcon
+from PyQt6.QtWidgets import (
+    QMainWindow,
+    QVBoxLayout,
+    QHBoxLayout,
+    QWidget,
+    QLabel,
+    QStatusBar,
+    QToolBar,
+    QMessageBox,
+    QTreeWidget,
+    QTreeWidgetItem,
+    QMenu,
+    QFrame,
+    QFileDialog,
+    QApplication
+)
 from multipledispatch import dispatch
+from pyqtgraph import PlotWidget, ColorButton, mkPen
 
-from src.main.python.dependencies import ICONS
 from src.main.python.Controllers.ElemenetsWindowController import ElementsWindowController
 from src.main.python.Controllers.PeakSearchWindowController import PeakSearchWindowController
 from src.main.python.Models import PeakSearchWindowModel
@@ -12,13 +28,14 @@ from src.main.python.Views import ConditionsWindow
 from src.main.python.Views import ElementsWindow
 from src.main.python.Views import PeakSearchWindow
 from src.main.python.Views.MessegeBox import Dialog
+from src.main.python.dependencies import ICONS
 
 COLORS = ["#FF0000", "#FFD700", "#00FF00", "#00FFFF", "#000080", "#0000FF", "#8B00FF",
           "#FF1493", "#FFC0CB", "#FF4500", "#FFFF00", "#FF00FF", "#00FF7F", "#FF7F00"]
 PX_COUNT = 2048
 
 
-class Window(QtWidgets.QMainWindow):
+class Window(QMainWindow):
     def __init__(self, size):
         super().__init__()
         self.setWindowTitle("Plot")
@@ -26,15 +43,15 @@ class Window(QtWidgets.QMainWindow):
         self.setMinimumHeight(int(0.75 * size.height()))
         self._createActions()
         self._createToolBar()
-        self.generalLayout = QtWidgets.QVBoxLayout()
+        self.generalLayout = QVBoxLayout()
         self._createMainWidget()
-        self.statusBar = QtWidgets.QStatusBar()
+        self.statusBar = QStatusBar()
         self.setStatusBar(self.statusBar)
         self._createPlotWidget()
         self._createForm()
-        self.coordinateLabel = QtWidgets.QLabel()
+        self.coordinateLabel = QLabel()
         self._placeComponents()
-        QtWidgets.QApplication.processEvents()
+        QApplication.processEvents()
         self.conditionWindow = ConditionsWindow.Window(size)
         self.elementsWindow = ElementsWindow.Window(size)
         self.peakSearchWindow = PeakSearchWindow.Window(size)
@@ -49,23 +66,23 @@ class Window(QtWidgets.QMainWindow):
         self._actionMap = {}
         labels = ["Open", "Peak Search", "Conditions", "Elements"]
         for label in labels:
-            action = QtGui.QAction()
+            action = QAction()
             action.setText(label)
-            action.setIcon(QtGui.QIcon(ICONS[label]))
+            action.setIcon(QIcon(ICONS[label]))
             self._actionMap[label] = action
         self._actionMap["Peak Search"].setDisabled(True)
 
     def _createToolBar(self):
-        self.toolBar = QtWidgets.QToolBar()
-        self.toolBar.setIconSize(QtCore.QSize(32, 32))
-        self.toolBar.setToolButtonStyle(QtCore.Qt.ToolButtonStyle.ToolButtonTextUnderIcon)
+        self.toolBar = QToolBar()
+        self.toolBar.setIconSize(QSize(32, 32))
+        self.toolBar.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextUnderIcon)
         self.toolBar.setMovable(False)
         for action in self._actionMap.values():
             self.toolBar.addAction(action)
         self.addToolBar(self.toolBar)
 
     def _createMainWidget(self):
-        mainWidget = QtWidgets.QWidget()
+        mainWidget = QWidget()
         mainWidget.setLayout(self.generalLayout)
         self.setCentralWidget(mainWidget)
 
@@ -85,24 +102,24 @@ class Window(QtWidgets.QMainWindow):
                                 """,
         )
         self.plotWidget.showGrid(x=True, y=True)
-        self.plotWidget.setFrameShape(QtWidgets.QFrame.Shape.Box)
-        self.plotWidget.setFrameShadow(QtWidgets.QFrame.Shadow.Plain)
+        self.plotWidget.setFrameShape(QFrame.Shape.Box)
+        self.plotWidget.setFrameShadow(QFrame.Shadow.Plain)
 
     def _createForm(self):
-        self.form = QtWidgets.QTreeWidget()
+        self.form = QTreeWidget()
         self.form.setColumnCount(3)
         self.form.setHeaderLabels(["File", "Condition", "Color"])
-        self.form.setFrameShape(QtWidgets.QFrame.Shape.Box)
-        self.form.setFrameShadow(QtWidgets.QFrame.Shadow.Plain)
+        self.form.setFrameShape(QFrame.Shape.Box)
+        self.form.setFrameShadow(QFrame.Shadow.Plain)
         self.form.header().setDefaultSectionSize(int(self.size().width() * 0.1))
         self.form.header().setHighlightSections(True)
         # self.form.setAnimated(True)
         # self.form.setExpandsOnDoubleClick(False)
-        self.form.setContextMenuPolicy(QtCore.Qt.ContextMenuPolicy.CustomContextMenu)
+        self.form.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.form.setMaximumWidth(int(self.size().width() * 0.3))
 
     def _placeComponents(self):
-        horizontalLayout = QtWidgets.QHBoxLayout()
+        horizontalLayout = QHBoxLayout()
         horizontalLayout.addWidget(self.plotWidget, 2)
         horizontalLayout.addWidget(self.form, 1)
         self.generalLayout.addLayout(horizontalLayout)
@@ -126,14 +143,14 @@ class Window(QtWidgets.QMainWindow):
             self.setCoordinate(mousePoint)
 
     def openFileDialog(self, fileFormat):
-        fileDialog = QtWidgets.QFileDialog(self)
-        fileDialog.setFileMode(QtWidgets.QFileDialog.FileMode.AnyFile)
+        fileDialog = QFileDialog(self)
+        fileDialog.setFileMode(QFileDialog.FileMode.AnyFile)
         fileDialog.setNameFilter(f"Texts (*{fileFormat})")
         fileDialog.show()
         return fileDialog
 
     def showContextMenu(self, position):
-        menu = QtWidgets.QMenu(self.form)
+        menu = QMenu(self.form)
         item = self.form.itemAt(position)
         if self.form.indexOfTopLevelItem(item) != -1:
             menu.exec(self.form.mapToGlobal(position))
@@ -141,15 +158,15 @@ class Window(QtWidgets.QMainWindow):
     @dispatch(str)
     def createFile(self, path):
         f = LocalFile(path)
-        fileItem = QtWidgets.QTreeWidgetItem()
+        fileItem = QTreeWidgetItem()
         fileItem.setText(0, f.name)
-        fileItem.setCheckState(0, QtCore.Qt.CheckState.Unchecked)
+        fileItem.setCheckState(0, Qt.CheckState.Unchecked)
         buttons = list()
         if f.conditions:
             for index, condition in enumerate(f.conditions):
-                conditionItem = QtWidgets.QTreeWidgetItem()
+                conditionItem = QTreeWidgetItem()
                 conditionItem.setText(1, condition.getName())
-                conditionItem.setCheckState(1, QtCore.Qt.CheckState.Unchecked)
+                conditionItem.setCheckState(1, Qt.CheckState.Unchecked)
                 fileItem.addChild(conditionItem)
                 self.form.addTopLevelItem(fileItem)
                 colorButton = ColorButton()
@@ -160,24 +177,24 @@ class Window(QtWidgets.QMainWindow):
             self._colorButtonMap[f.name] = buttons
         else:
             messageBox = Dialog(
-                QtWidgets.QMessageBox.Icon.Warning,
+                QMessageBox.Icon.Warning,
                 "Warning!",
                 "The selected file is not registered properly!"
             )
-            messageBox.setStandardButtons(QtWidgets.QMessageBox.StandardButton.Ok)
+            messageBox.setStandardButtons(QMessageBox.StandardButton.Ok)
             messageBox.exec()
 
     @dispatch(PacketFile)
     def createFile(self, file):
-        fileItem = QtWidgets.QTreeWidgetItem()
+        fileItem = QTreeWidgetItem()
         fileItem.setText(0, file.name)
-        fileItem.setCheckState(0, QtCore.Qt.CheckState.Unchecked)
+        fileItem.setCheckState(0, Qt.CheckState.Unchecked)
         buttons = list()
         if file.conditions:
             for index, condition in enumerate(file.conditions):
-                conditionItem = QtWidgets.QTreeWidgetItem()
+                conditionItem = QTreeWidgetItem()
                 conditionItem.setText(1, condition.getName())
-                conditionItem.setCheckState(1, QtCore.Qt.CheckState.Unchecked)
+                conditionItem.setCheckState(1, Qt.CheckState.Unchecked)
                 fileItem.addChild(conditionItem)
                 self.form.addTopLevelItem(fileItem)
                 colorButton = ColorButton()
@@ -188,11 +205,11 @@ class Window(QtWidgets.QMainWindow):
             self._colorButtonMap[file.name] = buttons
         else:
             messageBox = Dialog(
-                QtWidgets.QMessageBox.Icon.Warning,
+                QMessageBox.Icon.Warning,
                 "Warning!",
                 "The selected file is not registered properly!"
             )
-            messageBox.setStandardButtons(QtWidgets.QMessageBox.StandardButton.Ok)
+            messageBox.setStandardButtons(QMessageBox.StandardButton.Ok)
             messageBox.exec()
 
     def getColorButtonsMap(self):
@@ -209,22 +226,22 @@ class Window(QtWidgets.QMainWindow):
         self.form.blockSignals(True)
         top_level_index = self.form.indexOfTopLevelItem(item)
         if top_level_index != -1:
-            if item.checkState(0) == QtCore.Qt.CheckState.Unchecked:
+            if item.checkState(0) == Qt.CheckState.Unchecked:
                 for child_index in range(self.form.topLevelItem(top_level_index).childCount()):
-                    item.child(child_index).setCheckState(1, QtCore.Qt.CheckState.Unchecked)
-            elif item.checkState(0) == QtCore.Qt.CheckState.Checked:
+                    item.child(child_index).setCheckState(1, Qt.CheckState.Unchecked)
+            elif item.checkState(0) == Qt.CheckState.Checked:
                 for child_index in range(self.form.topLevelItem(top_level_index).childCount()):
-                    item.child(child_index).setCheckState(1, QtCore.Qt.CheckState.Checked)
+                    item.child(child_index).setCheckState(1, Qt.CheckState.Checked)
         else:
             top_level = item.parent()
             flag = False
             for i in range(top_level.childCount()):
-                if top_level.child(i).checkState(1) == QtCore.Qt.CheckState.Unchecked:
-                    top_level.setCheckState(0, QtCore.Qt.CheckState.Unchecked)
+                if top_level.child(i).checkState(1) == Qt.CheckState.Unchecked:
+                    top_level.setCheckState(0, Qt.CheckState.Unchecked)
                     flag = True
                     break
             if not flag:
-                top_level.setCheckState(0, QtCore.Qt.CheckState.Checked)
+                top_level.setCheckState(0, Qt.CheckState.Checked)
         self.form.blockSignals(False)
         self.plot()
 
@@ -235,7 +252,7 @@ class Window(QtWidgets.QMainWindow):
             top_level_item = self.form.topLevelItem(top_level_index)
             f = self._files[top_level_index]
             for child_index in range(top_level_item.childCount()):
-                if top_level_item.child(child_index).checkState(1) == QtCore.Qt.CheckState.Checked:
+                if top_level_item.child(child_index).checkState(1) == Qt.CheckState.Checked:
                     counts = f.counts[child_index]
                     px = np.arange(0, len(counts), 1)
                     color = self._colorButtonMap.get(f.name)[child_index].color()

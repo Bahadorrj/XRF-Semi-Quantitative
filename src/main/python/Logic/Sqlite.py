@@ -1,6 +1,7 @@
 import sqlite3
-from pandas import read_sql_query
 from dataclasses import dataclass
+
+from pandas import read_sql_query
 
 
 @dataclass

@@ -3,24 +3,26 @@ import socket
 import sys
 import threading
 
-from PyQt6 import QtWidgets, QtGui, QtCore
+from PyQt6.QtCore import pyqtSignal, QObject
+from PyQt6.QtGui import QIcon
+from PyQt6.QtWidgets import QApplication
 from numpy import ndarray, uint32
 
-from src.main.python.dependencies import ICONS, DATABASES
 from src.main.python.Controllers.PlotWindowController import PlotWindowController
 from src.main.python.Logic.Sqlite import DatabaseConnection, getValue
 from src.main.python.Types.ConditionClass import Condition
 from src.main.python.Types.FileClass import PacketFile
 from src.main.python.Views.PlotWindow import Window
+from src.main.python.dependencies import ICONS, DATABASES
 
 HOST = "0.0.0.0"
 PORT = 16000
 
 
-class GuiHandler(QtCore.QObject):
-    openGuiSignal = QtCore.pyqtSignal()
-    closeAllSignal = QtCore.pyqtSignal()
-    addFileSignal = QtCore.pyqtSignal(str)
+class GuiHandler(QObject):
+    openGuiSignal = pyqtSignal()
+    closeAllSignal = pyqtSignal()
+    addFileSignal = pyqtSignal(str)
 
     def __init__(self, mainWindow):
         super().__init__()
@@ -35,7 +37,7 @@ class GuiHandler(QtCore.QObject):
 
     def closeAll(self):
         self.mainWindow.close()
-        QtWidgets.QApplication.quit()
+        QApplication.quit()
         DatabaseConnection.getInstance(DATABASES['fundamentals']).closeConnection()
         logging.info("Application exit")
 
@@ -61,7 +63,7 @@ class GuiHandler(QtCore.QObject):
         logging.info(f"Added file: {new}")
 
 
-class ClientHandler(QtCore.QObject):
+class ClientHandler(QObject):
     dataLock = threading.Lock()
     commandLock = threading.Lock()
 
@@ -99,8 +101,8 @@ class ClientHandler(QtCore.QObject):
 
 def main():
     logging.basicConfig(level=logging.DEBUG)
-    app = QtWidgets.QApplication(sys.argv)
-    app.setWindowIcon(QtGui.QIcon(ICONS["CSAN"]))
+    app = QApplication(sys.argv)
+    app.setWindowIcon(QIcon(ICONS["CSAN"]))
     size = app.primaryScreen().size()
     mainWindow = Window(size)
     PlotWindowController(mainWindow)

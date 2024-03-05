@@ -1,11 +1,12 @@
-from PyQt6 import QtWidgets, QtCore
+from PyQt6.QtCore import Qt
+from PyQt6.QtWidgets import QTableWidget, QFrame, QHeaderView
 
 
-class Form(QtWidgets.QTableWidget):
+class Form(QTableWidget):
     def __init__(self, headers):
         super().__init__()
-        self.setFrameShape(QtWidgets.QFrame.Shape.Box)
-        self.setFrameShadow(QtWidgets.QFrame.Shadow.Plain)
+        self.setFrameShape(QFrame.Shape.Box)
+        self.setFrameShadow(QFrame.Shadow.Plain)
         self._headers = headers
         self._rowIds = list()
         self._nonWidgetHeaders = self._initNonWidgetHeaders()
@@ -14,7 +15,7 @@ class Form(QtWidgets.QTableWidget):
     def setupUI(self):
         self.setColumnCount(len(self._nonWidgetHeaders))
         self.setHorizontalHeaderLabels(self._nonWidgetHeaders)
-        self.horizontalHeader().setSectionResizeMode(QtWidgets.QHeaderView.ResizeMode.Stretch)
+        self.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
 
     def getHeaders(self):
         return self._headers
@@ -65,11 +66,11 @@ class Form(QtWidgets.QTableWidget):
             for index, header in enumerate(self.getHeaders()):
                 if "Widget" not in header:
                     self.horizontalHeader().setSectionResizeMode(
-                        index, QtWidgets.QHeaderView.ResizeMode.Stretch
+                        index, QHeaderView.ResizeMode.Stretch
                     )
                 else:
                     self.horizontalHeader().setSectionResizeMode(
-                        index, QtWidgets.QHeaderView.ResizeMode.ResizeToContents
+                        index, QHeaderView.ResizeMode.ResizeToContents
                     )
         self.blockSignals(True)
         index = self.rowCount()
@@ -81,8 +82,8 @@ class Form(QtWidgets.QTableWidget):
                 self.setCellWidget(index, i, item)
 
             try:
-                item.setTextAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
-                item.setFlags(QtCore.Qt.ItemFlag.ItemIsEnabled)
+                item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+                item.setFlags(Qt.ItemFlag.ItemIsEnabled)
             except AttributeError:
                 pass
         self.blockSignals(False)

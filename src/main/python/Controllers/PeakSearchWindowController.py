@@ -1,5 +1,6 @@
-import time
 from functools import partial
+from time import sleep
+
 from PyQt6.QtCore import QObject, pyqtSignal, QThread
 
 
@@ -10,7 +11,7 @@ class Worker(QObject):
 
     def run(self):
         for i in range(self.size):
-            time.sleep(0.05)
+            sleep(0.05)
             self.progress.emit(i)
         self.finished.emit()
 

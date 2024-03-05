@@ -1,8 +1,8 @@
 from dataclasses import dataclass
 
-from src.main.python.dependencies import DATABASES
 from src.main.python.Logic.Sqlite import getColumnLabels, getValue, DatabaseConnection
 from src.main.python.Types.DataClass import Data
+from src.main.python.dependencies import DATABASES
 
 
 @dataclass(order=True)

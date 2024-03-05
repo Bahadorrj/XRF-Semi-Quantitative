@@ -1,23 +1,33 @@
-from PyQt6 import QtWidgets, QtCore
+from PyQt6.QtCore import Qt
+from PyQt6.QtWidgets import (
+    QWidget,
+    QVBoxLayout,
+    QHBoxLayout,
+    QLabel,
+    QComboBox,
+    QSpacerItem,
+    QSizePolicy,
+    QTableWidgetItem
+)
 
-from src.main.python.dependencies import DATABASES
 from src.main.python.Logic.Sqlite import DatabaseConnection, getDatabaseDataframe
 from src.main.python.Views.TableWidget import Form
+from src.main.python.dependencies import DATABASES
 
 
-class Window(QtWidgets.QWidget):
+class Window(QWidget):
     def __init__(self, size):
         super().__init__()
         self.setMinimumWidth(int(size.width() * 0.8))
         self.setMinimumHeight(int(size.height() * 0.8))
         self.setWindowTitle("Elements")
 
-        self.mainLayout = QtWidgets.QVBoxLayout()
-        self.filterLayout = QtWidgets.QHBoxLayout()
-        self.filterLabel = QtWidgets.QLabel()
-        self.filter = QtWidgets.QComboBox()
-        self.spacerItem = QtWidgets.QSpacerItem(
-            0, 0, QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Minimum
+        self.mainLayout = QVBoxLayout()
+        self.filterLayout = QHBoxLayout()
+        self.filterLabel = QLabel()
+        self.filter = QComboBox()
+        self.spacerItem = QSpacerItem(
+            0, 0, QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum
         )
         headers = [
             'Atomic No',
@@ -62,19 +72,19 @@ class Window(QtWidgets.QWidget):
             items = list()
             for label in ['atomic_number', 'name', 'symbol', 'radiation_type',
                           'Kev', 'low_Kev', 'high_Kev', 'intensity']:
-                item = QtWidgets.QTableWidgetItem(str(self._elementsDf.at[row, label]))
+                item = QTableWidgetItem(str(self._elementsDf.at[row, label]))
                 items.append(item)
-            activeItem = QtWidgets.QTableWidgetItem()
+            activeItem = QTableWidgetItem()
             if self._elementsDf.at[row, "active"] == 1:
                 activeItem.setText("True")
-                activeItem.setForeground(QtCore.Qt.GlobalColor.green)
+                activeItem.setForeground(Qt.GlobalColor.green)
             else:
                 activeItem.setText("False")
-                activeItem.setForeground(QtCore.Qt.GlobalColor.red)
+                activeItem.setForeground(Qt.GlobalColor.red)
             items.append(activeItem)
             conditionId = self._elementsDf.at[row, 'condition_id']
             conditionName = self._conditionsDf['name'].get(conditionId)
-            conditionItem = QtWidgets.QTableWidgetItem(conditionName)
+            conditionItem = QTableWidgetItem(conditionName)
             items.append(conditionItem)
             self.form.addRow(items, self._elementsDf.at[row, "element_id"])
         self.form.setCurrentItem(self.form.item(0, 0))

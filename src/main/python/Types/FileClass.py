@@ -3,9 +3,9 @@ from pathlib import Path
 
 from numpy import zeros, uint32, ndarray
 
-from src.main.python.dependencies import DATABASES
 from src.main.python.Logic.Sqlite import DatabaseConnection, getValue
 from src.main.python.Types.ConditionClass import Condition
+from src.main.python.dependencies import DATABASES
 
 
 @dataclass(order=True)

@@ -1,47 +1,59 @@
-import numpy as np
-from PyQt6 import QtWidgets, QtCore, QtGui
+from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtGui import QIcon
+from PyQt6.QtWidgets import (
+    QMainWindow,
+    QVBoxLayout,
+    QWidget,
+    QLabel,
+    QStatusBar,
+    QPushButton,
+    QTableWidgetItem,
+    QMessageBox,
+    QApplication
+)
 from multipledispatch import dispatch
+from numpy import zeros, arange, logical_and, uint32, uint16
 from pyqtgraph import mkPen, GraphicsLayoutWidget, LinearRegionItem, InfiniteLine
 
-from src.main.python.dependencies import ICONS, DATABASES
 from src.main.python.Logic import Calculation
 from src.main.python.Logic.Sqlite import DatabaseConnection, getDatabaseDataframe, getValues
 from src.main.python.Types.ElementClass import Element
-from src.main.python.Views import MessegeBox
+from src.main.python.Views.MessegeBox import Dialog
 from src.main.python.Views.TableWidget import Form
+from src.main.python.dependencies import ICONS, DATABASES
 
 
-class Window(QtWidgets.QMainWindow):
-    elementAdded = QtCore.pyqtSignal(Element)
-    rowAdded = QtCore.pyqtSignal(int)
-    windowOpened = QtCore.pyqtSignal()
-    windowClosed = QtCore.pyqtSignal()
-    hideAll = QtCore.pyqtSignal(bool)
+class Window(QMainWindow):
+    elementAdded = pyqtSignal(Element)
+    rowAdded = pyqtSignal(int)
+    windowOpened = pyqtSignal()
+    windowClosed = pyqtSignal()
+    hideAll = pyqtSignal(bool)
 
     def __init__(self, size):
         super().__init__()
         # size
         self.setMinimumWidth(int(size.width() * 0.75))
         self.setMinimumHeight(int(size.height() * 0.75))
-        self.mainLayout = QtWidgets.QVBoxLayout()
-        self.mainWidget = QtWidgets.QWidget()
+        self.mainLayout = QVBoxLayout()
+        self.mainWidget = QWidget()
         self._createForm()
         self._createGraph()
-        self.coordinateLabel = QtWidgets.QLabel()
+        self.coordinateLabel = QLabel()
         self.coordinateLabel.setFixedWidth(200)
         self.coordinateLabel.setText(
             """<span style='font-size: 2rem'>x=0, y=0, , kEV= 0</span>""")
-        self.statusLabel = QtWidgets.QLabel()
+        self.statusLabel = QLabel()
         self.statusLabel.setFixedWidth(200)
-        self.statusBar = QtWidgets.QStatusBar()
+        self.statusBar = QStatusBar()
         self.statusBar.addWidget(self.coordinateLabel)
         self.statusBar.addWidget(self.statusLabel)
         self._placeComponents()
         database = DatabaseConnection.getInstance(DATABASES['fundamentals'])
         self._elementsDf = getDatabaseDataframe(database, "elements")
         self._conditionID = int()
-        self._counts = np.zeros(2048, dtype=np.uint32)
-        self._px = np.zeros(2048, dtype=np.uint16)
+        self._counts = zeros(2048, dtype=uint32)
+        self._px = zeros(2048, dtype=uint16)
         self._kiloElectronVolts = list()
         self._kev = float()
         self._initElements()
@@ -111,7 +123,7 @@ class Window(QtWidgets.QMainWindow):
     def init(self, counts, condition):
         self.setWindowTitle(condition.getName())
         self._counts = counts
-        self._px = np.arange(0, len(self._counts), 1)
+        self._px = arange(0, len(self._counts), 1)
         self._kiloElectronVolts = [Calculation.pxToEv(i) for i in self._px]
         self._conditionID = condition.getAttribute("condition_id")
         self.spectrumPlot.setLimits(
@@ -129,29 +141,29 @@ class Window(QtWidgets.QMainWindow):
         self.windowOpened.emit()
 
     def _addElementToForm(self, element):
-        removeButton = QtWidgets.QPushButton(icon=QtGui.QIcon(ICONS["Cross"]))
-        hideButton = QtWidgets.QPushButton()
+        removeButton = QPushButton(icon=QIcon(ICONS["Cross"]))
+        hideButton = QPushButton()
         if element.hidden:
-            hideButton.setIcon(QtGui.QIcon(ICONS["Hide"]))
+            hideButton.setIcon(QIcon(ICONS["Hide"]))
         else:
-            hideButton.setIcon(QtGui.QIcon(ICONS["Show"]))
-        elementItem = QtWidgets.QTableWidgetItem(
+            hideButton.setIcon(QIcon(ICONS["Show"]))
+        elementItem = QTableWidgetItem(
             element.getAttribute("symbol"))
-        typeItem = QtWidgets.QTableWidgetItem(
+        typeItem = QTableWidgetItem(
             element.getAttribute("radiation_type"))
-        kevItem = QtWidgets.QTableWidgetItem(str(element.getAttribute("Kev")))
-        lowItem = QtWidgets.QTableWidgetItem(str(element.lowKev))
-        highItem = QtWidgets.QTableWidgetItem(str(element.highKev))
-        intensityItem = QtWidgets.QTableWidgetItem(str(element.intensity))
-        statusItem = QtWidgets.QTableWidgetItem()
-        statusButton = QtWidgets.QPushButton()
+        kevItem = QTableWidgetItem(str(element.getAttribute("Kev")))
+        lowItem = QTableWidgetItem(str(element.lowKev))
+        highItem = QTableWidgetItem(str(element.highKev))
+        intensityItem = QTableWidgetItem(str(element.intensity))
+        statusItem = QTableWidgetItem()
+        statusButton = QPushButton()
         if element.activated:
             statusItem.setText("Activated")
-            statusItem.setForeground(QtCore.Qt.GlobalColor.green)
+            statusItem.setForeground(Qt.GlobalColor.green)
             statusButton.setText("Deactivate")
         else:
             statusItem.setText("Deactivated")
-            statusItem.setForeground(QtCore.Qt.GlobalColor.red)
+            statusItem.setForeground(Qt.GlobalColor.red)
             statusButton.setText("Activate")
         items = [removeButton, hideButton, elementItem, typeItem, kevItem,
                  lowItem, highItem, intensityItem, statusItem, statusButton]
@@ -203,11 +215,11 @@ class Window(QtWidgets.QMainWindow):
         pos = event.pos()
         mousePoint = self.peakPlotVB.mapSceneToView(pos)
         self._kev = self._kiloElectronVolts[int(mousePoint.x())]
-        if event.button() == QtCore.Qt.MouseButton.RightButton:
+        if event.button() == Qt.MouseButton.RightButton:
             self.peakPlotVB.menu.clear()
             greater = self._elementsDf["low_Kev"] < self._kev
             smaller = self._kev < self._elementsDf["high_Kev"]
-            mask = np.logical_and(greater, smaller)
+            mask = logical_and(greater, smaller)
             filteredDataframe = self._elementsDf[mask]
             for radiation_type in ["Ka", "KB", "La", "LB", "Ly", "Ma", "Bg"]:
                 type_elements = filteredDataframe[filteredDataframe["radiation_type"]
@@ -221,21 +233,21 @@ class Window(QtWidgets.QMainWindow):
     def actionClicked(self, action):
         elementSymbol = action.text()
         radiationType = action.parent().title()
-        mask = np.logical_and(
+        mask = logical_and(
             self._elementsDf["symbol"] == elementSymbol,
             self._elementsDf["radiation_type"] == radiationType)
         elementId = self._elementsDf[mask]["element_id"].iloc[0]
         if elementId in self.form.getRowIds():
-            messageBox = MessegeBox.Dialog(
-                QtWidgets.QMessageBox.Icon.Information,
+            messageBox = Dialog(
+                QMessageBox.Icon.Information,
                 "Duplicate  element!",
                 f"{elementSymbol} - {radiationType} is already added to the table.\n"
                 f"Would you like this line to be shown?"
             )
-            messageBox.setStandardButtons(QtWidgets.QMessageBox.StandardButton.Yes |
-                                          QtWidgets.QMessageBox.StandardButton.No)
+            messageBox.setStandardButtons(QMessageBox.StandardButton.Yes |
+                                          QMessageBox.StandardButton.No)
             returnValue = messageBox.exec()
-            if returnValue == QtWidgets.QMessageBox.StandardButton.Yes:
+            if returnValue == QMessageBox.StandardButton.Yes:
                 e = self.getElementById(elementId)
                 self.showElement(e)
                 self.selectRow(e)
@@ -333,7 +345,7 @@ class Window(QtWidgets.QMainWindow):
         intensity = Calculation.calculateIntensityInRange(rng, self._counts)
 
         row.get("Status").setText("Activated")
-        row.get("Status").setForeground(QtCore.Qt.GlobalColor.green)
+        row.get("Status").setForeground(Qt.GlobalColor.green)
         row.get("Activate Widget").setText("Deactivate")
         row.get("Intensity").setText(str(intensity))
 
@@ -351,7 +363,7 @@ class Window(QtWidgets.QMainWindow):
 
     def _deactivateElement(self, element, row):
         row.get("Status").setText("Deactivated")
-        row.get("Status").setForeground(QtCore.Qt.GlobalColor.red)
+        row.get("Status").setForeground(Qt.GlobalColor.red)
         row.get("Activate Widget").setText("Activate")
         row.get("Intensity").setText("None")
 
@@ -366,15 +378,15 @@ class Window(QtWidgets.QMainWindow):
     def removeRow(self):
         rowIndex = self.form.currentRow()
         element = self.getElementById(self.form.getCurrentRowId())
-        messageBox = MessegeBox.Dialog(
-            QtWidgets.QMessageBox.Icon.Warning,
+        messageBox = Dialog(
+            QMessageBox.Icon.Warning,
             "Warning!",
             f"{element.getAttribute('symbol')} - {element.getAttribute('radiation_type')} will be removed."
         )
         messageBox.setStandardButtons(
-            QtWidgets.QMessageBox.StandardButton.Ok | QtWidgets.QMessageBox.StandardButton.Cancel)
+            QMessageBox.StandardButton.Ok | QMessageBox.StandardButton.Cancel)
         returnValue = messageBox.exec()
-        if returnValue == QtWidgets.QMessageBox.StandardButton.Ok:
+        if returnValue == QMessageBox.StandardButton.Ok:
             self._remove(element, rowIndex)
 
     def _remove(self, element, index):
@@ -425,7 +437,7 @@ class Window(QtWidgets.QMainWindow):
     @dispatch(Element)
     def hideElement(self, element):
         row = self.form.getRowById(element.getAttribute("element_id"))
-        row.get("Hide Widget").setIcon(QtGui.QIcon(ICONS["Hide"]))
+        row.get("Hide Widget").setIcon(QIcon(ICONS["Hide"]))
         if element.activated is False and element.region in self.peakPlot.items:
             self.peakPlot.removeItem(element.region)
         self._removeLineOfElement(element)
@@ -435,7 +447,7 @@ class Window(QtWidgets.QMainWindow):
     def hideElement(self, index):
         element = self._addedElements[index]
         row = self.form.getRowById(element.getAttribute("element_id"))
-        row.get("Hide Widget").setIcon(QtGui.QIcon(ICONS["Hide"]))
+        row.get("Hide Widget").setIcon(QIcon(ICONS["Hide"]))
         if element.activated is False and element.region in self.peakPlot.items:
             self.peakPlot.removeItem(element.region)
         self._removeLineOfElement(element)
@@ -444,7 +456,7 @@ class Window(QtWidgets.QMainWindow):
     @dispatch(Element)
     def showElement(self, element):
         row = self.form.getRowById(element.getAttribute("element_id"))
-        row.get("Hide Widget").setIcon(QtGui.QIcon(ICONS["Show"]))
+        row.get("Hide Widget").setIcon(QIcon(ICONS["Show"]))
         if element.activated is False and element.region not in self.peakPlot.items:
             self.peakPlot.addItem(element.region)
         self._plotLineOfElement(element)
@@ -454,7 +466,7 @@ class Window(QtWidgets.QMainWindow):
     def showElement(self, index):
         element = self._addedElements[index]
         row = self.form.getRowById(element.getAttribute("element_id"))
-        row.get("Hide Widget").setIcon(QtGui.QIcon(ICONS["Show"]))
+        row.get("Hide Widget").setIcon(QIcon(ICONS["Show"]))
         if element.activated is False and element.region not in self.peakPlot.items:
             self.peakPlot.addItem(element.region)
         self._plotLineOfElement(element)
@@ -467,19 +479,19 @@ class Window(QtWidgets.QMainWindow):
             self._configureHideALL()
 
     def _configureRemoveAll(self):
-        messageBox = MessegeBox.Dialog(
-            QtWidgets.QMessageBox.Icon.Warning,
+        messageBox = Dialog(
+            QMessageBox.Icon.Warning,
             "Warning!",
             "All records will be removed.\nNote that all of the activated elements will also be deactivated.\n"
             "Press OK if you want to continue."
         )
         messageBox.setStandardButtons(
-            QtWidgets.QMessageBox.StandardButton.Ok | QtWidgets.QMessageBox.StandardButton.Cancel)
+            QMessageBox.StandardButton.Ok | QMessageBox.StandardButton.Cancel)
         returnValue = messageBox.exec()
-        if returnValue == QtWidgets.QMessageBox.StandardButton.Ok:
+        if returnValue == QMessageBox.StandardButton.Ok:
             for element in self._addedElements:
                 self._remove(element, 0)
-                QtWidgets.QApplication.processEvents()
+                QApplication.processEvents()
 
     def _configureHideALL(self):
         hidden = self._addedElements[0].hidden
