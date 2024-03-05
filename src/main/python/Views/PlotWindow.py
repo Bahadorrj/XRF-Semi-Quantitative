@@ -3,6 +3,7 @@ from PyQt6 import QtWidgets, QtCore, QtGui
 from pyqtgraph import PlotWidget, ColorButton, mkPen
 from multipledispatch import dispatch
 
+from src.main.python.dependencies import ICONS
 from src.main.python.Controllers.ElemenetsWindowController import ElementsWindowController
 from src.main.python.Controllers.PeakSearchWindowController import PeakSearchWindowController
 from src.main.python.Models import PeakSearchWindowModel
@@ -10,7 +11,6 @@ from src.main.python.Types.FileClass import LocalFile, PacketFile
 from src.main.python.Views import ConditionsWindow
 from src.main.python.Views import ElementsWindow
 from src.main.python.Views import PeakSearchWindow
-from src.main.python.Views.Icons import ICONS
 from src.main.python.Views.MessegeBox import Dialog
 
 COLORS = ["#FF0000", "#FFD700", "#00FF00", "#00FFFF", "#000080", "#0000FF", "#8B00FF",

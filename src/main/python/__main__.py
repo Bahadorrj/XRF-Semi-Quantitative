@@ -6,11 +6,11 @@ import threading
 from PyQt6 import QtWidgets, QtGui, QtCore
 from numpy import ndarray, uint32
 
+from src.main.python.dependencies import ICONS, DATABASES
 from src.main.python.Controllers.PlotWindowController import PlotWindowController
 from src.main.python.Logic.Sqlite import DatabaseConnection, getValue
 from src.main.python.Types.ConditionClass import Condition
 from src.main.python.Types.FileClass import PacketFile
-from src.main.python.Views.Icons import ICONS
 from src.main.python.Views.PlotWindow import Window
 
 HOST = "0.0.0.0"
@@ -36,7 +36,7 @@ class GuiHandler(QtCore.QObject):
     def closeAll(self):
         self.mainWindow.close()
         QtWidgets.QApplication.quit()
-        DatabaseConnection.getInstance(r"F:\CSAN\Master\DB\fundamentals.db").closeConnection()
+        DatabaseConnection.getInstance(DATABASES['fundamentals']).closeConnection()
         logging.info("Application exit")
 
     def addFile(self, data: str):
@@ -48,7 +48,7 @@ class GuiHandler(QtCore.QObject):
         while seperated[pointer] != "-stp":
             conditionName = seperated[pointer]
             pointer += 1
-            database = DatabaseConnection.getInstance(r"F:\CSAN\Master\DB\fundamentals.db")
+            database = DatabaseConnection.getInstance(DATABASES['fundamentals'])
             conditionID = getValue(database, "conditions", where=f"name = '{conditionName}'")[0]
             condition = Condition(conditionID)
             counts = ndarray(2048, dtype=uint32)

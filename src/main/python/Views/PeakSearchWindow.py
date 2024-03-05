@@ -3,11 +3,11 @@ from PyQt6 import QtWidgets, QtCore, QtGui
 from multipledispatch import dispatch
 from pyqtgraph import mkPen, GraphicsLayoutWidget, LinearRegionItem, InfiniteLine
 
+from src.main.python.dependencies import ICONS, DATABASES
 from src.main.python.Logic import Calculation
 from src.main.python.Logic.Sqlite import DatabaseConnection, getDatabaseDataframe, getValues
 from src.main.python.Types.ElementClass import Element
 from src.main.python.Views import MessegeBox
-from src.main.python.Views.Icons import ICONS
 from src.main.python.Views.TableWidget import Form
 
 
@@ -37,7 +37,7 @@ class Window(QtWidgets.QMainWindow):
         self.statusBar.addWidget(self.coordinateLabel)
         self.statusBar.addWidget(self.statusLabel)
         self._placeComponents()
-        database = DatabaseConnection.getInstance(r"F:\CSAN\Master\DB\fundamentals.db")
+        database = DatabaseConnection.getInstance(DATABASES['fundamentals'])
         self._elementsDf = getDatabaseDataframe(database, "elements")
         self._conditionID = int()
         self._counts = np.zeros(2048, dtype=np.uint32)
@@ -93,7 +93,7 @@ class Window(QtWidgets.QMainWindow):
     def _initElements(self):
         self._elements = list()
         self._addedElements = list()
-        database = DatabaseConnection.getInstance(r"F:\CSAN\Master\DB\fundamentals.db")
+        database = DatabaseConnection.getInstance(DATABASES['fundamentals'])
         values = getValues(database, "elements")
         for value in values:
             e = Element(value[0])
