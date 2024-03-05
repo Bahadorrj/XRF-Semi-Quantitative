@@ -357,7 +357,6 @@ fabric.properties
 
 /Exe
 /Additional
-*.txt
 *.ico
 *.db
 *.rar
