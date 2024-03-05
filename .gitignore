@@ -357,7 +357,5 @@ fabric.properties
 
 /Exe
 /Additional
-*.ico
 *.db
 *.rar
-/Client.py
