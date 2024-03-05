@@ -1,6 +1,6 @@
 from PyQt6 import QtWidgets, QtCore
 
-from src.main.python.Logic.Sqlite import getDatabaseDataframe
+from src.main.python.Logic.Sqlite import DatabaseConnection, getDatabaseDataframe
 from src.main.python.Views.TableWidget import Form
 
 
@@ -31,11 +31,11 @@ class Window(QtWidgets.QWidget):
             'Activated in'
         ]
         self.form = Form(headers)
-        self._elementsDf = getDatabaseDataframe("fundamentals", "elements")
+        database = DatabaseConnection.getInstance(r"F:\CSAN\Master\DB\fundamentals.db")
+        self._elementsDf = getDatabaseDataframe(database, "elements")
         query = "element_id IN (SELECT element_id FROM UQ ORDER BY element_id)"
-        self._UQDf = getDatabaseDataframe(
-            "fundamentals", "elements", where=query)
-        self._conditionsDf = getDatabaseDataframe("fundamentals", "conditions")
+        self._UQDf = getDatabaseDataframe(database, "elements", where=query)
+        self._conditionsDf = getDatabaseDataframe(database, "conditions")
         self._rowCount = self._elementsDf.shape[0]
 
         self._setupUI()

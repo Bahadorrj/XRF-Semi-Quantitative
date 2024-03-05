@@ -7,7 +7,7 @@ from PyQt6 import QtWidgets, QtGui, QtCore
 from numpy import ndarray, uint32
 
 from src.main.python.Controllers.PlotWindowController import PlotWindowController
-from src.main.python.Logic.Sqlite import DATABASES, getValue
+from src.main.python.Logic.Sqlite import DatabaseConnection, getValue
 from src.main.python.Types.ConditionClass import Condition
 from src.main.python.Types.FileClass import PacketFile
 from src.main.python.Views.Icons import ICONS
@@ -36,7 +36,7 @@ class GuiHandler(QtCore.QObject):
     def closeAll(self):
         self.mainWindow.close()
         QtWidgets.QApplication.quit()
-        DATABASES["fundamentals"].closeConnection()
+        DatabaseConnection.getInstance(r"F:\CSAN\Master\DB\fundamentals.db").closeConnection()
         logging.info("Application exit")
 
     def addFile(self, data: str):
@@ -48,7 +48,8 @@ class GuiHandler(QtCore.QObject):
         while seperated[pointer] != "-stp":
             conditionName = seperated[pointer]
             pointer += 1
-            conditionID = getValue("fundamentals", "conditions", where=f"name = '{conditionName}'")[0]
+            database = DatabaseConnection.getInstance(r"F:\CSAN\Master\DB\fundamentals.db")
+            conditionID = getValue(database, "conditions", where=f"name = '{conditionName}'")[0]
             condition = Condition(conditionID)
             counts = ndarray(2048, dtype=uint32)
             for i in range(2048):
@@ -97,7 +98,6 @@ class ClientHandler(QtCore.QObject):
 
 
 def main():
-    DATABASES["fundamentals"].connect()
     logging.basicConfig(level=logging.DEBUG)
     app = QtWidgets.QApplication(sys.argv)
     app.setWindowIcon(QtGui.QIcon(ICONS["CSAN"]))

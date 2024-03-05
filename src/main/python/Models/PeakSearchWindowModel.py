@@ -1,8 +1,7 @@
-from src.main.python.Logic.Sqlite import DATABASES
+from src.main.python.Logic.Sqlite import DatabaseConnection
 
 def writeElementToTable(elements, conditionID):
-    connection = DATABASES.get("fundamentals").connection
-    cur = connection.cursor()
+    database = DatabaseConnection.getInstance(r"F:\CSAN\Master\DB\fundamentals.db")
     for element in elements:
         if element.activated:
             query = f"""
@@ -14,7 +13,7 @@ def writeElementToTable(elements, conditionID):
                     condition_id = {conditionID}
                 WHERE element_id = {element.getAttribute("element_id")};
             """
-            cur.execute(query)
+            database.executeQuery(query)
         else:
             query = f"""
                 UPDATE elements
@@ -23,5 +22,4 @@ def writeElementToTable(elements, conditionID):
                     condition_id = null
                 WHERE element_id = {element.getAttribute("element_id")};
             """
-            cur.execute(query)
-    connection.commit()
+            database.executeQuery(query)

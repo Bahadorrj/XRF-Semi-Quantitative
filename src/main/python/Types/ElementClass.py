@@ -4,7 +4,7 @@ from numpy import uint32
 from pyqtgraph import InfiniteLine, InfLineLabel, mkPen, LinearRegionItem
 
 from src.main.python.Logic import Calculation
-from src.main.python.Logic.Sqlite import getColumnLabels, getValue
+from src.main.python.Logic.Sqlite import getColumnLabels, getValue, DatabaseConnection
 from src.main.python.Types.DataClass import Data
 
 
@@ -22,8 +22,9 @@ class Element(Data):
     range: list[int] = field(default_factory=list, init=False)
 
     def __post_init__(self):
-        self.labels = getColumnLabels("fundamentals", "elements")
-        self.values = getValue("fundamentals", "elements", where=f"element_id = {self.id}")
+        database = DatabaseConnection.getInstance(r"F:\CSAN\Master\DB\fundamentals.db")
+        self.labels = getColumnLabels(database, "elements")
+        self.values = getValue(database, "elements", where=f"element_id = {self.id}")
         self.lowKev = self.getAttribute("low_Kev")
         self.highKev = self.getAttribute("high_Kev")
         self.intensity = self.getAttribute("intensity")

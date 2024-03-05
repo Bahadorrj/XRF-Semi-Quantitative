@@ -4,7 +4,7 @@ from multipledispatch import dispatch
 from pyqtgraph import mkPen, GraphicsLayoutWidget, LinearRegionItem, InfiniteLine
 
 from src.main.python.Logic import Calculation
-from src.main.python.Logic import Sqlite
+from src.main.python.Logic.Sqlite import DatabaseConnection, getDatabaseDataframe, getValues
 from src.main.python.Types.ElementClass import Element
 from src.main.python.Views import MessegeBox
 from src.main.python.Views.Icons import ICONS
@@ -37,9 +37,8 @@ class Window(QtWidgets.QMainWindow):
         self.statusBar.addWidget(self.coordinateLabel)
         self.statusBar.addWidget(self.statusLabel)
         self._placeComponents()
-
-        self._elementsDf = Sqlite.getDatabaseDataframe(
-            "fundamentals", "elements")
+        database = DatabaseConnection.getInstance(r"F:\CSAN\Master\DB\fundamentals.db")
+        self._elementsDf = getDatabaseDataframe(database, "elements")
         self._conditionID = int()
         self._counts = np.zeros(2048, dtype=np.uint32)
         self._px = np.zeros(2048, dtype=np.uint16)
@@ -94,7 +93,8 @@ class Window(QtWidgets.QMainWindow):
     def _initElements(self):
         self._elements = list()
         self._addedElements = list()
-        values = Sqlite.getValues("fundamentals", "elements")
+        database = DatabaseConnection.getInstance(r"F:\CSAN\Master\DB\fundamentals.db")
+        values = getValues(database, "elements")
         for value in values:
             e = Element(value[0])
             self._elements.append(e)

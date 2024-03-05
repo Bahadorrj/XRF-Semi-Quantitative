@@ -1,75 +1,76 @@
 import sqlite3
-import pandas as pd
+from pandas import read_sql_query
+from dataclasses import dataclass
 
-from dataclasses import dataclass, field
 
+@dataclass
+class DatabaseConnection:
+    _instance = None
+    conn: sqlite3.Connection
 
-@dataclass(order=True)
-class Database:
-    address: str
-    name: str = field(default="main")
-    connection: sqlite3.Connection = field(init=False, repr=False)
+    @classmethod
+    def getInstance(cls, databaseFile: str):
+        if cls._instance is None:
+            conn = cls.createConnection(databaseFile)
+            cls._instance = cls(conn)
+        return cls._instance
 
-    def connect(self):
-        self.connection = sqlite3.connect(self.address)
+    @staticmethod
+    def createConnection(databaseFile: str) -> sqlite3.Connection:
+        conn = None
+        try:
+            conn = sqlite3.connect(databaseFile)
+            return conn
+        except sqlite3.Error as e:
+            print(e)
+        return conn
+
+    def executeQuery(self, query: str):
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute(query)
+            self.conn.commit()
+            return cursor
+        except sqlite3.Error as e:
+            print(e)
+
+    def fetchData(self, query: str) -> list:
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute(query)
+            rows = cursor.fetchall()
+            return rows
+        except sqlite3.Error as e:
+            print(e)
 
     def closeConnection(self):
-        if self.connection is not None:
-            self.connection.close()
+        if self.conn is not None:
+            self.conn.close()
 
 
-DATABASES = {
-    "fundamentals": Database(r"DB\fundamentals.db")
-}
-
-
-def getColumnLabels(databaseName, tableName):
-    # Connect to the SQLite database
-    connection = DATABASES.get(databaseName).connection
-    cursor = connection.cursor()
+def getColumnLabels(database: DatabaseConnection, tableName: str) -> list:
     # Get column labels from the specified table
-    cursor.execute(f"PRAGMA table_info({tableName})")
-    columns = cursor.fetchall()
+    columns = database.fetchData(f"PRAGMA table_info({tableName})")
     # Extract column labels
-    column_labels = [col[1] for col in columns]
-    return column_labels
+    columnLabels = [col[1] for col in columns]
+    return columnLabels
 
 
-def getValue(databaseName, tableName, columnName="*", where=""):
-    connection = DATABASES.get(databaseName).connection
-    cur = connection.cursor()
+def getValues(database: DatabaseConnection, tableName: str, columnName: str = "*", where: str = ""):
     if where:
         query = f"SELECT {columnName} FROM {tableName} WHERE {where};"
     else:
         query = f"SELECT {columnName} FROM {tableName};"
-    try:
-        cur.execute(query)
-        return cur.fetchone()
-    except TypeError:
-        print("Invalid request!")
-    return None
+    return database.fetchData(query)
 
+def getValue(database: DatabaseConnection, tableName: str, columnName: str = "*", where: str = ""):
+    return getValues(database, tableName, columnName, where)[0]
 
-def getValues(databaseName, tableName, columnName="*", where=""):
-    connection = DATABASES.get(databaseName).connection
-    cur = connection.cursor()
-    if where:
-        query = f"SELECT {columnName} FROM {tableName} WHERE {where};"
-    else:
-        query = f"SELECT {columnName} FROM {tableName};"
-    try:
-        cur.execute(query)
-        return cur.fetchall()
-    except TypeError:
-        print("Invalid request!")
-    return None
-
-
-def getDatabaseDataframe(databaseName, tableName, columnName='*', where=''):
-    connection = DATABASES.get(databaseName).connection
+def getDatabaseDataframe(database: DatabaseConnection, tableName: str, columnName: str = "*", where: str = ""):
+    connection = database.conn
     if where == '':
-        dataframe = pd.read_sql_query(f"SELECT {columnName} FROM {tableName}", connection)
+        dataframe = read_sql_query(f"SELECT {columnName} FROM {tableName}", connection)
     else:
-        dataframe = pd.read_sql_query(
+        dataframe = read_sql_query(
             f"SELECT {columnName} FROM {tableName} WHERE {where}", connection)
     return dataframe

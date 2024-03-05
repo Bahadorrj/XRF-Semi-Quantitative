@@ -3,7 +3,7 @@ from pathlib import Path
 
 from numpy import zeros, uint32, ndarray
 
-from src.main.python.Logic import Sqlite
+from src.main.python.Logic.Sqlite import DatabaseConnection, getValue
 from src.main.python.Types.ConditionClass import Condition
 
 
@@ -22,7 +22,8 @@ class LocalFile:
             index = 0
             while line:
                 if "Condition" in line:
-                    conditionID = Sqlite.getValue("fundamentals", "conditions", where=f"name = '{line.strip()}'")[0]
+                    database = DatabaseConnection.getInstance(r"F:\CSAN\Master\DB\fundamentals.db")
+                    conditionID = getValue(database, "conditions", where=f"name = '{line.strip()}'")[0]
                     c = Condition(conditionID)
                     self.conditions.append(c)
                 try:
