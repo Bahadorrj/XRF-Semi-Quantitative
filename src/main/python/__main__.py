@@ -7,35 +7,36 @@ from PyQt6 import QtWidgets, QtGui, QtCore
 from numpy import ndarray, uint32
 
 from src.main.python.Controllers.PlotWindowController import PlotWindowController
-from src.main.python.Logic.Sqlite import getValue
+from src.main.python.Logic.Sqlite import DATABASES, getValue
 from src.main.python.Types.ConditionClass import Condition
 from src.main.python.Types.FileClass import PacketFile
 from src.main.python.Views.Icons import ICONS
 from src.main.python.Views.PlotWindow import Window
 
-HOST = "127.0.0.1"
+HOST = "0.0.0.0"
 PORT = 16000
 
 
 class GuiHandler(QtCore.QObject):
     openGuiSignal = QtCore.pyqtSignal()
-    closeGuiSignal = QtCore.pyqtSignal()
+    closeAllSignal = QtCore.pyqtSignal()
     addFileSignal = QtCore.pyqtSignal(str)
 
     def __init__(self, mainWindow):
         super().__init__()
         self.mainWindow = mainWindow
         self.openGuiSignal.connect(self.openGui)
-        self.closeGuiSignal.connect(self.closeGui)
+        self.closeAllSignal.connect(self.closeAll)
         self.addFileSignal.connect(self.addFile)
 
     def openGui(self):
         self.mainWindow.showMaximized()
         logging.info("GUI opened")
 
-    def closeGui(self):
+    def closeAll(self):
         self.mainWindow.close()
         QtWidgets.QApplication.quit()
+        DATABASES["fundamentals"].closeConnection()
         logging.info("Application exit")
 
     def addFile(self, data: str):
@@ -80,7 +81,7 @@ class ClientHandler(QtCore.QObject):
                     self.guiHandler.openGuiSignal.emit()
                 elif command == "-cls":
                     # close is sent when the VB exe closes
-                    self.guiHandler.closeGuiSignal.emit()
+                    self.guiHandler.closeAllSignal.emit()
                     break
                 elif command == "-als":
                     with self.dataLock:
@@ -96,6 +97,7 @@ class ClientHandler(QtCore.QObject):
 
 
 def main():
+    DATABASES["fundamentals"].connect()
     logging.basicConfig(level=logging.DEBUG)
     app = QtWidgets.QApplication(sys.argv)
     app.setWindowIcon(QtGui.QIcon(ICONS["CSAN"]))

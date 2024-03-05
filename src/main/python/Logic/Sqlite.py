@@ -18,14 +18,10 @@ class Database:
             self.connection.close()
 
 
-ADDRESS = {
-    "fundamentals": r"DB\fundamentals.db"
-    # "fundamentals": r"../../../../DB/fundamentals.db"
-}
 DATABASES = {
-    "fundamentals": Database(ADDRESS["fundamentals"])
+    "fundamentals": Database(r"DB\fundamentals.db")
 }
-DATABASES["fundamentals"].connect()
+
 
 def getColumnLabels(databaseName, tableName):
     # Connect to the SQLite database
