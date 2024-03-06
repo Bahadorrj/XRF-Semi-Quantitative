@@ -1,7 +1,7 @@
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, asdict
 from pathlib import Path
 
-from numpy import zeros, uint32, ndarray
+from numpy import zeros, uint32
 
 from src.main.python.Logic.Sqlite import DatabaseConnection, getValue
 from src.main.python.Types.ConditionClass import Condition
@@ -9,11 +9,18 @@ from src.main.python.dependencies import DATABASES
 
 
 @dataclass(order=True)
-class LocalFile:
+class File:
+    name: str
+    conditions: list = field(init=False, repr=True, default_factory=list)
+    counts: list = field(init=False, repr=False, default_factory=list)
+
+    def asDict(self):
+        return asdict(self)
+
+
+@dataclass(order=True)
+class LocalFile(File):
     path: str
-    name: str = field(init=False)
-    conditions: list[Condition] = field(init=False, repr=False, default_factory=list)
-    counts: list[ndarray] = field(init=False, repr=False, default_factory=list)
 
     def __post_init__(self):
         self.name = Path(self.path).stem
@@ -34,14 +41,7 @@ class LocalFile:
                     if index == 2048:
                         self.counts.append(counts)
                         counts = zeros(2048, dtype=uint32)
-
                         index = 0
                 except ValueError:
                     pass
                 line = file.readline()
-
-@dataclass(order=True)
-class PacketFile:
-    name: str
-    conditions: list[Condition] = field(init=False, repr=True, default_factory=list)
-    counts: list[ndarray] = field(init=False, repr=False, default_factory=list)

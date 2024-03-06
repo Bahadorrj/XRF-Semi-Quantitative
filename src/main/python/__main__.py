@@ -11,7 +11,7 @@ from numpy import ndarray, uint32
 from src.main.python.Controllers.PlotWindowController import PlotWindowController
 from src.main.python.Logic.Sqlite import DatabaseConnection, getValue
 from src.main.python.Types.ConditionClass import Condition
-from src.main.python.Types.FileClass import PacketFile
+from src.main.python.Types.FileClass import File
 from src.main.python.Views.PlotWindow import Window
 from src.main.python.dependencies import ICONS, DATABASES
 
@@ -46,7 +46,7 @@ class GuiHandler(QObject):
         pointer = 0
         sampleFileName = seperated[pointer]
         pointer += 1
-        new = PacketFile(sampleFileName)
+        new = File(sampleFileName)
         while seperated[pointer] != "-stp":
             conditionName = seperated[pointer]
             pointer += 1
