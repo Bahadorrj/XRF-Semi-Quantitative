@@ -22,8 +22,9 @@ from pyqtgraph import PlotWidget, ColorButton, mkPen
 
 from src.main.python.Controllers.ElemenetsWindowController import ElementsWindowController
 from src.main.python.Controllers.PeakSearchWindowController import PeakSearchWindowController
+from src.main.python.Logic.FileExtension import FileHandler
 from src.main.python.Models import PeakSearchWindowModel
-from src.main.python.Types.FileClass import LocalFile, PacketFile
+from src.main.python.Types.FileClass import LocalFile, File
 from src.main.python.Views import ConditionsWindow
 from src.main.python.Views import ElementsWindow
 from src.main.python.Views import PeakSearchWindow
@@ -64,7 +65,7 @@ class Window(QMainWindow):
 
     def _createActions(self):
         self._actionMap = {}
-        labels = ["Open", "Peak Search", "Conditions", "Elements"]
+        labels = ["Open", "Save", "Peak Search", "Conditions", "Elements"]
         for label in labels:
             action = QAction()
             action.setText(label)
@@ -74,7 +75,7 @@ class Window(QMainWindow):
 
     def _createToolBar(self):
         self.toolBar = QToolBar()
-        self.toolBar.setIconSize(QSize(32, 32))
+        self.toolBar.setIconSize(QSize(24, 24))
         self.toolBar.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextUnderIcon)
         self.toolBar.setMovable(False)
         for action in self._actionMap.values():
@@ -184,7 +185,7 @@ class Window(QMainWindow):
             messageBox.setStandardButtons(QMessageBox.StandardButton.Ok)
             messageBox.exec()
 
-    @dispatch(PacketFile)
+    @dispatch(File)
     def createFile(self, file):
         fileItem = QTreeWidgetItem()
         fileItem.setText(0, file.name)
@@ -279,6 +280,9 @@ class Window(QMainWindow):
             file = self._files[topLevelIndex]
             self.peakSearchWindow.init(file.counts[childIndex], file.conditions[childIndex])
             self.peakSearchWindow.showMaximized()
+
+    def saveAll(self):
+        FileHandler.writeFiles(self._files, r"F:\CSAN\Master\test.xdd")
 
     def closeEvent(self, event):
         # Intercept the close event

@@ -25,6 +25,8 @@ class PlotWindowController:
         if label == "Open":
             fileDialog = self._view.openFileDialog(".txt")
             fileDialog.fileSelected.connect(self._view.createFile)
+        elif label == "Save":
+            self._view.saveAll()
         elif label == "Conditions":
             self._view.openConditionsWindow()
         elif label == "Elements":
