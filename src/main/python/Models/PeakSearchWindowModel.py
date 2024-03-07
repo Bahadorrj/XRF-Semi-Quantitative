@@ -1,8 +1,8 @@
 from src.main.python.Logic.Sqlite import DatabaseConnection
-from src.main.python.dependencies import DATABASES
+import qrcResources
 
 def writeElementToTable(elements, conditionID):
-    database = DatabaseConnection.getInstance(DATABASES['fundamentals'])
+    database = DatabaseConnection.getInstance(":fundamentals.db")
     for element in elements:
         if element.activated:
             query = f"""

@@ -20,7 +20,8 @@ from src.main.python.Logic.Sqlite import DatabaseConnection, getDatabaseDatafram
 from src.main.python.Types.ElementClass import Element
 from src.main.python.Views.MessegeBox import Dialog
 from src.main.python.Views.TableWidget import Form
-from src.main.python.dependencies import ICONS, DATABASES
+
+import qrcResources
 
 
 class Window(QMainWindow):
@@ -49,7 +50,7 @@ class Window(QMainWindow):
         self.statusBar.addWidget(self.coordinateLabel)
         self.statusBar.addWidget(self.statusLabel)
         self._placeComponents()
-        database = DatabaseConnection.getInstance(DATABASES['fundamentals'])
+        database = DatabaseConnection.getInstance(":fundamentals.db")
         self._elementsDf = getDatabaseDataframe(database, "elements")
         self._conditionID = int()
         self._counts = zeros(2048, dtype=uint32)
@@ -105,7 +106,7 @@ class Window(QMainWindow):
     def _initElements(self):
         self._elements = list()
         self._addedElements = list()
-        database = DatabaseConnection.getInstance(DATABASES['fundamentals'])
+        database = DatabaseConnection.getInstance(":fundamentals.db")
         values = getValues(database, "elements")
         for value in values:
             e = Element(value[0])
@@ -141,12 +142,12 @@ class Window(QMainWindow):
         self.windowOpened.emit()
 
     def _addElementToForm(self, element):
-        removeButton = QPushButton(icon=QIcon(ICONS["Cross"]))
+        removeButton = QPushButton(icon=QIcon(":cross.png"))
         hideButton = QPushButton()
         if element.hidden:
-            hideButton.setIcon(QIcon(ICONS["Hide"]))
+            hideButton.setIcon(QIcon(":hide.png"))
         else:
-            hideButton.setIcon(QIcon(ICONS["Show"]))
+            hideButton.setIcon(QIcon(":show.png"))
         elementItem = QTableWidgetItem(
             element.getAttribute("symbol"))
         typeItem = QTableWidgetItem(
@@ -437,7 +438,7 @@ class Window(QMainWindow):
     @dispatch(Element)
     def hideElement(self, element):
         row = self.form.getRowById(element.getAttribute("element_id"))
-        row.get("Hide Widget").setIcon(QIcon(ICONS["Hide"]))
+        row.get("Hide Widget").setIcon(QIcon(":hide.png"))
         if element.activated is False and element.region in self.peakPlot.items:
             self.peakPlot.removeItem(element.region)
         self._removeLineOfElement(element)
@@ -447,7 +448,7 @@ class Window(QMainWindow):
     def hideElement(self, index):
         element = self._addedElements[index]
         row = self.form.getRowById(element.getAttribute("element_id"))
-        row.get("Hide Widget").setIcon(QIcon(ICONS["Hide"]))
+        row.get("Hide Widget").setIcon(QIcon(":hide.png"))
         if element.activated is False and element.region in self.peakPlot.items:
             self.peakPlot.removeItem(element.region)
         self._removeLineOfElement(element)
@@ -456,7 +457,7 @@ class Window(QMainWindow):
     @dispatch(Element)
     def showElement(self, element):
         row = self.form.getRowById(element.getAttribute("element_id"))
-        row.get("Hide Widget").setIcon(QIcon(ICONS["Show"]))
+        row.get("Hide Widget").setIcon(QIcon(":show.png"))
         if element.activated is False and element.region not in self.peakPlot.items:
             self.peakPlot.addItem(element.region)
         self._plotLineOfElement(element)
@@ -466,7 +467,7 @@ class Window(QMainWindow):
     def showElement(self, index):
         element = self._addedElements[index]
         row = self.form.getRowById(element.getAttribute("element_id"))
-        row.get("Hide Widget").setIcon(QIcon(ICONS["Show"]))
+        row.get("Hide Widget").setIcon(QIcon(":show.png"))
         if element.activated is False and element.region not in self.peakPlot.items:
             self.peakPlot.addItem(element.region)
         self._plotLineOfElement(element)

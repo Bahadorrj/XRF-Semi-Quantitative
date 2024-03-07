@@ -13,7 +13,8 @@ from src.main.python.Logic.Sqlite import DatabaseConnection, getValue
 from src.main.python.Types.ConditionClass import Condition
 from src.main.python.Types.FileClass import File
 from src.main.python.Views.PlotWindow import Window
-from src.main.python.dependencies import ICONS, DATABASES
+
+import qrcResources
 
 HOST = "0.0.0.0"
 PORT = 16000
@@ -38,7 +39,7 @@ class GuiHandler(QObject):
     def closeAll(self):
         self.mainWindow.close()
         QApplication.quit()
-        DatabaseConnection.getInstance(DATABASES['fundamentals']).closeConnection()
+        DatabaseConnection.getInstance(":fundamentals.db").closeConnection()
         logging.info("Application exit")
 
     def addFile(self, data: str):
@@ -50,7 +51,7 @@ class GuiHandler(QObject):
         while seperated[pointer] != "-stp":
             conditionName = seperated[pointer]
             pointer += 1
-            database = DatabaseConnection.getInstance(DATABASES['fundamentals'])
+            database = DatabaseConnection.getInstance(":fundamentals.db")
             conditionID = getValue(database, "conditions", where=f"name = '{conditionName}'")[0]
             condition = Condition(conditionID)
             counts = ndarray(2048, dtype=uint32)
@@ -102,18 +103,19 @@ class ClientHandler(QObject):
 def main():
     logging.basicConfig(level=logging.DEBUG)
     app = QApplication(sys.argv)
-    app.setWindowIcon(QIcon(ICONS["CSAN"]))
+    app.setWindowIcon(QIcon(":CSAN.ico"))
     size = app.primaryScreen().size()
     mainWindow = Window(size)
     PlotWindowController(mainWindow)
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        s.bind((HOST, PORT))
-        s.listen(1)
-        logging.info(f"Server listening on {HOST}:{PORT}")
-        conn, addr = s.accept()
-        logging.info(f"Connected to {addr}")
-        guiHandler = GuiHandler(mainWindow)
-        clientHandler = ClientHandler(conn, guiHandler)
-        clientThread = threading.Thread(target=clientHandler.handleClient)
-        clientThread.start()
+    # with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+    #     s.bind((HOST, PORT))
+    #     s.listen(1)
+    #     logging.info(f"Server listening on {HOST}:{PORT}")
+    #     conn, addr = s.accept()
+    #     logging.info(f"Connected to {addr}")
+    #     guiHandler = GuiHandler(mainWindow)
+    #     clientHandler = ClientHandler(conn, guiHandler)
+    #     clientThread = threading.Thread(target=clientHandler.handleClient)
+    #     clientThread.start()
+    mainWindow.show()
     sys.exit(app.exec())

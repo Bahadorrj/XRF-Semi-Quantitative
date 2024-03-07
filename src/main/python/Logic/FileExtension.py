@@ -36,7 +36,8 @@ class FileHandler:
             countsArray = [array(countArray, dtype=uint32) for countArray in fileAsDict['counts']]
             ids = fileAsDict['ids']
 
-            file = File(name)
+            file = File()
+            file.name = name
             file.conditions = [Condition(id) for id in ids]
             file.counts = countsArray
             files.append(file)

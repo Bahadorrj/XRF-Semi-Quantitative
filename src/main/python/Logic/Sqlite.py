@@ -1,7 +1,14 @@
+import os
 import sqlite3
-from dataclasses import dataclass
+import sys
 
+from dataclasses import dataclass
 from pandas import read_sql_query
+
+
+# Define function to resolve alias to file path
+def resource_path(relative_path):
+    return os.path.join(os.path.abspath("."), f"src\\main\\db\\{relative_path[1:]}")
 
 
 @dataclass
@@ -20,7 +27,8 @@ class DatabaseConnection:
     def createConnection(databaseFile: str) -> sqlite3.Connection:
         conn = None
         try:
-            conn = sqlite3.connect(databaseFile)
+            db_path = resource_path(databaseFile)
+            conn = sqlite3.connect(db_path)
             return conn
         except sqlite3.Error as e:
             print(e)
@@ -64,8 +72,10 @@ def getValues(database: DatabaseConnection, tableName: str, columnName: str = "*
         query = f"SELECT {columnName} FROM {tableName};"
     return database.fetchData(query)
 
+
 def getValue(database: DatabaseConnection, tableName: str, columnName: str = "*", where: str = ""):
     return getValues(database, tableName, columnName, where)[0]
+
 
 def getDatabaseDataframe(database: DatabaseConnection, tableName: str, columnName: str = "*", where: str = ""):
     connection = database.conn

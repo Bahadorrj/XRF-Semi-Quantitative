@@ -5,12 +5,13 @@ from numpy import zeros, uint32
 
 from src.main.python.Logic.Sqlite import DatabaseConnection, getValue
 from src.main.python.Types.ConditionClass import Condition
-from src.main.python.dependencies import DATABASES
+
+import qrcResources
 
 
 @dataclass(order=True)
 class File:
-    name: str
+    name: str = field(init=False)
     conditions: list = field(init=False, repr=True, default_factory=list)
     counts: list = field(init=False, repr=False, default_factory=list)
 
@@ -30,7 +31,7 @@ class LocalFile(File):
             index = 0
             while line:
                 if "Condition" in line:
-                    database = DatabaseConnection.getInstance(DATABASES['fundamentals'])
+                    database = DatabaseConnection.getInstance(":fundamentals.db")
                     conditionID = getValue(database, "conditions", where=f"name = '{line.strip()}'")[0]
                     c = Condition(conditionID)
                     self.conditions.append(c)
