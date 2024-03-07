@@ -10,7 +10,7 @@ class PlotWindowController:
         self._view.getPlotWidget().scene().sigMouseMoved.connect(self._view.mouseMoved)
         # action
         for label, action in self._view.getActionsMap().items():
-            action.triggered.connect(partial(self._openRelatedComponent, label))
+            action.triggered.connect(partial(self._connectActionsAndSlots, label))
         # form
         self._view.form.customContextMenuRequested.connect(self._view.showContextMenu)
         self._view.form.itemClicked.connect(self._view.itemClicked)
@@ -21,10 +21,12 @@ class PlotWindowController:
             for button in buttons:
                 button.sigColorChanged.connect(self._view.plot)
 
-    def _openRelatedComponent(self, label):
+    def _connectActionsAndSlots(self, label):
         if label == "open":
             fileDialog = self._view.openFileDialog(".txt")
-            fileDialog.fileSelected.connect(self._view.createFile)
+            fileDialog.fileSelected.connect(self._view.addProject)
+        elif label == "close":
+            self._view.close()
         elif label == "save":
             self._view.exportProject()
         elif label == "conditions":

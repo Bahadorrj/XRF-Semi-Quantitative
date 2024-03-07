@@ -17,14 +17,13 @@ from PyQt6.QtWidgets import (
     QFileDialog,
     QApplication
 )
-from multipledispatch import dispatch
 from pyqtgraph import PlotWidget, ColorButton, mkPen
 
 from src.main.python.Controllers.ElemenetsWindowController import ElementsWindowController
 from src.main.python.Controllers.PeakSearchWindowController import PeakSearchWindowController
 from src.main.python.Logic.FileExtension import FileHandler
 from src.main.python.Models import PeakSearchWindowModel
-from src.main.python.Types.FileClass import LocalFile, File
+from src.main.python.Types.ProjectFileClass import ProjectFile
 from src.main.python.Views import ConditionsWindow
 from src.main.python.Views import ElementsWindow
 from src.main.python.Views import PeakSearchWindow
@@ -68,13 +67,14 @@ class Window(QMainWindow):
 
     def _createActions(self):
         self._actionMap = {}
-        labels = ["open", "close", "save", "peak-search", "conditions", "elements", "exit"]
+        labels = ["open", "close", "save", "peak-search", "conditions", "elements"]
         for label in labels:
             action = QAction()
             action.setText(label)
             action.setIcon(QIcon(f":{label}.png"))
             self._actionMap[label] = action
         self._actionMap["peak-search"].setDisabled(True)
+        self._actionMap["save"].setDisabled(True)
 
     def _createMenus(self):
         self.openMenu = QMenu("&Open")
@@ -169,7 +169,7 @@ class Window(QMainWindow):
     def openFileDialog(self, fileFormat):
         fileDialog = QFileDialog(self)
         fileDialog.setFileMode(QFileDialog.FileMode.AnyFile)
-        fileDialog.setNameFilter(f"Texts (*{fileFormat})")
+        fileDialog.setNameFilter("(*.xdd)")
         fileDialog.show()
         return fileDialog
 
@@ -187,14 +187,15 @@ class Window(QMainWindow):
         if self.form.indexOfTopLevelItem(item) != -1:
             menu.exec(self.form.mapToGlobal(position))
 
-    @dispatch(str)
-    def createFile(self, path):
-        f = LocalFile(path)
-        fileItem = QTreeWidgetItem()
-        fileItem.setText(0, f.name)
-        fileItem.setCheckState(0, Qt.CheckState.Unchecked)
-        buttons = list()
-        if f.conditions:
+    def addProject(self, path):
+        if not self._actionMap["save"].isEnabled():
+            self._actionMap["save"].setDisabled(False)
+        project = ProjectFile(path)
+        for f in project.files:
+            fileItem = QTreeWidgetItem()
+            fileItem.setText(0, f.name)
+            fileItem.setCheckState(0, Qt.CheckState.Unchecked)
+            buttons = list()
             for index, condition in enumerate(f.conditions):
                 conditionItem = QTreeWidgetItem()
                 conditionItem.setText(1, condition.getName())
@@ -207,17 +208,10 @@ class Window(QMainWindow):
                 buttons.append(colorButton)
             self._files.append(f)
             self._colorButtonMap[f.name] = buttons
-        else:
-            messageBox = Dialog(
-                QMessageBox.Icon.Warning,
-                "Warning!",
-                "The selected file is not registered properly!"
-            )
-            messageBox.setStandardButtons(QMessageBox.StandardButton.Ok)
-            messageBox.exec()
 
-    @dispatch(File)
-    def createFile(self, file):
+    def addFile(self, file):
+        if not self._actionMap["save"].isEnabled():
+            self._actionMap["save"].setDisabled(False)
         fileItem = QTreeWidgetItem()
         fileItem.setText(0, file.name)
         fileItem.setCheckState(0, Qt.CheckState.Unchecked)

@@ -47,7 +47,8 @@ class GuiHandler(QObject):
         pointer = 0
         sampleFileName = seperated[pointer]
         pointer += 1
-        new = File(sampleFileName)
+        new = File()
+        new.name = sampleFileName
         while seperated[pointer] != "-stp":
             conditionName = seperated[pointer]
             pointer += 1
@@ -60,7 +61,7 @@ class GuiHandler(QObject):
                 pointer += 1
             new.conditions.append(condition)
             new.counts.append(counts)
-        self.mainWindow.createFile(new)
+        self.mainWindow.addFile(new)
         logging.info(f"Added file: {new}")
 
 
