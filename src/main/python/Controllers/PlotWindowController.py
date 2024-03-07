@@ -22,14 +22,14 @@ class PlotWindowController:
                 button.sigColorChanged.connect(self._view.plot)
 
     def _openRelatedComponent(self, label):
-        if label == "Open":
+        if label == "open":
             fileDialog = self._view.openFileDialog(".txt")
             fileDialog.fileSelected.connect(self._view.createFile)
-        elif label == "Save":
-            self._view.saveAll()
-        elif label == "Conditions":
+        elif label == "save":
+            self._view.exportProject()
+        elif label == "conditions":
             self._view.openConditionsWindow()
-        elif label == "Elements":
+        elif label == "elements":
             self._view.openElementsWindow()
-        elif label == "Peak Search":
+        elif label == "peak-search":
             self._view.openPeakSearchWindow()

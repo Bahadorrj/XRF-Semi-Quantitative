@@ -29,7 +29,8 @@ from src.main.python.Views import ConditionsWindow
 from src.main.python.Views import ElementsWindow
 from src.main.python.Views import PeakSearchWindow
 from src.main.python.Views.MessegeBox import Dialog
-from src.main.python.dependencies import ICONS
+
+import qrcResources
 
 COLORS = ["#FF0000", "#FFD700", "#00FF00", "#00FFFF", "#000080", "#0000FF", "#8B00FF",
           "#FF1493", "#FFC0CB", "#FF4500", "#FFFF00", "#FF00FF", "#00FF7F", "#FF7F00"]
@@ -43,6 +44,8 @@ class Window(QMainWindow):
         self.setMinimumWidth(int(0.75 * size.width()))
         self.setMinimumHeight(int(0.75 * size.height()))
         self._createActions()
+        self._createMenus()
+        self._createMenuBar()
         self._createToolBar()
         self.generalLayout = QVBoxLayout()
         self._createMainWidget()
@@ -65,21 +68,41 @@ class Window(QMainWindow):
 
     def _createActions(self):
         self._actionMap = {}
-        labels = ["Open", "Save", "Peak Search", "Conditions", "Elements"]
+        labels = ["open", "close", "save", "peak-search", "conditions", "elements", "exit"]
         for label in labels:
             action = QAction()
             action.setText(label)
-            action.setIcon(QIcon(ICONS[label]))
+            action.setIcon(QIcon(f":{label}.png"))
             self._actionMap[label] = action
-        self._actionMap["Peak Search"].setDisabled(True)
+        self._actionMap["peak-search"].setDisabled(True)
+
+    def _createMenus(self):
+        self.openMenu = QMenu("&Open")
+        self.openMenu.addAction(self._actionMap['open'])
+        self.recentMenu = QMenu("&Recent Projects")
+        self.openMenu.addMenu(self.recentMenu)
+
+    def _createMenuBar(self):
+        menuBar = self.menuBar()
+        # Creating menus using a QMenu object
+        fileMenu = menuBar.addMenu("&File")
+        fileMenu.addMenu(self.openMenu)
+        fileMenu.addSeparator()
+        fileMenu.addAction(self._actionMap['save'])
+        fileMenu.addAction(self._actionMap['close'])
+        # editMenu = menuBar.addMenu("&Edit")
+        # helpMenu = menuBar.addMenu("&Help")
 
     def _createToolBar(self):
         self.toolBar = QToolBar()
         self.toolBar.setIconSize(QSize(24, 24))
         self.toolBar.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextUnderIcon)
         self.toolBar.setMovable(False)
-        for action in self._actionMap.values():
-            self.toolBar.addAction(action)
+        self.toolBar.addAction(self._actionMap['open'])
+        self.toolBar.addAction(self._actionMap['save'])
+        self.toolBar.addAction(self._actionMap['peak-search'])
+        self.toolBar.addAction(self._actionMap['conditions'])
+        self.toolBar.addAction(self._actionMap['elements'])
         self.addToolBar(self.toolBar)
 
     def _createMainWidget(self):
@@ -150,6 +173,14 @@ class Window(QMainWindow):
         fileDialog.show()
         return fileDialog
 
+    def exportProject(self):
+        default_dir = r"F:\CSAN\Master"
+        filePath, _ = QFileDialog.getSaveFileName(
+            self, "Save project", default_dir, filter="*.xdd"
+        )
+        if filePath:
+            self.saveWorkSpaceTo(filePath)
+
     def showContextMenu(self, position):
         menu = QMenu(self.form)
         item = self.form.itemAt(position)
@@ -218,9 +249,9 @@ class Window(QMainWindow):
 
     def itemClicked(self, item):
         if self.form.indexOfTopLevelItem(item) == -1:
-            self._actionMap.get("Peak Search").setDisabled(False)
+            self._actionMap.get("peak-search").setDisabled(False)
         else:
-            self._actionMap.get("Peak Search").setDisabled(True)
+            self._actionMap.get("peak-search").setDisabled(True)
 
     def itemChanged(self, item):
         self.form.setCurrentItem(item)
@@ -281,16 +312,16 @@ class Window(QMainWindow):
             self.peakSearchWindow.init(file.counts[childIndex], file.conditions[childIndex])
             self.peakSearchWindow.showMaximized()
 
-    def saveAll(self):
-        FileHandler.writeFiles(self._files, r"F:\CSAN\Master\test.xdd")
+    def saveWorkSpaceTo(self, filePath):
+        FileHandler.writeFiles(self._files, filePath)
 
-    def closeEvent(self, event):
-        # Intercept the close event
-        # Check if the close is initiated by the close button
-        if event.spontaneous():
-            # Hide the window instead of closing
-            self.hide()
-            event.ignore()
-        else:
-            # Handle the close event normally
-            event.accept()
+    # def closeEvent(self, event):
+    #     # Intercept the close event
+    #     # Check if the close is initiated by the close button
+    #     if event.spontaneous():
+    #         # Hide the window instead of closing
+    #         self.hide()
+    #         event.ignore()
+    #     else:
+    #         # Handle the close event normally
+    #         event.accept()
