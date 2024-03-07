@@ -89,7 +89,8 @@ class ClientHandler(QObject):
                 elif command == "-als":
                     with self.dataLock:
                         data = self.conn.recv(2048 * 128).decode("utf-8")
-                        self.guiHandler.addFileSignal.emit(data)
+                        print(data)
+                        # self.guiHandler.addFileSignal.emit(data)
                 else:
                     logging.warning(f"There is not any action related to {command}. "
                                     f"make sure you are sending the correct command.")
