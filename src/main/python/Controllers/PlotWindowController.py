@@ -12,7 +12,6 @@ class PlotWindowController:
         for label, action in self._view.getActionsMap().items():
             action.triggered.connect(partial(self._connectActionsAndSlots, label))
         # form
-        self._view.form.customContextMenuRequested.connect(self._view.showContextMenu)
         self._view.form.itemClicked.connect(self._view.itemClicked)
         self._view.form.itemChanged.connect(self._view.itemChanged)
         self._view.form.itemDoubleClicked.connect(self._view.openPeakSearchWindow)

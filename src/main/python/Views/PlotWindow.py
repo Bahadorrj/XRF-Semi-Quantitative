@@ -29,11 +29,32 @@ from src.main.python.Views import ElementsWindow
 from src.main.python.Views import PeakSearchWindow
 from src.main.python.Views.MessegeBox import Dialog
 
-import qrcResources
-
 COLORS = ["#FF0000", "#FFD700", "#00FF00", "#00FFFF", "#000080", "#0000FF", "#8B00FF",
           "#FF1493", "#FFC0CB", "#FF4500", "#FFFF00", "#FF00FF", "#00FF7F", "#FF7F00"]
 PX_COUNT = 2048
+
+
+class MyForm(QTreeWidget):
+    def contextMenuEvent(self, event):
+        if self.indexOfTopLevelItem(self.itemAt(event.pos())) != -1:
+            contextMenu = QMenu(self)
+            actionEdit = QAction("Edit", self)
+            actionDelete = QAction("Delete", self)
+
+            contextMenu.addAction(actionEdit)
+            contextMenu.addAction(actionDelete)
+
+            action = contextMenu.exec(self.mapToGlobal(event.pos()))
+            if action == actionEdit:
+                item = self.itemAt(event.pos())
+                if item and item.parent() is None:  # Check if it's a top-level item
+                    item.setFlags(item.flags() | Qt.ItemFlag.ItemIsEditable)
+                    self.editItem(item)
+            elif action == actionDelete:
+                item = self.itemAt(event.pos())
+                if item and item.parent() is None:  # Check if it's a top-level item
+                    self.takeTopLevelItem(self.indexOfTopLevelItem(item))
+                    del item
 
 
 class Window(QMainWindow):
@@ -130,16 +151,15 @@ class Window(QMainWindow):
         self.plotWidget.setFrameShadow(QFrame.Shadow.Plain)
 
     def _createForm(self):
-        self.form = QTreeWidget()
+        self.form = MyForm()
         self.form.setColumnCount(3)
         self.form.setHeaderLabels(["File", "Condition", "Color"])
         self.form.setFrameShape(QFrame.Shape.Box)
         self.form.setFrameShadow(QFrame.Shadow.Plain)
         self.form.header().setDefaultSectionSize(int(self.size().width() * 0.1))
         self.form.header().setHighlightSections(True)
-        # self.form.setAnimated(True)
-        # self.form.setExpandsOnDoubleClick(False)
-        self.form.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.form.setAnimated(True)
+        self.form.setExpandsOnDoubleClick(False)
         self.form.setMaximumWidth(int(self.size().width() * 0.3))
 
     def _placeComponents(self):
@@ -180,12 +200,6 @@ class Window(QMainWindow):
         )
         if filePath:
             self.saveWorkSpaceTo(filePath)
-
-    def showContextMenu(self, position):
-        menu = QMenu(self.form)
-        item = self.form.itemAt(position)
-        if self.form.indexOfTopLevelItem(item) != -1:
-            menu.exec(self.form.mapToGlobal(position))
 
     def addProject(self, path):
         if not self._actionMap["save"].isEnabled():
@@ -250,13 +264,13 @@ class Window(QMainWindow):
     def itemChanged(self, item):
         self.form.setCurrentItem(item)
         self.form.blockSignals(True)
-        top_level_index = self.form.indexOfTopLevelItem(item)
-        if top_level_index != -1:
+        topLevelIndex = self.form.indexOfTopLevelItem(item)
+        if topLevelIndex != -1:
             if item.checkState(0) == Qt.CheckState.Unchecked:
-                for child_index in range(self.form.topLevelItem(top_level_index).childCount()):
+                for child_index in range(self.form.topLevelItem(topLevelIndex).childCount()):
                     item.child(child_index).setCheckState(1, Qt.CheckState.Unchecked)
             elif item.checkState(0) == Qt.CheckState.Checked:
-                for child_index in range(self.form.topLevelItem(top_level_index).childCount()):
+                for child_index in range(self.form.topLevelItem(topLevelIndex).childCount()):
                     item.child(child_index).setCheckState(1, Qt.CheckState.Checked)
         else:
             top_level = item.parent()
