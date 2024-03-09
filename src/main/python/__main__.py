@@ -95,10 +95,15 @@ class ClientHandler(QObject):
                     self.conn.sendall(b"Server is running")
                 elif command == "-als":
                     with self.dataLock:
-                        data = self.conn.recv(2048 * 128).decode("utf-8")
+                        data = ""
+                        while True:
+                            buffer = self.conn.recv(10).decode("utf-8")
+                            data += buffer
+                            if data[-4:] != "-stp" or not buffer:
+                                break
                         self.guiHandler.addFileSignal.emit(data)
                 elif command == "-ext":
-                    # close is sent when the VB exe closes
+                    # exit is sent when the VB exe closes
                     self.guiHandler.exit.emit()
                     break
                 else:
