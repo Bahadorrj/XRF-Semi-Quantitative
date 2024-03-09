@@ -22,21 +22,26 @@ PORT = 16000
 
 class GuiHandler(QObject):
     openGuiSignal = pyqtSignal()
-    closeAllSignal = pyqtSignal()
+    closeGuiSignal = pyqtSignal()
     addFileSignal = pyqtSignal(str)
+    exit = pyqtSignal()
 
     def __init__(self, mainWindow):
         super().__init__()
         self.mainWindow = mainWindow
         self.openGuiSignal.connect(self.openGui)
-        self.closeAllSignal.connect(self.closeAll)
+        self.closeGuiSignal.connect(self.hideGui)
         self.addFileSignal.connect(self.addFile)
+        self.exit.connect(self.exitApplication)
 
     def openGui(self):
         self.mainWindow.showMaximized()
         logging.info("GUI opened")
 
-    def closeAll(self):
+    def hideGui(self):
+        self.mainWindow.hide()
+
+    def exitApplication(self):
         self.mainWindow.close()
         QApplication.quit()
         DatabaseConnection.getInstance(":fundamentals.db").closeConnection()
@@ -85,13 +90,17 @@ class ClientHandler(QObject):
                 if command == "-opn":
                     self.guiHandler.openGuiSignal.emit()
                 elif command == "-cls":
-                    # close is sent when the VB exe closes
-                    self.guiHandler.closeAllSignal.emit()
-                    break
+                    self.guiHandler.closeGuiSignal.emit()
+                elif command == "-chk":
+                    self.conn.sendall(b"Server is running")
                 elif command == "-als":
                     with self.dataLock:
                         data = self.conn.recv(2048 * 128).decode("utf-8")
                         self.guiHandler.addFileSignal.emit(data)
+                elif command == "-ext":
+                    # close is sent when the VB exe closes
+                    self.guiHandler.exit.emit()
+                    break
                 else:
                     logging.warning(f"There is not any action related to {command}. "
                                     f"make sure you are sending the correct command.")
@@ -108,15 +117,14 @@ def main():
     size = app.primaryScreen().size()
     mainWindow = Window(size)
     PlotWindowController(mainWindow)
-    # with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-    #     s.bind((HOST, PORT))
-    #     s.listen(1)
-    #     logging.info(f"Server listening on {HOST}:{PORT}")
-    #     conn, addr = s.accept()
-    #     logging.info(f"Connected to {addr}")
-    #     guiHandler = GuiHandler(mainWindow)
-    #     clientHandler = ClientHandler(conn, guiHandler)
-    #     clientThread = threading.Thread(target=clientHandler.handleClient)
-    #     clientThread.start()
-    mainWindow.show()
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.bind((HOST, PORT))
+        s.listen(1)
+        logging.info(f"Server listening on {HOST}:{PORT}")
+        conn, addr = s.accept()
+        logging.info(f"Connected to {addr}")
+        guiHandler = GuiHandler(mainWindow)
+        clientHandler = ClientHandler(conn, guiHandler)
+        clientThread = threading.Thread(target=clientHandler.handleClient)
+        clientThread.start()
     sys.exit(app.exec())

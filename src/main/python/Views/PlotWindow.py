@@ -332,13 +332,13 @@ class Window(QMainWindow):
     def saveProjectTo(self, filePath):
         FileHandler.writeFiles(self._files, filePath)
 
-    # def closeEvent(self, event):
-    #     # Intercept the close event
-    #     # Check if the close is initiated by the close button
-    #     if event.spontaneous():
-    #         # Hide the window instead of closing
-    #         self.hide()
-    #         event.ignore()
-    #     else:
-    #         # Handle the close event normally
-    #         event.accept()
+    def closeEvent(self, event):
+        # Intercept the close event
+        # Check if the close is initiated by the close button
+        if event.spontaneous():
+            # Hide the window instead of closing
+            self.hide()
+            event.ignore()
+        else:
+            # Handle the close event normally
+            event.accept()
