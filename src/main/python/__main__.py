@@ -89,9 +89,14 @@ class ClientHandler(QObject):
                     self.guiHandler.closeAllSignal.emit()
                     break
                 elif command == "-als":
-                    with self.dataLock:
-                        data = self.conn.recv(2048 * 128).decode("utf-8")
-                        self.guiHandler.addFileSignal.emit(data)
+                    # with self.dataLock:
+                    data = ""
+                    while True:
+                        data += self.conn.recv(10).decode("utf-8")
+                        if data[-4:] == "-stp":
+                            break
+                    logging.info(f"Received data: {data}")
+                    self.guiHandler.addFileSignal.emit(data)
                 else:
                     logging.warning(f"There is not any action related to {command}. "
                                     f"make sure you are sending the correct command.")
@@ -108,15 +113,14 @@ def main():
     size = app.primaryScreen().size()
     mainWindow = Window(size)
     PlotWindowController(mainWindow)
-    # with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-    #     s.bind((HOST, PORT))
-    #     s.listen(1)
-    #     logging.info(f"Server listening on {HOST}:{PORT}")
-    #     conn, addr = s.accept()
-    #     logging.info(f"Connected to {addr}")
-    #     guiHandler = GuiHandler(mainWindow)
-    #     clientHandler = ClientHandler(conn, guiHandler)
-    #     clientThread = threading.Thread(target=clientHandler.handleClient)
-    #     clientThread.start()
-    mainWindow.show()
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.bind((HOST, PORT))
+        s.listen(1)
+        logging.info(f"Server listening on {HOST}:{PORT}")
+        conn, addr = s.accept()
+        logging.info(f"Connected to {addr}")
+        guiHandler = GuiHandler(mainWindow)
+        clientHandler = ClientHandler(conn, guiHandler)
+        clientThread = threading.Thread(target=clientHandler.handleClient)
+        clientThread.start()
     sys.exit(app.exec())
