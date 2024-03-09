@@ -97,11 +97,11 @@ class ClientHandler(QObject):
                     with self.dataLock:
                         data = ""
                         while True:
-                            buffer = self.conn.recv(10).decode("utf-8")
-                            data += buffer
-                            if data[-4:] != "-stp" or not buffer:
+                            data += self.conn.recv(10).decode("utf-8")
+                            if data[-4:] == "-stp":
                                 break
-                        self.guiHandler.addFileSignal.emit(data)
+                        if data:
+                            self.guiHandler.addFileSignal.emit(data)
                 elif command == "-ext":
                     # exit is sent when the VB exe closes
                     self.guiHandler.exit.emit()
