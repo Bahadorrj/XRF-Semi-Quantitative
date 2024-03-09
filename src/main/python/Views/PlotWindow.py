@@ -1,5 +1,5 @@
 import numpy as np
-from PyQt6.QtCore import QSize, Qt
+from PyQt6.QtCore import QSize, Qt, pyqtSignal
 from PyQt6.QtGui import QAction, QIcon
 from PyQt6.QtWidgets import (
     QMainWindow,
@@ -35,8 +35,11 @@ PX_COUNT = 2048
 
 
 class MyForm(QTreeWidget):
+    itemDeleted = pyqtSignal(int)
+
     def contextMenuEvent(self, event):
-        if self.indexOfTopLevelItem(self.itemAt(event.pos())) != -1:
+        indexOfTopLevel = self.indexOfTopLevelItem(self.itemAt(event.pos()))
+        if indexOfTopLevel != -1:
             contextMenu = QMenu(self)
             actionEdit = QAction("Edit", self)
             actionDelete = QAction("Delete", self)
@@ -54,6 +57,7 @@ class MyForm(QTreeWidget):
                 item = self.itemAt(event.pos())
                 if item and item.parent() is None:  # Check if it's a top-level item
                     self.takeTopLevelItem(self.indexOfTopLevelItem(item))
+                    self.itemDeleted.emit(indexOfTopLevel)
                     del item
 
 
@@ -199,7 +203,9 @@ class Window(QMainWindow):
             self, "Save project", default_dir, filter="*.xdd"
         )
         if filePath:
-            self.saveWorkSpaceTo(filePath)
+            for index in range(self.form.topLevelItemCount()):
+                self._files[index].name = self.form.topLevelItem(index).text(0)
+            self.saveProjectTo(filePath)
 
     def addProject(self, path):
         if not self._actionMap["save"].isEnabled():
@@ -261,6 +267,9 @@ class Window(QMainWindow):
         else:
             self._actionMap.get("peak-search").setDisabled(True)
 
+    def itemDeleted(self, index):
+        self._files.pop(index)
+
     def itemChanged(self, item):
         self.form.setCurrentItem(item)
         self.form.blockSignals(True)
@@ -320,7 +329,7 @@ class Window(QMainWindow):
             self.peakSearchWindow.init(file.counts[childIndex], file.conditions[childIndex])
             self.peakSearchWindow.showMaximized()
 
-    def saveWorkSpaceTo(self, filePath):
+    def saveProjectTo(self, filePath):
         FileHandler.writeFiles(self._files, filePath)
 
     # def closeEvent(self, event):
