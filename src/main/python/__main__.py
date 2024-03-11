@@ -22,21 +22,26 @@ PORT = 16000
 
 class GuiHandler(QObject):
     openGuiSignal = pyqtSignal()
-    closeAllSignal = pyqtSignal()
+    closeGuiSignal = pyqtSignal()
     addFileSignal = pyqtSignal(str)
+    exit = pyqtSignal()
 
     def __init__(self, mainWindow):
         super().__init__()
         self.mainWindow = mainWindow
         self.openGuiSignal.connect(self.openGui)
-        self.closeAllSignal.connect(self.closeAll)
+        self.closeGuiSignal.connect(self.hideGui)
         self.addFileSignal.connect(self.addFile)
+        self.exit.connect(self.exitApplication)
 
     def openGui(self):
         self.mainWindow.showMaximized()
         logging.info("GUI opened")
 
-    def closeAll(self):
+    def hideGui(self):
+        self.mainWindow.hide()
+
+    def exitApplication(self):
         self.mainWindow.close()
         QApplication.quit()
         DatabaseConnection.getInstance(":fundamentals.db").closeConnection()
@@ -85,18 +90,22 @@ class ClientHandler(QObject):
                 if command == "-opn":
                     self.guiHandler.openGuiSignal.emit()
                 elif command == "-cls":
-                    # close is sent when the VB exe closes
-                    self.guiHandler.closeAllSignal.emit()
-                    break
+                    self.guiHandler.closeGuiSignal.emit()
+                elif command == "-chk":
+                    self.conn.sendall(b"Server is running")
                 elif command == "-als":
-                    # with self.dataLock:
-                    data = ""
-                    while True:
-                        data += self.conn.recv(10).decode("utf-8")
-                        if data[-4:] == "-stp":
-                            break
-                    logging.info(f"Received data: {data}")
-                    self.guiHandler.addFileSignal.emit(data)
+                    with self.dataLock:
+                        data = ""
+                        while True:
+                            data += self.conn.recv(10).decode("utf-8")
+                            if data[-4:] == "-stp":
+                                break
+                        if data:
+                            self.guiHandler.addFileSignal.emit(data)
+                elif command == "-ext":
+                    # exit is sent when the VB exe closes
+                    self.guiHandler.exit.emit()
+                    break
                 else:
                     logging.warning(f"There is not any action related to {command}. "
                                     f"make sure you are sending the correct command.")

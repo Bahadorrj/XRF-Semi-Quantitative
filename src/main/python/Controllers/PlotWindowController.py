@@ -15,6 +15,7 @@ class PlotWindowController:
         self._view.form.itemClicked.connect(self._view.itemClicked)
         self._view.form.itemChanged.connect(self._view.itemChanged)
         self._view.form.itemDoubleClicked.connect(self._view.openPeakSearchWindow)
+        self._view.form.itemDeleted.connect(self._view.itemDeleted)
         # color buttons
         for fileName, buttons in self._view.getColorButtonsMap().items():
             for button in buttons:
