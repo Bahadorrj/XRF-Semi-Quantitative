@@ -15,19 +15,20 @@ from PyQt6.QtWidgets import (
     QMenu,
     QFrame,
     QFileDialog,
-    QApplication
+    QApplication,
+    QDialog
 )
 from pyqtgraph import PlotWidget, ColorButton, mkPen
 
-from src.main.python.Controllers.ElemenetsWindowController import ElementsWindowController
-from src.main.python.Controllers.PeakSearchWindowController import PeakSearchWindowController
-from src.main.python.Logic.FileExtension import FileHandler
-from src.main.python.Models import PeakSearchWindowModel
-from src.main.python.Types.ProjectFileClass import ProjectFile
-from src.main.python.Views import ConditionsWindow
-from src.main.python.Views import ElementsWindow
-from src.main.python.Views import PeakSearchWindow
-from src.main.python.Views.MessegeBox import Dialog
+from python.Controllers.PlotWindowController import PlotWindowController
+from python.Controllers.ElemenetsWindowController import ElementsWindowController
+from python.Controllers.PeakSearchWindowController import PeakSearchWindowController
+from python.Logic.FileExtension import FileHandler
+from python.Models import PeakSearchWindowModel
+from python.Types.ProjectFileClass import ProjectFile
+from python.Views import ConditionsWindow
+from python.Views import ElementsWindow
+from python.Views import PeakSearchWindow
 
 COLORS = ["#FF0000", "#FFD700", "#00FF00", "#00FFFF", "#000080", "#0000FF", "#8B00FF",
           "#FF1493", "#FFC0CB", "#FF4500", "#FFFF00", "#FF00FF", "#00FF7F", "#FF7F00"]
@@ -60,10 +61,20 @@ class MyForm(QTreeWidget):
                     self.itemDeleted.emit(indexOfTopLevel)
                     del item
 
+class LoadingDialog(QDialog):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Loading...")
+        layout = QVBoxLayout()
+        label = QLabel("Initializing, please wait...")
+        layout.addWidget(label)
+        self.setLayout(layout)
+        self.setFixedSize(200, 100)
+
 
 class Window(QMainWindow):
-    def __init__(self, size):
-        super().__init__()
+    def __init__(self, size, parent=None):
+        super().__init__(parent)
         self.setWindowTitle("Plot")
         self.setMinimumWidth(int(0.75 * size.width()))
         self.setMinimumHeight(int(0.75 * size.height()))
@@ -87,44 +98,51 @@ class Window(QMainWindow):
         ElementsWindowController(self.elementsWindow)
         PeakSearchWindowController(self.peakSearchWindow, PeakSearchWindowModel)
 
+        self._screenSize = size
         self._files = list()
         self._colorButtonMap = dict()
 
     def _createActions(self):
         self._actionMap = {}
-        labels = ["open", "close", "save", "peak-search", "conditions", "elements"]
+        labels = ['new', 'open-as-new-project', 'open-append', 'close',
+                  'save-as', 'save', 'peak-search', 'conditions', "elements"]
         for label in labels:
             action = QAction()
-            action.setText(label)
+            action.setText(label.replace("-", " "))
             action.setIcon(QIcon(f":{label}.png"))
             self._actionMap[label] = action
-        self._actionMap["peak-search"].setDisabled(True)
-        self._actionMap["save"].setDisabled(True)
+        self._actionMap['peak-search'].setDisabled(True)
+        self._actionMap['save'].setDisabled(True)
+        self._actionMap['save-as'].setDisabled(True)
 
     def _createMenus(self):
-        self.openMenu = QMenu("&Open")
-        self.openMenu.addAction(self._actionMap['open'])
-        self.recentMenu = QMenu("&Recent Projects")
+        self.openMenu = QMenu('&Open')
+        self.openMenu.addAction(self._actionMap['open-as-new-project'])
+        self.openMenu.addAction(self._actionMap['open-append'])
+        self.recentMenu = QMenu('&Recent Projects')
         self.openMenu.addMenu(self.recentMenu)
 
     def _createMenuBar(self):
         menuBar = self.menuBar()
         # Creating menus using a QMenu object
-        fileMenu = menuBar.addMenu("&File")
+        fileMenu = menuBar.addMenu('&File')
+        fileMenu.addAction(self._actionMap['new'])
         fileMenu.addMenu(self.openMenu)
         fileMenu.addSeparator()
         fileMenu.addAction(self._actionMap['save'])
+        fileMenu.addAction(self._actionMap['save-as'])
         fileMenu.addAction(self._actionMap['close'])
         # editMenu = menuBar.addMenu("&Edit")
         # helpMenu = menuBar.addMenu("&Help")
 
     def _createToolBar(self):
         self.toolBar = QToolBar()
-        self.toolBar.setIconSize(QSize(24, 24))
+        self.toolBar.setIconSize(QSize(16, 16))
         self.toolBar.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextUnderIcon)
         self.toolBar.setMovable(False)
-        self.toolBar.addAction(self._actionMap['open'])
+        self.toolBar.addAction(self._actionMap['open-append'])
         self.toolBar.addAction(self._actionMap['save'])
+        self.toolBar.addAction(self._actionMap['save-as'])
         self.toolBar.addAction(self._actionMap['peak-search'])
         self.toolBar.addAction(self._actionMap['conditions'])
         self.toolBar.addAction(self._actionMap['elements'])
@@ -190,12 +208,9 @@ class Window(QMainWindow):
             mousePoint = self.plotWidget.getPlotItem().vb.mapSceneToView(pos)
             self.setCoordinate(mousePoint)
 
-    def openFileDialog(self, fileFormat):
-        fileDialog = QFileDialog(self)
-        fileDialog.setFileMode(QFileDialog.FileMode.AnyFile)
-        fileDialog.setNameFilter("(*.xdd)")
-        fileDialog.show()
-        return fileDialog
+    def openFileDialog(self):
+        result = QFileDialog.getOpenFileName(self, filter="(*.xdd)")
+        return result
 
     def exportProject(self):
         default_dir = r"F:\CSAN\Master"
@@ -210,53 +225,40 @@ class Window(QMainWindow):
     def addProject(self, path):
         if not self._actionMap["save"].isEnabled():
             self._actionMap["save"].setDisabled(False)
+            self._actionMap["save-as"].setDisabled(False)
         project = ProjectFile(path)
         for f in project.files:
-            fileItem = QTreeWidgetItem()
-            fileItem.setText(0, f.name)
-            fileItem.setCheckState(0, Qt.CheckState.Unchecked)
-            buttons = list()
-            for index, condition in enumerate(f.conditions):
-                conditionItem = QTreeWidgetItem()
-                conditionItem.setText(1, condition.getName())
-                conditionItem.setCheckState(1, Qt.CheckState.Unchecked)
-                fileItem.addChild(conditionItem)
-                self.form.addTopLevelItem(fileItem)
-                colorButton = ColorButton()
-                colorButton.setColor(COLORS[index])
-                self.form.setItemWidget(conditionItem, 2, colorButton)
-                buttons.append(colorButton)
-            self._files.append(f)
-            self._colorButtonMap[f.name] = buttons
+            self.addFile(f)
+
+    def openNewProject(self, path):
+        newWindow = Window(self._screenSize, self)
+        newWindow.addProject(path)
+        newWindow.show()
+        PlotWindowController(newWindow)
+
 
     def addFile(self, file):
-        if not self._actionMap["save"].isEnabled():
-            self._actionMap["save"].setDisabled(False)
         fileItem = QTreeWidgetItem()
         fileItem.setText(0, file.name)
         fileItem.setCheckState(0, Qt.CheckState.Unchecked)
         buttons = list()
-        if file.conditions:
-            for index, condition in enumerate(file.conditions):
-                conditionItem = QTreeWidgetItem()
-                conditionItem.setText(1, condition.getName())
-                conditionItem.setCheckState(1, Qt.CheckState.Unchecked)
-                fileItem.addChild(conditionItem)
-                self.form.addTopLevelItem(fileItem)
-                colorButton = ColorButton()
-                colorButton.setColor(COLORS[index])
-                self.form.setItemWidget(conditionItem, 2, colorButton)
-                buttons.append(colorButton)
-            self._files.append(file)
-            self._colorButtonMap[file.name] = buttons
-        else:
-            messageBox = Dialog(
-                QMessageBox.Icon.Warning,
-                "Warning!",
-                "The selected file is not registered properly!"
-            )
-            messageBox.setStandardButtons(QMessageBox.StandardButton.Ok)
-            messageBox.exec()
+        for index, condition in enumerate(file.conditions):
+            conditionItem = QTreeWidgetItem()
+            conditionItem.setText(1, condition.getName())
+            conditionItem.setCheckState(1, Qt.CheckState.Unchecked)
+            fileItem.addChild(conditionItem)
+            self.form.addTopLevelItem(fileItem)
+            colorButton = ColorButton()
+            colorButton.setColor(COLORS[index])
+            self.form.setItemWidget(conditionItem, 2, colorButton)
+            buttons.append(colorButton)
+        self._files.append(file)
+        self._colorButtonMap[file.name] = buttons
+
+    def resetWindow(self):
+        self._files.clear()
+        self.plotWidget.clear()
+        self.form.clear()
 
     def getColorButtonsMap(self):
         return self._colorButtonMap
@@ -269,6 +271,9 @@ class Window(QMainWindow):
 
     def itemDeleted(self, index):
         self._files.pop(index)
+        if not self._files:
+            self._actionMap["save"].setDisabled(True)
+            self._actionMap["save-as"].setDisabled(True)
 
     def itemChanged(self, item):
         self.form.setCurrentItem(item)
@@ -332,13 +337,13 @@ class Window(QMainWindow):
     def saveProjectTo(self, filePath):
         FileHandler.writeFiles(self._files, filePath)
 
-    def closeEvent(self, event):
-        # Intercept the close event
-        # Check if the close is initiated by the close button
-        if event.spontaneous():
-            # Hide the window instead of closing
-            self.hide()
-            event.ignore()
-        else:
-            # Handle the close event normally
-            event.accept()
+    # def closeEvent(self, event):
+    #     # Intercept the close event
+    #     # Check if the close is initiated by the close button
+    #     if event.spontaneous():
+    #         # Hide the window instead of closing
+    #         self.hide()
+    #         event.ignore()
+    #     else:
+    #         # Handle the close event normally
+    #         event.accept()

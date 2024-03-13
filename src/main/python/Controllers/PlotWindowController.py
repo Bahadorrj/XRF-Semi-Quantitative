@@ -1,3 +1,4 @@
+import threading
 from functools import partial
 
 class PlotWindowController:
@@ -22,12 +23,17 @@ class PlotWindowController:
                 button.sigColorChanged.connect(self._view.plot)
 
     def _connectActionsAndSlots(self, label):
-        if label == "open":
-            fileDialog = self._view.openFileDialog(".txt")
-            fileDialog.fileSelected.connect(self._view.addProject)
-        elif label == "close":
-            self._view.close()
-        elif label == "save":
+        if label == "open-append":
+            path = self._view.openFileDialog()[0]
+            if path:
+                self._view.addProject(path)
+        elif label == "open-as-new-project":
+            path = self._view.openFileDialog()[0]
+            if path:
+                threading.Thread(target=self._view.openNewProject(path)).start()
+        elif label == "new":
+            self._view.resetWindow()
+        elif label == "save-as":
             self._view.exportProject()
         elif label == "conditions":
             self._view.openConditionsWindow()
@@ -35,3 +41,5 @@ class PlotWindowController:
             self._view.openElementsWindow()
         elif label == "peak-search":
             self._view.openPeakSearchWindow()
+        elif label == "close-project":
+            self._view.close()
