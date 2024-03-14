@@ -15,11 +15,11 @@ from multipledispatch import dispatch
 from numpy import zeros, arange, logical_and, uint32, uint16
 from pyqtgraph import mkPen, GraphicsLayoutWidget, LinearRegionItem, InfiniteLine
 
-from src.main.python.Logic import Calculation
-from src.main.python.Logic.Sqlite import DatabaseConnection, getDatabaseDataframe, getValues
-from src.main.python.Types.ElementClass import Element
-from src.main.python.Views.MessegeBox import Dialog
-from src.main.python.Views.TableWidget import Form
+from python.Logic import Calculation
+from python.Logic.Sqlite import DatabaseConnection, getDatabaseDataframe, getValues
+from python.Types.ElementClass import Element
+from python.Views.MessegeBox import Dialog
+from python.Views.TableWidget import Form
 
 import qrcResources
 

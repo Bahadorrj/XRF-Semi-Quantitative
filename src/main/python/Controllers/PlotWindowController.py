@@ -24,11 +24,11 @@ class PlotWindowController:
 
     def _connectActionsAndSlots(self, label):
         if label == "open-append":
-            path = self._view.openFileDialog()[0]
+            path = self._view.openFileDialog()
             if path:
                 self._view.addProject(path)
         elif label == "open-as-new-project":
-            path = self._view.openFileDialog()[0]
+            path = self._view.openFileDialog()
             if path:
                 threading.Thread(target=self._view.openNewProject(path)).start()
         elif label == "new":

@@ -1,6 +1,6 @@
 import numpy as np
 from PyQt6.QtCore import QSize, Qt, pyqtSignal
-from PyQt6.QtGui import QAction, QIcon
+from PyQt6.QtGui import QAction, QIcon, QAbstractFileIconProvider
 from PyQt6.QtWidgets import (
     QMainWindow,
     QVBoxLayout,
@@ -16,7 +16,8 @@ from PyQt6.QtWidgets import (
     QFrame,
     QFileDialog,
     QApplication,
-    QDialog
+    QDialog,
+    QFileIconProvider
 )
 from pyqtgraph import PlotWidget, ColorButton, mkPen
 
@@ -61,6 +62,7 @@ class MyForm(QTreeWidget):
                     self.itemDeleted.emit(indexOfTopLevel)
                     del item
 
+
 class LoadingDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -70,6 +72,17 @@ class LoadingDialog(QDialog):
         layout.addWidget(label)
         self.setLayout(layout)
         self.setFixedSize(200, 100)
+
+class CustomIconProvider(QFileIconProvider):
+    def __init__(self, icon_path):
+        super().__init__()
+        self.icon = QIcon(icon_path)
+
+    def icon(self, fileInfo):
+        if fileInfo.suffix().lower() == "xdd":
+            return self.icon
+        else:
+            return super().icon(fileInfo)
 
 
 class Window(QMainWindow):
@@ -209,8 +222,19 @@ class Window(QMainWindow):
             self.setCoordinate(mousePoint)
 
     def openFileDialog(self):
-        result = QFileDialog.getOpenFileName(self, filter="(*.xdd)")
-        return result
+        fileDialog = QFileDialog(self)
+        # Set file mode to existing file
+        fileDialog.setFileMode(QFileDialog.FileMode.AnyFile)
+
+        # Set custom file filter to only allow files with .xdd extension
+        fileDialog.setNameFilter("XDD files (*.xdd)")
+        # Set custom icon for files with .xdd extension
+        iconProvider = CustomIconProvider(r"F:\CSAN\Master\src\main\icons\document.png")
+
+        fileDialog.setIconProvider(iconProvider)
+        result = fileDialog.exec()
+
+        return fileDialog.selectedFiles()[0] if result else None
 
     def exportProject(self):
         default_dir = r"F:\CSAN\Master"
@@ -235,7 +259,6 @@ class Window(QMainWindow):
         newWindow.addProject(path)
         newWindow.show()
         PlotWindowController(newWindow)
-
 
     def addFile(self, file):
         fileItem = QTreeWidgetItem()

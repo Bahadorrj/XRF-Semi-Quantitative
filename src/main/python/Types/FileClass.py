@@ -3,8 +3,8 @@ from pathlib import Path
 
 from numpy import zeros, uint32
 
-from src.main.python.Logic.Sqlite import DatabaseConnection, getValue
-from src.main.python.Types.ConditionClass import Condition
+from python.Logic.Sqlite import DatabaseConnection, getValue
+from python.Types.ConditionClass import Condition
 
 import qrcResources
 

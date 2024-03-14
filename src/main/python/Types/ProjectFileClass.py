@@ -1,6 +1,6 @@
 from dataclasses import dataclass, field
-from src.main.python.Types.FileClass import File
-from src.main.python.Logic.FileExtension import FileHandler
+from python.Types.FileClass import File
+from python.Logic.FileExtension import FileHandler
 
 @dataclass
 class ProjectFile:

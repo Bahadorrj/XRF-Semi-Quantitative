@@ -1,4 +1,4 @@
-from src.main.python.Logic.Sqlite import DatabaseConnection
+from python.Logic.Sqlite import DatabaseConnection
 import qrcResources
 
 def writeElementToTable(elements, conditionID):

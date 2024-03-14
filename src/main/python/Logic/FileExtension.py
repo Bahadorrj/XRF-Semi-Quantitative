@@ -1,8 +1,8 @@
 from json import dump, load
 from numpy import array, uint32
 
-from src.main.python.Types.FileClass import File
-from src.main.python.Types.ConditionClass import Condition
+from python.Types.FileClass import File
+from python.Types.ConditionClass import Condition
 
 
 class FileHandler:

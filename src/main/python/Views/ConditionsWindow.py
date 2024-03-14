@@ -5,8 +5,8 @@ from PyQt6.QtWidgets import (
     QTableWidgetItem
 )
 
-from src.main.python.Logic.Sqlite import getDatabaseDataframe, DatabaseConnection
-from src.main.python.Views.TableWidget import Form
+from python.Logic.Sqlite import getDatabaseDataframe, DatabaseConnection
+from python.Views.TableWidget import Form
 
 import qrcResources
 

@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 
-from src.main.python.Logic.Sqlite import getColumnLabels, getValue, DatabaseConnection
-from src.main.python.Types.DataClass import Data
+from python.Logic.Sqlite import getColumnLabels, getValue, DatabaseConnection
+from python.Types.DataClass import Data
 
 import qrcResources
 

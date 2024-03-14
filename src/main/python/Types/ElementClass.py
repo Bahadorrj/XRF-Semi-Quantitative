@@ -3,9 +3,9 @@ from dataclasses import dataclass, field
 from numpy import uint32
 from pyqtgraph import InfiniteLine, InfLineLabel, mkPen, LinearRegionItem
 
-from src.main.python.Logic import Calculation
-from src.main.python.Logic.Sqlite import getColumnLabels, getValue, DatabaseConnection
-from src.main.python.Types.DataClass import Data
+from python.Logic import Calculation
+from python.Logic.Sqlite import getColumnLabels, getValue, DatabaseConnection
+from python.Types.DataClass import Data
 
 import qrcResources
 
