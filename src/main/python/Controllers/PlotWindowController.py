@@ -41,5 +41,5 @@ class PlotWindowController:
             self._view.openElementsWindow()
         elif label == "peak-search":
             self._view.openPeakSearchWindow()
-        elif label == "close-project":
+        elif label == "close":
             self._view.close()

@@ -1,6 +1,6 @@
 import numpy as np
 from PyQt6.QtCore import QSize, Qt, pyqtSignal
-from PyQt6.QtGui import QAction, QIcon, QAbstractFileIconProvider
+from PyQt6.QtGui import QAction, QIcon
 from PyQt6.QtWidgets import (
     QMainWindow,
     QVBoxLayout,
@@ -9,7 +9,6 @@ from PyQt6.QtWidgets import (
     QLabel,
     QStatusBar,
     QToolBar,
-    QMessageBox,
     QTreeWidget,
     QTreeWidgetItem,
     QMenu,
@@ -73,16 +72,11 @@ class LoadingDialog(QDialog):
         self.setLayout(layout)
         self.setFixedSize(200, 100)
 
-class CustomIconProvider(QFileIconProvider):
-    def __init__(self, icon_path):
-        super().__init__()
-        self.icon = QIcon(icon_path)
-
+class CustomFileIconProvider(QFileIconProvider):
     def icon(self, fileInfo):
-        if fileInfo.suffix().lower() == "xdd":
-            return self.icon
-        else:
-            return super().icon(fileInfo)
+        if fileInfo != QFileIconProvider.IconType.Computer and fileInfo.filePath().endswith(".xdd"):
+            return QIcon(":CSAN.ico")
+        return super().icon(fileInfo)
 
 
 class Window(QMainWindow):
@@ -225,13 +219,14 @@ class Window(QMainWindow):
         fileDialog = QFileDialog(self)
         # Set file mode to existing file
         fileDialog.setFileMode(QFileDialog.FileMode.AnyFile)
-
+        # Set default directory
+        fileDialog.setDirectory("/Additional/xdd")
         # Set custom file filter to only allow files with .xdd extension
         fileDialog.setNameFilter("XDD files (*.xdd)")
         # Set custom icon for files with .xdd extension
-        iconProvider = CustomIconProvider(r"F:\CSAN\Master\src\main\icons\document.png")
+        fileDialog.setOption(QFileDialog.Option.DontUseNativeDialog, True)  # This ensures the custom icon works
+        fileDialog.setIconProvider(CustomFileIconProvider())
 
-        fileDialog.setIconProvider(iconProvider)
         result = fileDialog.exec()
 
         return fileDialog.selectedFiles()[0] if result else None
