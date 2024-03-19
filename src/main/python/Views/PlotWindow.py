@@ -1,5 +1,5 @@
 import numpy as np
-from PyQt6.QtCore import QSize, Qt, pyqtSignal
+from PyQt6.QtCore import QSize, Qt
 from PyQt6.QtGui import QAction, QIcon
 from PyQt6.QtWidgets import (
     QMainWindow,
@@ -9,13 +9,11 @@ from PyQt6.QtWidgets import (
     QLabel,
     QStatusBar,
     QToolBar,
-    QTreeWidget,
     QTreeWidgetItem,
     QMenu,
     QFrame,
     QFileDialog,
     QApplication,
-    QDialog,
     QFileIconProvider
 )
 from pyqtgraph import PlotWidget, ColorButton, mkPen
@@ -29,48 +27,11 @@ from python.Types.ProjectFileClass import ProjectFile
 from python.Views import ConditionsWindow
 from python.Views import ElementsWindow
 from python.Views import PeakSearchWindow
+from python.Views.Widgets import Tree
 
 COLORS = ["#FF0000", "#FFD700", "#00FF00", "#00FFFF", "#000080", "#0000FF", "#8B00FF",
           "#FF1493", "#FFC0CB", "#FF4500", "#FFFF00", "#FF00FF", "#00FF7F", "#FF7F00"]
 PX_COUNT = 2048
-
-
-class MyForm(QTreeWidget):
-    itemDeleted = pyqtSignal(int)
-
-    def contextMenuEvent(self, event):
-        indexOfTopLevel = self.indexOfTopLevelItem(self.itemAt(event.pos()))
-        if indexOfTopLevel != -1:
-            contextMenu = QMenu(self)
-            actionEdit = QAction("Edit", self)
-            actionDelete = QAction("Delete", self)
-
-            contextMenu.addAction(actionEdit)
-            contextMenu.addAction(actionDelete)
-
-            action = contextMenu.exec(self.mapToGlobal(event.pos()))
-            if action == actionEdit:
-                item = self.itemAt(event.pos())
-                if item and item.parent() is None:  # Check if it's a top-level item
-                    item.setFlags(item.flags() | Qt.ItemFlag.ItemIsEditable)
-                    self.editItem(item)
-            elif action == actionDelete:
-                item = self.itemAt(event.pos())
-                if item and item.parent() is None:  # Check if it's a top-level item
-                    self.takeTopLevelItem(self.indexOfTopLevelItem(item))
-                    self.itemDeleted.emit(indexOfTopLevel)
-                    del item
-
-
-class LoadingDialog(QDialog):
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self.setWindowTitle("Loading...")
-        layout = QVBoxLayout()
-        label = QLabel("Initializing, please wait...")
-        layout.addWidget(label)
-        self.setLayout(layout)
-        self.setFixedSize(200, 100)
 
 class CustomFileIconProvider(QFileIconProvider):
     def icon(self, fileInfo):
@@ -180,7 +141,7 @@ class Window(QMainWindow):
         self.plotWidget.setFrameShadow(QFrame.Shadow.Plain)
 
     def _createForm(self):
-        self.form = MyForm()
+        self.form = Tree()
         self.form.setColumnCount(3)
         self.form.setHeaderLabels(["File", "Condition", "Color"])
         self.form.setFrameShape(QFrame.Shape.Box)

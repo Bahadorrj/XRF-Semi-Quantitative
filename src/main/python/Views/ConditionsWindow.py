@@ -6,7 +6,7 @@ from PyQt6.QtWidgets import (
 )
 
 from python.Logic.Sqlite import getDatabaseDataframe, DatabaseConnection
-from python.Views.TableWidget import Form
+from python.Views.Widgets import Table
 
 import qrcResources
 
@@ -28,7 +28,7 @@ class Window(QWidget):
             "Mask",
             "Active",
         ]
-        self.form = Form(headerLabels)
+        self.form = Table(headerLabels)
         database = DatabaseConnection.getInstance(":fundamentals.db")
         self._conditionsDf = getDatabaseDataframe(database, "conditions")
         self._setupUI()

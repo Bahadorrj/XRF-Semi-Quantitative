@@ -1,8 +1,10 @@
 from PyQt6.QtCore import Qt
-from PyQt6.QtWidgets import QTableWidget, QFrame, QHeaderView
+from PyQt6.QtWidgets import QTableWidget, QFrame, QHeaderView, QTreeWidget,QMenu
+from PyQt6.QtGui import QAction
+from PyQt6.QtCore import pyqtSignal
 
 
-class Form(QTableWidget):
+class Table(QTableWidget):
     def __init__(self, headers):
         super().__init__()
         self.setFrameShape(QFrame.Shape.Box)
@@ -119,3 +121,29 @@ class Form(QTableWidget):
         for row in range(self.rowCount()):
             self.removeRow(0)
         super().clear()
+
+class Tree(QTreeWidget):
+    itemDeleted = pyqtSignal(int)
+
+    def contextMenuEvent(self, event):
+        indexOfTopLevel = self.indexOfTopLevelItem(self.itemAt(event.pos()))
+        if indexOfTopLevel != -1:
+            contextMenu = QMenu(self)
+            actionEdit = QAction("Edit", self)
+            actionDelete = QAction("Delete", self)
+
+            contextMenu.addAction(actionEdit)
+            contextMenu.addAction(actionDelete)
+
+            action = contextMenu.exec(self.mapToGlobal(event.pos()))
+            if action == actionEdit:
+                item = self.itemAt(event.pos())
+                if item and item.parent() is None:  # Check if it's a top-level item
+                    item.setFlags(item.flags() | Qt.ItemFlag.ItemIsEditable)
+                    self.editItem(item)
+            elif action == actionDelete:
+                item = self.itemAt(event.pos())
+                if item and item.parent() is None:  # Check if it's a top-level item
+                    self.takeTopLevelItem(self.indexOfTopLevelItem(item))
+                    self.itemDeleted.emit(indexOfTopLevel)
+                    del item

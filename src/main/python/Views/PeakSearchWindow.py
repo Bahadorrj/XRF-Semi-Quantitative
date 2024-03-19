@@ -19,7 +19,7 @@ from python.Logic import Calculation
 from python.Logic.Sqlite import DatabaseConnection, getDatabaseDataframe, getValues
 from python.Types.ElementClass import Element
 from python.Views.MessegeBox import Dialog
-from python.Views.TableWidget import Form
+from python.Views.Widgets import Table
 
 import qrcResources
 
@@ -72,7 +72,7 @@ class Window(QMainWindow):
             "Status",
             "Activate Widget"
         ]
-        self.form = Form(headers)
+        self.form = Table(headers)
         self.form.setMaximumHeight(int(self.size().height() * 0.3))
 
     def _createGraph(self):
