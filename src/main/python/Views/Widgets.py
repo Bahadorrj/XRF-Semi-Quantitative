@@ -125,6 +125,9 @@ class Table(QTableWidget):
 class Tree(QTreeWidget):
     itemDeleted = pyqtSignal(int)
 
+    def __init__(self):
+        super().__init__()
+
     def contextMenuEvent(self, event):
         indexOfTopLevel = self.indexOfTopLevelItem(self.itemAt(event.pos()))
         if indexOfTopLevel != -1:
@@ -147,3 +150,8 @@ class Tree(QTreeWidget):
                     self.takeTopLevelItem(self.indexOfTopLevelItem(item))
                     self.itemDeleted.emit(indexOfTopLevel)
                     del item
+
+    def isItemTopLevel(self, item):
+        if self.indexOfTopLevelItem(item) != -1:
+            return True
+        return False

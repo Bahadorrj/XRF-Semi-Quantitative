@@ -140,6 +140,7 @@ class Window(QMainWindow):
         self.spectrumRegion.setBounds((0, max(self._px)))
         self.peakPlot.setXRange(0, 100, padding=0)
         self.windowOpened.emit()
+        self.show()
 
     def _addElementToForm(self, element):
         removeButton = QPushButton(icon=QIcon(":cross.png"))

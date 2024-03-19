@@ -1,4 +1,5 @@
-import numpy as np
+from numpy import arange
+from pathlib import Path
 from PyQt6.QtCore import QSize, Qt
 from PyQt6.QtGui import QAction, QIcon
 from PyQt6.QtWidgets import (
@@ -67,8 +68,7 @@ class Window(QMainWindow):
         PeakSearchWindowController(self.peakSearchWindow, PeakSearchWindowModel)
 
         self._screenSize = size
-        self._files = list()
-        self._colorButtonMap = dict()
+        self._projects = list()
 
     def _createActions(self):
         self._actionMap = {}
@@ -97,7 +97,7 @@ class Window(QMainWindow):
         fileMenu.addAction(self._actionMap['new'])
         fileMenu.addMenu(self.openMenu)
         fileMenu.addSeparator()
-        fileMenu.addAction(self._actionMap['save'])
+        # fileMenu.addAction(self._actionMap['save'])
         fileMenu.addAction(self._actionMap['save-as'])
         fileMenu.addAction(self._actionMap['close'])
         # editMenu = menuBar.addMenu("&Edit")
@@ -109,7 +109,7 @@ class Window(QMainWindow):
         self.toolBar.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextUnderIcon)
         self.toolBar.setMovable(False)
         self.toolBar.addAction(self._actionMap['open-append'])
-        self.toolBar.addAction(self._actionMap['save'])
+        # self.toolBar.addAction(self._actionMap['save'])
         self.toolBar.addAction(self._actionMap['save-as'])
         self.toolBar.addAction(self._actionMap['peak-search'])
         self.toolBar.addAction(self._actionMap['conditions'])
@@ -194,21 +194,26 @@ class Window(QMainWindow):
 
     def exportProject(self):
         default_dir = r"F:\CSAN\Master"
-        filePath, _ = QFileDialog.getSaveFileName(
+        projectPath, _ = QFileDialog.getSaveFileName(
             self, "Save project", default_dir, filter="*.xdd"
         )
-        if filePath:
+        if projectPath:
             for index in range(self.form.topLevelItemCount()):
-                self._files[index].name = self.form.topLevelItem(index).text(0)
-            self.saveProjectTo(filePath)
+                self._projects[index].name = self.form.topLevelItem(index).text(0)
+            self.saveProjectTo(projectPath)
 
     def addProject(self, path):
         if not self._actionMap["save"].isEnabled():
             self._actionMap["save"].setDisabled(False)
             self._actionMap["save-as"].setDisabled(False)
         project = ProjectFile(path)
-        for f in project.files:
-            self.addFile(f)
+        projectItem = QTreeWidgetItem()
+        projectItem.setText(0, Path(project.path).stem)
+        for file in project.files:
+            fileItem, buttons = self.addFile(file)
+            projectItem.addChild(fileItem)
+        self._projects.append(project)
+        self.form.addTopLevelItem(projectItem)
 
     def openNewProject(self, path):
         newWindow = Window(self._screenSize, self)
@@ -216,7 +221,7 @@ class Window(QMainWindow):
         newWindow.show()
         PlotWindowController(newWindow)
 
-    def addFile(self, file):
+    def addFile(self, file) -> tuple:
         fileItem = QTreeWidgetItem()
         fileItem.setText(0, file.name)
         fileItem.setCheckState(0, Qt.CheckState.Unchecked)
@@ -226,77 +231,79 @@ class Window(QMainWindow):
             conditionItem.setText(1, condition.getName())
             conditionItem.setCheckState(1, Qt.CheckState.Unchecked)
             fileItem.addChild(conditionItem)
-            self.form.addTopLevelItem(fileItem)
             colorButton = ColorButton()
             colorButton.setColor(COLORS[index])
             self.form.setItemWidget(conditionItem, 2, colorButton)
             buttons.append(colorButton)
-        self._files.append(file)
-        self._colorButtonMap[file.name] = buttons
+            colorButton.sigColorChanged.connect(self.plot)
+
+        return fileItem, buttons
 
     def resetWindow(self):
-        self._files.clear()
+        self._projects.clear()
         self.plotWidget.clear()
         self.form.clear()
 
-    def getColorButtonsMap(self):
-        return self._colorButtonMap
-
     def itemClicked(self, item):
-        if self.form.indexOfTopLevelItem(item) == -1:
+        if item.childCount() == 0:
             self._actionMap.get("peak-search").setDisabled(False)
         else:
             self._actionMap.get("peak-search").setDisabled(True)
 
     def itemDeleted(self, index):
-        self._files.pop(index)
-        if not self._files:
+        self._projects.pop(index)
+        if not self._projects:
             self._actionMap["save"].setDisabled(True)
             self._actionMap["save-as"].setDisabled(True)
 
-    def itemChanged(self, item):
-        self.form.setCurrentItem(item)
-        self.form.blockSignals(True)
-        topLevelIndex = self.form.indexOfTopLevelItem(item)
-        if topLevelIndex != -1:
-            if item.checkState(0) == Qt.CheckState.Unchecked:
-                for child_index in range(self.form.topLevelItem(topLevelIndex).childCount()):
-                    item.child(child_index).setCheckState(1, Qt.CheckState.Unchecked)
-            elif item.checkState(0) == Qt.CheckState.Checked:
-                for child_index in range(self.form.topLevelItem(topLevelIndex).childCount()):
-                    item.child(child_index).setCheckState(1, Qt.CheckState.Checked)
-        else:
-            top_level = item.parent()
-            flag = False
-            for i in range(top_level.childCount()):
-                if top_level.child(i).checkState(1) == Qt.CheckState.Unchecked:
-                    top_level.setCheckState(0, Qt.CheckState.Unchecked)
-                    flag = True
-                    break
-            if not flag:
-                top_level.setCheckState(0, Qt.CheckState.Checked)
-        self.form.blockSignals(False)
-        self.plot()
+    def itemChanged(self, item: QTreeWidgetItem):
+        if self.form.indexOfTopLevelItem(item) == -1:
+            self.form.setCurrentItem(item)
+            self.form.blockSignals(True)
+            if item.childCount() != 0:
+                if item.checkState(0) == Qt.CheckState.Unchecked:
+                    for childIndex in range(item.childCount()):
+                        item.child(childIndex).setCheckState(1, Qt.CheckState.Unchecked)
+                elif item.checkState(0) == Qt.CheckState.Checked:
+                    for childIndex in range(item.childCount()):
+                        item.child(childIndex).setCheckState(1, Qt.CheckState.Checked)
+            else:
+                fileItem = item.parent()
+                flag = False
+                for i in range(fileItem.childCount()):
+                    if fileItem.child(i).checkState(1) == Qt.CheckState.Unchecked:
+                        fileItem.setCheckState(0, Qt.CheckState.Unchecked)
+                        flag = True
+                        break
+                if not flag:
+                    fileItem.setCheckState(0, Qt.CheckState.Checked)
+            self.form.blockSignals(False)
+            self.plot()
 
     def plot(self):
         self.plotWidget.clear()
         self.setLimits()
-        for top_level_index in range(self.form.topLevelItemCount()):
-            top_level_item = self.form.topLevelItem(top_level_index)
-            f = self._files[top_level_index]
-            for child_index in range(top_level_item.childCount()):
-                if top_level_item.child(child_index).checkState(1) == Qt.CheckState.Checked:
-                    counts = f.counts[child_index]
-                    px = np.arange(0, len(counts), 1)
-                    color = self._colorButtonMap.get(f.name)[child_index].color()
-                    self.plotWidget.plot(x=px, y=counts, pen=mkPen(color=color, width=3))
+        for projectIndex in range(self.form.topLevelItemCount()):
+            projectItem = self.form.topLevelItem(projectIndex)
+            project = self._projects[projectIndex]
+            for fileIndex in range(projectItem.childCount()):
+                fileItem = projectItem.child(fileIndex)
+                file = project.files[fileIndex]
+                for conditionIndex in range(fileItem.childCount()):
+                    conditionItem = fileItem.child(conditionIndex)
+                    if conditionItem.checkState(1) == Qt.CheckState.Checked:
+                        counts = file.counts[conditionIndex]
+                        px = arange(0, len(counts), 1)
+                        color = self.form.itemWidget(conditionItem, 2).color()
+                        self.plotWidget.plot(x=px, y=counts, pen=mkPen(color=color, width=3))
 
     def setLimits(self):
         y = 0
-        for file in self._files:
-            for counts in file.counts:
-                if y < max(counts):
-                    y = max(counts)
+        for project in self._projects:
+            for file in project.files:
+                for counts in file.counts:
+                    if y < max(counts):
+                        y = max(counts)
         self.plotWidget.setLimits(xMin=0, xMax=PX_COUNT, yMin=0, yMax=1.1 * y)
 
     def openConditionsWindow(self):
@@ -306,15 +313,21 @@ class Window(QMainWindow):
         self.elementsWindow.show()
 
     def openPeakSearchWindow(self):
-        topLevelIndex = self.form.indexOfTopLevelItem(self.form.currentItem().parent())
-        childIndex = self.form.currentIndex().row()
-        if topLevelIndex != -1:
-            file = self._files[topLevelIndex]
-            self.peakSearchWindow.init(file.counts[childIndex], file.conditions[childIndex])
-            self.peakSearchWindow.showMaximized()
+        if self.form.currentItem().childCount() == 0:
+            conditionItem = self.form.currentItem()
+            fileItem = conditionItem.parent()
+            projectItem = fileItem.parent()
+            projectIndex = self.form.indexOfTopLevelItem(projectItem)
+            fileIndex = projectItem.indexOfChild(fileItem)
+            conditionIndex = fileItem.indexOfChild(conditionItem)
+            file = self._projects[projectIndex].files[fileIndex]
+            self.peakSearchWindow.init(
+                file.counts[conditionIndex],
+                file.conditions[conditionIndex]
+            )
 
-    def saveProjectTo(self, filePath):
-        FileHandler.writeFiles(self._files, filePath)
+    def saveProjectTo(self, projectPath):
+        FileHandler.writeFiles(self._projects, projectPath)
 
     # def closeEvent(self, event):
     #     # Intercept the close event

@@ -17,10 +17,11 @@ class PlotWindowController:
         self._view.form.itemChanged.connect(self._view.itemChanged)
         self._view.form.itemDoubleClicked.connect(self._view.openPeakSearchWindow)
         self._view.form.itemDeleted.connect(self._view.itemDeleted)
-        # color buttons
-        for fileName, buttons in self._view.getColorButtonsMap().items():
-            for button in buttons:
-                button.sigColorChanged.connect(self._view.plot)
+        # # color buttons
+        # for dictionary in self._view.getColorButtonsMap():
+        #     for fileName, buttons in dictionary.items():
+        #         for button in buttons:
+        #             button.sigColorChanged.connect(self._view.plot)
 
     def _connectActionsAndSlots(self, label):
         if label == "open-append":
