@@ -7,18 +7,19 @@ from python.Types.ConditionClass import Condition
 
 class FileHandler:
     @staticmethod
-    def writeFiles(files, filePath):
+    def writeFiles(projects, filePath):
         # Serialize each LocalFile object to a dictionary
         filesDictList = []
-        for file in files:
-            countsSerializable = [countArray.tolist() for countArray in file.counts]
-            idsSerializable = [condition.id for condition in file.conditions]
-            localFileDict = {
-                "name": file.name,
-                "ids": idsSerializable,
-                "counts": countsSerializable
-            }
-            filesDictList.append(localFileDict)
+        for project in projects:
+            for file in project.files:
+                countsSerializable = [countArray.tolist() for countArray in file.counts]
+                idsSerializable = [condition.id for condition in file.conditions]
+                localFileDict = {
+                    "name": file.name,
+                    "ids": idsSerializable,
+                    "counts": countsSerializable
+                }
+                filesDictList.append(localFileDict)
 
         # Write serialized data to a file
         with open(filePath, 'w') as f:

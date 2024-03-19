@@ -193,9 +193,9 @@ class Window(QMainWindow):
         return fileDialog.selectedFiles()[0] if result else None
 
     def exportProject(self):
-        default_dir = r"F:\CSAN\Master"
+        defaultDir = r"F:\CSAN\Master"
         projectPath, _ = QFileDialog.getSaveFileName(
-            self, "Save project", default_dir, filter="*.xdd"
+            self, "Save project", defaultDir, filter="*.xdd", options=QFileDialog.Option.DontUseNativeDialog
         )
         if projectPath:
             for index in range(self.form.topLevelItemCount()):
@@ -210,7 +210,7 @@ class Window(QMainWindow):
         projectItem = QTreeWidgetItem()
         projectItem.setText(0, Path(project.path).stem)
         for file in project.files:
-            fileItem, buttons = self.addFile(file)
+            fileItem = self.addFile(file)
             projectItem.addChild(fileItem)
         self._projects.append(project)
         self.form.addTopLevelItem(projectItem)
@@ -221,11 +221,10 @@ class Window(QMainWindow):
         newWindow.show()
         PlotWindowController(newWindow)
 
-    def addFile(self, file) -> tuple:
+    def addFile(self, file) -> QTreeWidgetItem:
         fileItem = QTreeWidgetItem()
         fileItem.setText(0, file.name)
         fileItem.setCheckState(0, Qt.CheckState.Unchecked)
-        buttons = list()
         for index, condition in enumerate(file.conditions):
             conditionItem = QTreeWidgetItem()
             conditionItem.setText(1, condition.getName())
@@ -234,10 +233,9 @@ class Window(QMainWindow):
             colorButton = ColorButton()
             colorButton.setColor(COLORS[index])
             self.form.setItemWidget(conditionItem, 2, colorButton)
-            buttons.append(colorButton)
             colorButton.sigColorChanged.connect(self.plot)
 
-        return fileItem, buttons
+        return fileItem
 
     def resetWindow(self):
         self._projects.clear()
