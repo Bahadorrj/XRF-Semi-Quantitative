@@ -1,3 +1,5 @@
+import threading
+
 from numpy import arange
 from pathlib import Path
 from PyQt6.QtCore import QSize, Qt
@@ -193,10 +195,18 @@ class Window(QMainWindow):
         return fileDialog.selectedFiles()[0] if result else None
 
     def exportProject(self):
-        defaultDir = r"F:\CSAN\Master"
-        projectPath, _ = QFileDialog.getSaveFileName(
-            self, "Save project", defaultDir, filter="*.xdd", options=QFileDialog.Option.DontUseNativeDialog
-        )
+        fileDialog = QFileDialog(self)
+        # Set file mode to existing file
+        fileDialog.setFileMode(QFileDialog.FileMode.AnyFile)
+        # Set default directory
+        fileDialog.setDirectory("/Additional/xdd")
+        # Set custom file filter to only allow files with .xdd extension
+        fileDialog.setNameFilter("XDD files (*.xdd)")
+        # Set custom icon for files with .xdd extension
+        fileDialog.setOption(QFileDialog.Option.DontUseNativeDialog, True)  # This ensures the custom icon works
+        fileDialog.setIconProvider(CustomFileIconProvider())
+        fileDialog.setAcceptMode(QFileDialog.AcceptMode.AcceptSave)
+        projectPath = fileDialog.exec()
         if projectPath:
             for index in range(self.form.topLevelItemCount()):
                 self._projects[index].name = self.form.topLevelItem(index).text(0)
@@ -276,7 +286,7 @@ class Window(QMainWindow):
                 if not flag:
                     fileItem.setCheckState(0, Qt.CheckState.Checked)
             self.form.blockSignals(False)
-            self.plot()
+            threading.Thread(self.plot()).start()
 
     def plot(self):
         self.plotWidget.clear()
