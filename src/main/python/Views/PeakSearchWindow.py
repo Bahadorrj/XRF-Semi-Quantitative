@@ -21,8 +21,6 @@ from python.Types.ElementClass import Element
 from python.Views.MessegeBox import Dialog
 from python.Views.Widgets import Table
 
-import qrcResources
-
 
 class Window(QMainWindow):
     elementAdded = pyqtSignal(Element)
@@ -140,7 +138,7 @@ class Window(QMainWindow):
         self.spectrumRegion.setBounds((0, max(self._px)))
         self.peakPlot.setXRange(0, 100, padding=0)
         self.windowOpened.emit()
-        self.show()
+        self.showMaximized()
 
     def _addElementToForm(self, element):
         removeButton = QPushButton(icon=QIcon(":cross.png"))

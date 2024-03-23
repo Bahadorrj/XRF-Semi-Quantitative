@@ -1,5 +1,4 @@
 import logging
-import socket
 import sys
 import threading
 
@@ -13,8 +12,6 @@ from src.main.python.Logic.Sqlite import DatabaseConnection, getValue
 from src.main.python.Types.ConditionClass import Condition
 from src.main.python.Types.FileClass import File
 from src.main.python.Views.PlotWindow import Window
-
-import qrcResources
 
 HOST = "0.0.0.0"
 PORT = 16000
@@ -132,5 +129,5 @@ def main():
     #     clientHandler = ClientHandler(conn, guiHandler)
     #     clientThread = threading.Thread(target=clientHandler.handleClient)
     #     clientThread.start()
-    mainWindow.show()
+    mainWindow.showMaximized()
     sys.exit(app.exec())
