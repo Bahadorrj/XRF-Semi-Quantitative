@@ -5,7 +5,7 @@ import threading
 
 from PyQt6.QtCore import pyqtSignal, QObject
 from PyQt6.QtGui import QIcon
-from PyQt6.QtWidgets import QApplication
+from PyQt6.QtWidgets import QApplication, QMainWindow
 from numpy import ndarray, uint32
 
 from src.main.python.Controllers.PlotWindowController import PlotWindowController
@@ -13,11 +13,6 @@ from src.main.python.Logic.Sqlite import DatabaseConnection, getValue
 from src.main.python.Types.ConditionClass import Condition
 from src.main.python.Types.FileClass import File
 from src.main.python.Views.PlotWindow import Window
-
-import qrcResources
-
-HOST = "0.0.0.0"
-PORT = 16000
 
 
 class GuiHandler(QObject):
@@ -92,7 +87,9 @@ class ClientHandler(QObject):
                 elif command == "-cls":
                     self.guiHandler.closeGuiSignal.emit()
                 elif command == "-chk":
-                    self.conn.sendall(b"Server is running")
+                    massage = f"Server is running on {self.conn.getsockname()}"
+                    logging.info(massage)
+                    self.conn.sendall(massage.encode("utf-8"))
                 elif command == "-als":
                     with self.dataLock:
                         data = ""
@@ -115,6 +112,19 @@ class ClientHandler(QObject):
             self.conn.close()  # Ensure connection is closed
 
 
+def connectServerAndGUI(host, port, mainWindow: QMainWindow):
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.bind((host, port))
+        s.listen(1)
+        logging.info(f"Server listening on {host}:{port}")
+        conn, addr = s.accept()
+        logging.info(f"Connected to {addr}")
+        guiHandler = GuiHandler(mainWindow)
+        clientHandler = ClientHandler(conn, guiHandler)
+        clientThread = threading.Thread(target=clientHandler.handleClient)
+        clientThread.start()
+
+
 def main():
     logging.basicConfig(level=logging.DEBUG)
     app = QApplication(sys.argv)
@@ -122,15 +132,6 @@ def main():
     size = app.primaryScreen().size()
     mainWindow = Window(size)
     PlotWindowController(mainWindow)
-    # with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-    #     s.bind((HOST, PORT))
-    #     s.listen(1)
-    #     logging.info(f"Server listening on {HOST}:{PORT}")
-    #     conn, addr = s.accept()
-    #     logging.info(f"Connected to {addr}")
-    #     guiHandler = GuiHandler(mainWindow)
-    #     clientHandler = ClientHandler(conn, guiHandler)
-    #     clientThread = threading.Thread(target=clientHandler.handleClient)
-    #     clientThread.start()
+    # connectServerAndGUI('127.0.0.1', 16000, mainWindow)
     mainWindow.show()
     sys.exit(app.exec())
