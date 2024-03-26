@@ -2,17 +2,19 @@ import logging
 import socket
 import sys
 import threading
+import unittest
 
 from PyQt6.QtCore import pyqtSignal, QObject
 from PyQt6.QtGui import QIcon
 from PyQt6.QtWidgets import QApplication, QMainWindow
 from numpy import ndarray, uint32
 
-from src.main.python.Controllers.PlotWindowController import PlotWindowController
-from src.main.python.Logic.Sqlite import DatabaseConnection, getValue
-from src.main.python.Types.ConditionClass import Condition
-from src.main.python.Types.FileClass import File
-from src.main.python.Views.PlotWindow import Window
+from python.Controllers.PlotWindowController import PlotWindowController
+from python.Logic.Sqlite import DatabaseConnection, getValue
+from python.Types.ConditionClass import Condition
+from python.Types.FileClass import File
+from python.Views.PlotWindow import Window
+from src.test import TestSqlite
 
 
 class GuiHandler(QObject):
@@ -127,11 +129,17 @@ def connectServerAndGUI(host, port, mainWindow: QMainWindow):
 
 def main():
     logging.basicConfig(level=logging.DEBUG)
-    app = QApplication(sys.argv)
-    app.setWindowIcon(QIcon(":CSAN.ico"))
-    size = app.primaryScreen().size()
-    mainWindow = Window(size)
-    PlotWindowController(mainWindow)
-    # connectServerAndGUI('127.0.0.1', 16000, mainWindow)
-    mainWindow.show()
-    sys.exit(app.exec())
+    testResult = unittest.TextTestRunner().run(unittest.TestLoader().loadTestsFromModule(TestSqlite))
+    if testResult.wasSuccessful():
+        logging.info("Test Successful!")
+        app = QApplication(sys.argv)
+        app.setWindowIcon(QIcon(":CSAN.ico"))
+        size = app.primaryScreen().size()
+        mainWindow = Window(size)
+        PlotWindowController(mainWindow)
+        connectServerAndGUI('127.0.0.1', 16000, mainWindow)
+        # mainWindow.show()
+        sys.exit(app.exec())
+    else:
+        logging.info("No valid fundamentals.db was found. "
+                     "Please make sure that you have the proper database in src/main/db path.")

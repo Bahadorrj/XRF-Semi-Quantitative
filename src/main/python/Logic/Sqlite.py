@@ -1,13 +1,13 @@
 import os
 import sqlite3
-
 from dataclasses import dataclass
+
 from pandas import read_sql_query
 
 
 # Define function to resolve alias to file path
 def resource_path(relative_path):
-    return os.path.join(os.path.abspath("."), f"src\\main\\db\\{relative_path[1:]}")
+    return os.path.join(os.path.abspath(".").split("\\src")[0], f"src\\main\\db\\{relative_path[1:]}")
 
 
 @dataclass
