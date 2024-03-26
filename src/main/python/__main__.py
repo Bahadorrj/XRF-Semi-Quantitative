@@ -1,20 +1,20 @@
 import logging
+import socket
 import sys
 import threading
+import unittest
 
 from PyQt6.QtCore import pyqtSignal, QObject
 from PyQt6.QtGui import QIcon
-from PyQt6.QtWidgets import QApplication
+from PyQt6.QtWidgets import QApplication, QMainWindow
 from numpy import ndarray, uint32
 
-from src.main.python.Controllers.PlotWindowController import PlotWindowController
-from src.main.python.Logic.Sqlite import DatabaseConnection, getValue
-from src.main.python.Types.ConditionClass import Condition
-from src.main.python.Types.FileClass import File
-from src.main.python.Views.PlotWindow import Window
-
-HOST = "0.0.0.0"
-PORT = 16000
+from python.Controllers.PlotWindowController import PlotWindowController
+from python.Logic.Sqlite import DatabaseConnection, getValue
+from python.Types.ConditionClass import Condition
+from python.Types.FileClass import File
+from python.Views.PlotWindow import Window
+from src.test import TestSqlite
 
 
 class GuiHandler(QObject):
@@ -89,7 +89,9 @@ class ClientHandler(QObject):
                 elif command == "-cls":
                     self.guiHandler.closeGuiSignal.emit()
                 elif command == "-chk":
-                    self.conn.sendall(b"Server is running")
+                    massage = f"Server is running on {self.conn.getsockname()}"
+                    logging.info(massage)
+                    self.conn.sendall(massage.encode("utf-8"))
                 elif command == "-als":
                     with self.dataLock:
                         data = ""
@@ -112,22 +114,32 @@ class ClientHandler(QObject):
             self.conn.close()  # Ensure connection is closed
 
 
+def connectServerAndGUI(host, port, mainWindow: QMainWindow):
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.bind((host, port))
+        s.listen(1)
+        logging.info(f"Server listening on {host}:{port}")
+        conn, addr = s.accept()
+        logging.info(f"Connected to {addr}")
+        guiHandler = GuiHandler(mainWindow)
+        clientHandler = ClientHandler(conn, guiHandler)
+        clientThread = threading.Thread(target=clientHandler.handleClient)
+        clientThread.start()
+
+
 def main():
     logging.basicConfig(level=logging.DEBUG)
-    app = QApplication(sys.argv)
-    app.setWindowIcon(QIcon(":CSAN.ico"))
-    size = app.primaryScreen().size()
-    mainWindow = Window(size)
-    PlotWindowController(mainWindow)
-    # with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-    #     s.bind((HOST, PORT))
-    #     s.listen(1)
-    #     logging.info(f"Server listening on {HOST}:{PORT}")
-    #     conn, addr = s.accept()
-    #     logging.info(f"Connected to {addr}")
-    #     guiHandler = GuiHandler(mainWindow)
-    #     clientHandler = ClientHandler(conn, guiHandler)
-    #     clientThread = threading.Thread(target=clientHandler.handleClient)
-    #     clientThread.start()
-    mainWindow.showMaximized()
-    sys.exit(app.exec())
+    testResult = unittest.TextTestRunner().run(unittest.TestLoader().loadTestsFromModule(TestSqlite))
+    if testResult.wasSuccessful():
+        logging.info("Test Successful!")
+        app = QApplication(sys.argv)
+        app.setWindowIcon(QIcon(":CSAN.ico"))
+        size = app.primaryScreen().size()
+        mainWindow = Window(size)
+        PlotWindowController(mainWindow)
+        connectServerAndGUI('127.0.0.1', 16000, mainWindow)
+        # mainWindow.show()
+        sys.exit(app.exec())
+    else:
+        logging.info("No valid fundamentals.db was found. "
+                     "Please make sure that you have the proper database in src/main/db path.")
