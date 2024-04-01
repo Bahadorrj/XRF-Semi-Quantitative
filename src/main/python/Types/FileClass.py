@@ -6,8 +6,6 @@ from numpy import zeros, uint32
 from python.Logic.Sqlite import DatabaseConnection, getValue
 from python.Types.ConditionClass import Condition
 
-import qrcResources
-
 
 @dataclass(order=True)
 class File:
@@ -22,6 +20,7 @@ class File:
 @dataclass(order=True)
 class LocalFile(File):
     path: str
+    name: str = field(init=False)
 
     def __post_init__(self):
         self.name = Path(self.path).stem
