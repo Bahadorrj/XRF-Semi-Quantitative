@@ -213,21 +213,22 @@ class Window(QMainWindow):
 
     def openPopUp(self, event):
         pos = event.pos()
-        mousePoint = self.peakPlotVB.mapSceneToView(pos)
-        self._kev = self._kiloElectronVolts[int(mousePoint.x())]
         if event.button() == Qt.MouseButton.RightButton:
+            mousePoint = self.peakPlotVB.mapSceneToView(pos)
+            self._kev = self._kiloElectronVolts[int(mousePoint.x())]
             self.peakPlotVB.menu.clear()
-            greater = self._elementsDf["low_Kev"] < self._kev
-            smaller = self._kev < self._elementsDf["high_Kev"]
+            greater = self._elementsDf["low_Kev"] <= self._kev
+            smaller = self._kev <= self._elementsDf["high_Kev"]
             mask = logical_and(greater, smaller)
             filteredDataframe = self._elementsDf[mask]
-            for radiation_type in ["Ka", "KB", "La", "LB", "Ly", "Ma", "Bg"]:
-                type_elements = filteredDataframe[filteredDataframe["radiation_type"]
-                                                  == radiation_type]
-                if type_elements.empty is False:
+            for radiation_type in self._elementsDf["radiation_type"].unique():
+                filteredElements = filteredDataframe[
+                    filteredDataframe["radiation_type"] == radiation_type
+                    ]
+                if filteredElements.empty is False:
                     menu = self.peakPlotVB.menu.addMenu(radiation_type)
                     menu.triggered.connect(self.actionClicked)
-                    for symbol in type_elements["symbol"].tolist():
+                    for symbol in filteredElements["symbol"].tolist():
                         menu.addAction(symbol)
 
     def actionClicked(self, action):
