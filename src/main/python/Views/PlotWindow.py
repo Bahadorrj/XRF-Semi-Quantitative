@@ -1,7 +1,6 @@
 import threading
-
-from numpy import arange
 from pathlib import Path
+
 from PyQt6.QtCore import QSize, Qt
 from PyQt6.QtGui import QAction, QIcon
 from PyQt6.QtWidgets import (
@@ -19,13 +18,15 @@ from PyQt6.QtWidgets import (
     QApplication,
     QFileIconProvider
 )
+from numpy import arange
 from pyqtgraph import PlotWidget, ColorButton, mkPen
 
-from python.Controllers.PlotWindowController import PlotWindowController
 from python.Controllers.ElemenetsWindowController import ElementsWindowController
 from python.Controllers.PeakSearchWindowController import PeakSearchWindowController
+from python.Controllers.PlotWindowController import PlotWindowController
 from python.Logic.FileExtension import FileHandler
 from python.Models import PeakSearchWindowModel
+from python.Types.FileClass import LocalFile
 from python.Types.ProjectFileClass import ProjectFile
 from python.Views import ConditionsWindow
 from python.Views import ElementsWindow
@@ -185,7 +186,7 @@ class Window(QMainWindow):
         # Set default directory
         fileDialog.setDirectory("/Additional/xdd")
         # Set custom file filter to only allow files with .xdd extension
-        fileDialog.setNameFilter("XDD files (*.xdd)")
+        fileDialog.setNameFilters(["XDD Files (*.xdd)", "Text Files (*.txt)"])
         # Set custom icon for files with .xdd extension
         fileDialog.setOption(QFileDialog.Option.DontUseNativeDialog, True)  # This ensures the custom icon works
         fileDialog.setIconProvider(CustomFileIconProvider())
@@ -216,14 +217,29 @@ class Window(QMainWindow):
         if not self._actionMap["save"].isEnabled():
             self._actionMap["save"].setDisabled(False)
             self._actionMap["save-as"].setDisabled(False)
-        project = ProjectFile(path)
-        projectItem = QTreeWidgetItem()
-        projectItem.setText(0, Path(project.path).stem)
-        for file in project.files:
+        if path.endswith(".xdd"):
+            project = ProjectFile(path)
+            projectItem = QTreeWidgetItem()
+            projectItem.setText(0, Path(project.path).stem)
+            for file in project.files:
+                fileItem = self.addFile(file)
+                projectItem.addChild(fileItem)
+            self._projects.append(project)
+            self.form.addTopLevelItem(projectItem)
+        elif path.endswith(".txt"):
+            file = LocalFile(path)
             fileItem = self.addFile(file)
-            projectItem.addChild(fileItem)
-        self._projects.append(project)
-        self.form.addTopLevelItem(projectItem)
+            if self.form.topLevelItemCount() == 0:
+                project = ProjectFile()
+                project.files.append(file)
+                self._projects.insert(0, project)
+                textFileItem = QTreeWidgetItem()
+                textFileItem.setText(0, "Text Files")
+                textFileItem.addChild(fileItem)
+                self.form.insertTopLevelItem(0, textFileItem)
+            else:
+                self._projects[0].files.append(file)
+                self.form.topLevelItem(0).addChild(fileItem)
 
     def openNewProject(self, path):
         newWindow = Window(self._screenSize, self)
@@ -258,8 +274,13 @@ class Window(QMainWindow):
         else:
             self._actionMap.get("peak-search").setDisabled(True)
 
-    def itemDeleted(self, index):
-        self._projects.pop(index)
+    def itemDeleted(self, item):
+        topLevelIndex = self.form.indexOfTopLevelItem(item.parent())
+        topLevelItem = self.form.topLevelItem(topLevelIndex)
+        childIndex = topLevelItem.indexOfChild(item)
+        self._projects[topLevelIndex].files.pop(childIndex)
+        topLevelItem.takeChild(childIndex)
+        del item
         if not self._projects:
             self._actionMap["save"].setDisabled(True)
             self._actionMap["save-as"].setDisabled(True)

@@ -1,7 +1,7 @@
 from PyQt6.QtCore import Qt
-from PyQt6.QtWidgets import QTableWidget, QFrame, QHeaderView, QTreeWidget,QMenu
-from PyQt6.QtGui import QAction
 from PyQt6.QtCore import pyqtSignal
+from PyQt6.QtGui import QAction
+from PyQt6.QtWidgets import QTableWidget, QFrame, QHeaderView, QTreeWidget, QMenu, QTreeWidgetItem
 
 
 class Table(QTableWidget):
@@ -123,14 +123,14 @@ class Table(QTableWidget):
         super().clear()
 
 class Tree(QTreeWidget):
-    itemDeleted = pyqtSignal(int)
+    itemDeleted = pyqtSignal(QTreeWidgetItem)
 
     def __init__(self):
         super().__init__()
 
     def contextMenuEvent(self, event):
-        indexOfTopLevel = self.indexOfTopLevelItem(self.itemAt(event.pos()))
-        if indexOfTopLevel != -1:
+        item = self.itemAt(event.pos())
+        if not self.itemIsTopLevel(item) and self.currentColumn() == 0:
             contextMenu = QMenu(self)
             actionEdit = QAction("Edit", self)
             actionDelete = QAction("Delete", self)
@@ -141,17 +141,13 @@ class Tree(QTreeWidget):
             action = contextMenu.exec(self.mapToGlobal(event.pos()))
             if action == actionEdit:
                 item = self.itemAt(event.pos())
-                if item and item.parent() is None:  # Check if it's a top-level item
-                    item.setFlags(item.flags() | Qt.ItemFlag.ItemIsEditable)
-                    self.editItem(item)
+                item.setFlags(item.flags() | Qt.ItemFlag.ItemIsEditable)
+                self.editItem(item)
             elif action == actionDelete:
                 item = self.itemAt(event.pos())
-                if item and item.parent() is None:  # Check if it's a top-level item
-                    self.takeTopLevelItem(self.indexOfTopLevelItem(item))
-                    self.itemDeleted.emit(indexOfTopLevel)
-                    del item
+                self.itemDeleted.emit(item)
 
-    def isItemTopLevel(self, item):
+    def itemIsTopLevel(self, item):
         if self.indexOfTopLevelItem(item) != -1:
             return True
         return False

@@ -137,8 +137,8 @@ def main():
         size = app.primaryScreen().size()
         mainWindow = Window(size)
         PlotWindowController(mainWindow)
-        connectServerAndGUI('127.0.0.1', 16000, mainWindow)
-        # mainWindow.show()
+        # connectServerAndGUI('127.0.0.1', 16000, mainWindow)
+        mainWindow.showMaximized()
         sys.exit(app.exec())
     else:
         logging.info("No valid fundamentals.db was found. "
