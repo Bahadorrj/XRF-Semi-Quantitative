@@ -207,7 +207,8 @@ class Window(QMainWindow):
         fileDialog.setOption(QFileDialog.Option.DontUseNativeDialog, True)  # This ensures the custom icon works
         fileDialog.setIconProvider(CustomFileIconProvider())
         fileDialog.setAcceptMode(QFileDialog.AcceptMode.AcceptSave)
-        projectPath = fileDialog.exec()
+        fileDialog.exec()
+        projectPath = fileDialog.selectedUrls()[0].path()
         if projectPath:
             for index in range(self.form.topLevelItemCount()):
                 self._projects[index].name = self.form.topLevelItem(index).text(0)
@@ -218,28 +219,37 @@ class Window(QMainWindow):
             self._actionMap["save"].setDisabled(False)
             self._actionMap["save-as"].setDisabled(False)
         if path.endswith(".xdd"):
-            project = ProjectFile(path)
-            projectItem = QTreeWidgetItem()
-            projectItem.setText(0, Path(project.path).stem)
-            for file in project.files:
-                fileItem = self.addFile(file)
-                projectItem.addChild(fileItem)
-            self._projects.append(project)
-            self.form.addTopLevelItem(projectItem)
+            self.addNewXDD(path)
         elif path.endswith(".txt"):
             file = LocalFile(path)
-            fileItem = self.addFile(file)
-            if self.form.topLevelItemCount() == 0:
-                project = ProjectFile()
-                project.files.append(file)
-                self._projects.insert(0, project)
-                textFileItem = QTreeWidgetItem()
-                textFileItem.setText(0, "Text Files")
-                textFileItem.addChild(fileItem)
-                self.form.insertTopLevelItem(0, textFileItem)
+            fileItem = self.createFileItem(file)
+            if self.form.topLevelItemCount() != 0:
+                if self.form.topLevelItem(0).text(0) == "Text Files":
+                    self._projects[0].files.append(file)
+                    self.form.topLevelItem(0).addChild(fileItem)
+                else:
+                    self.addNewText(file, fileItem)
             else:
-                self._projects[0].files.append(file)
-                self.form.topLevelItem(0).addChild(fileItem)
+                self.addNewText(file, fileItem)
+
+    def addNewXDD(self, path):
+        project = ProjectFile(path)
+        self._projects.append(project)
+        projectItem = QTreeWidgetItem()
+        projectItem.setText(0, Path(project.path).stem)
+        for file in project.files:
+            fileItem = self.createFileItem(file)
+            projectItem.addChild(fileItem)
+        self.form.addTopLevelItem(projectItem)
+
+    def addNewText(self, file, item):
+        project = ProjectFile()
+        project.files.append(file)
+        self._projects.insert(0, project)
+        textFileItem = QTreeWidgetItem()
+        textFileItem.setText(0, "Text Files")
+        textFileItem.addChild(item)
+        self.form.insertTopLevelItem(0, textFileItem)
 
     def openNewProject(self, path):
         newWindow = Window(self._screenSize, self)
@@ -247,7 +257,7 @@ class Window(QMainWindow):
         newWindow.show()
         PlotWindowController(newWindow)
 
-    def addFile(self, file) -> QTreeWidgetItem:
+    def createFileItem(self, file) -> QTreeWidgetItem:
         fileItem = QTreeWidgetItem()
         fileItem.setText(0, file.name)
         fileItem.setCheckState(0, Qt.CheckState.Unchecked)

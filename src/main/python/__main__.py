@@ -63,7 +63,7 @@ class GuiHandler(QObject):
                 pointer += 1
             new.conditions.append(condition)
             new.counts.append(counts)
-        self.mainWindow.addFile(new)
+        self.mainWindow.createFileItem(new)
         logging.info(f"Added file: {new}")
 
 

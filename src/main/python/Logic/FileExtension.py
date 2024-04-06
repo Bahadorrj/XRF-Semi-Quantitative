@@ -1,8 +1,9 @@
 from json import dump, load
+
 from numpy import array, uint32
 
-from python.Types.FileClass import File
 from python.Types.ConditionClass import Condition
+from python.Types.FileClass import File
 
 
 class FileHandler:
@@ -22,7 +23,7 @@ class FileHandler:
                 filesDictList.append(localFileDict)
 
         # Write serialized data to a file
-        with open(filePath, 'w') as f:
+        with open(f"{filePath[1:]}.xdd", 'w') as f:
             dump(filesDictList, f, indent=4)
 
     @staticmethod
