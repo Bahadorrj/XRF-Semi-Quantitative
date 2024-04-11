@@ -40,9 +40,7 @@ class GuiHandler(QObject):
         DatabaseConnection.getInstance(":fundamentals.db").closeConnection()
         if not self.mainWindow.isHidden():
             self.mainWindow.close()
-        QApplication.quit()
         logging.info("Application exit")
-        sys.exit()
 
     def addFile(self, data: str):
         file = PacketFile(data)
@@ -54,10 +52,11 @@ class ClientHandler(QObject):
     dataLock = threading.Lock()
     commandLock = threading.Lock()
 
-    def __init__(self, conn, guiHandler):
+    def __init__(self, conn, guiHandler, app):
         super().__init__()
         self.conn = conn
         self.guiHandler = guiHandler
+        self.app = app
 
     def handleClient(self):
         try:
@@ -87,6 +86,7 @@ class ClientHandler(QObject):
                 elif command == "-ext":
                     # exit is sent when the VB exe closes
                     self.guiHandler.exit.emit()
+                    self.app.exit()
                     break
                 else:
                     logging.warning(f"There is not any action related to {command}. "
@@ -97,7 +97,7 @@ class ClientHandler(QObject):
             self.conn.close()  # Ensure connection is closed
 
 
-def connectServerAndGUI(host, port, mainWindow: QMainWindow):
+def connectServerAndGUI(host, port, mainWindow: QMainWindow, app: QApplication):
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         s.bind((host, port))
         s.listen(1)
@@ -105,9 +105,8 @@ def connectServerAndGUI(host, port, mainWindow: QMainWindow):
         conn, addr = s.accept()
         logging.info(f"Connected to {addr}")
         guiHandler = GuiHandler(mainWindow)
-        clientHandler = ClientHandler(conn, guiHandler)
-        clientThread = threading.Thread(target=clientHandler.handleClient)
-        clientThread.start()
+        clientHandler = ClientHandler(conn, guiHandler, app)
+        threading.Thread(target=clientHandler.handleClient).start()
 
 
 def main():
@@ -120,9 +119,9 @@ def main():
         size = app.primaryScreen().size()
         mainWindow = Window(size)
         PlotWindowController(mainWindow)
-        connectServerAndGUI('127.0.0.1', 16000, mainWindow)
+        connectServerAndGUI('127.0.0.1', 16000, mainWindow, app)
         # mainWindow.showMaximized()
-        app.exec()
+        sys.exit(app.exec())
     else:
         logging.info("No valid fundamentals.db was found. "
                      "Please make sure that you have the proper database in src/main/db path.")
