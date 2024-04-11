@@ -67,3 +67,9 @@ class PacketFile(File):
                 pointer += 1
             self.conditions.append(condition)
             self.counts.append(counts)
+
+
+@dataclass
+class ProjectFile:
+    name: str
+    files: list[File] = field(default_factory=list, init=False)

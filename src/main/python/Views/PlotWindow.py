@@ -25,8 +25,7 @@ from python.Controllers.PeakSearchWindowController import PeakSearchWindowContro
 from python.Controllers.PlotWindowController import PlotWindowController
 from python.Logic.FileExtension import FileHandler
 from python.Models import PeakSearchWindowModel
-from python.Types.FileClass import TextFile
-from python.Types.ProjectFileClass import ProjectFile
+from python.Types.FileClass import TextFile, ProjectFile
 from python.Views import ConditionsWindow
 from python.Views import ElementsWindow
 from python.Views import PeakSearchWindow
