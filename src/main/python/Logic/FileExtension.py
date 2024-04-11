@@ -8,7 +8,7 @@ from python.Types.FileClass import File
 
 class FileHandler:
     @staticmethod
-    def writeFiles(projects, filePath):
+    def writeFiles(projects, projectPath):
         # Serialize each LocalFile object to a dictionary
         filesDictList = []
         for project in projects:
@@ -23,7 +23,7 @@ class FileHandler:
                 filesDictList.append(localFileDict)
 
         # Write serialized data to a file
-        with open(f"{filePath[1:]}.xdd", 'w') as f:
+        with open(f"{projectPath[1:]}.xdd", 'w') as f:
             dump(filesDictList, f, indent=4)
 
     @staticmethod

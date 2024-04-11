@@ -7,19 +7,17 @@ import unittest
 from PyQt6.QtCore import pyqtSignal, QObject
 from PyQt6.QtGui import QIcon
 from PyQt6.QtWidgets import QApplication, QMainWindow
-from numpy import ndarray, uint32
 
 from python.Controllers.PlotWindowController import PlotWindowController
-from python.Logic.Sqlite import DatabaseConnection, getValue
-from python.Types.ConditionClass import Condition
-from python.Types.FileClass import File
+from python.Logic.Sqlite import DatabaseConnection
+from python.Types.FileClass import PacketFile
 from python.Views.PlotWindow import Window
 from src.test import TestSqlite
 
 
 class GuiHandler(QObject):
     openGuiSignal = pyqtSignal()
-    closeGuiSignal = pyqtSignal()
+    hideGuiSignal = pyqtSignal()
     addFileSignal = pyqtSignal(str)
     exit = pyqtSignal()
 
@@ -27,7 +25,7 @@ class GuiHandler(QObject):
         super().__init__()
         self.mainWindow = mainWindow
         self.openGuiSignal.connect(self.openGui)
-        self.closeGuiSignal.connect(self.hideGui)
+        self.hideGuiSignal.connect(self.hideGui)
         self.addFileSignal.connect(self.addFile)
         self.exit.connect(self.exitApplication)
 
@@ -39,32 +37,17 @@ class GuiHandler(QObject):
         self.mainWindow.hide()
 
     def exitApplication(self):
-        self.mainWindow.close()
-        QApplication.quit()
         DatabaseConnection.getInstance(":fundamentals.db").closeConnection()
+        if not self.mainWindow.isHidden():
+            self.mainWindow.close()
+        QApplication.quit()
         logging.info("Application exit")
+        sys.exit()
 
     def addFile(self, data: str):
-        seperated = data.split('\\')
-        pointer = 0
-        sampleFileName = seperated[pointer]
-        pointer += 1
-        new = File()
-        new.name = sampleFileName
-        while seperated[pointer] != "-stp":
-            conditionName = seperated[pointer]
-            pointer += 1
-            database = DatabaseConnection.getInstance(":fundamentals.db")
-            conditionID = getValue(database, "conditions", where=f"name = '{conditionName}'")[0]
-            condition = Condition(conditionID)
-            counts = ndarray(2048, dtype=uint32)
-            for i in range(2048):
-                counts[i] = seperated[pointer]
-                pointer += 1
-            new.conditions.append(condition)
-            new.counts.append(counts)
-        self.mainWindow.createFileItem(new)
-        logging.info(f"Added file: {new}")
+        file = PacketFile(data)
+        self.mainWindow.insertFile(file, 2)
+        logging.info(f"Added file: {file}")
 
 
 class ClientHandler(QObject):
@@ -87,7 +70,7 @@ class ClientHandler(QObject):
                 if command == "-opn":
                     self.guiHandler.openGuiSignal.emit()
                 elif command == "-cls":
-                    self.guiHandler.closeGuiSignal.emit()
+                    self.guiHandler.hideGuiSignal.emit()
                 elif command == "-chk":
                     massage = f"Server is running on {self.conn.getsockname()}"
                     logging.info(massage)
@@ -137,9 +120,9 @@ def main():
         size = app.primaryScreen().size()
         mainWindow = Window(size)
         PlotWindowController(mainWindow)
-        # connectServerAndGUI('127.0.0.1', 16000, mainWindow)
-        mainWindow.showMaximized()
-        sys.exit(app.exec())
+        connectServerAndGUI('127.0.0.1', 16000, mainWindow)
+        # mainWindow.showMaximized()
+        app.exec()
     else:
         logging.info("No valid fundamentals.db was found. "
                      "Please make sure that you have the proper database in src/main/db path.")

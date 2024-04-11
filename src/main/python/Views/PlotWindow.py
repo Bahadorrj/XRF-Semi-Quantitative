@@ -1,5 +1,4 @@
 import threading
-from pathlib import Path
 
 from PyQt6.QtCore import QSize, Qt
 from PyQt6.QtGui import QAction, QIcon
@@ -26,7 +25,7 @@ from python.Controllers.PeakSearchWindowController import PeakSearchWindowContro
 from python.Controllers.PlotWindowController import PlotWindowController
 from python.Logic.FileExtension import FileHandler
 from python.Models import PeakSearchWindowModel
-from python.Types.FileClass import LocalFile
+from python.Types.FileClass import TextFile
 from python.Types.ProjectFileClass import ProjectFile
 from python.Views import ConditionsWindow
 from python.Views import ElementsWindow
@@ -47,6 +46,10 @@ class CustomFileIconProvider(QFileIconProvider):
 class Window(QMainWindow):
     def __init__(self, size, parent=None):
         super().__init__(parent)
+
+        self._screenSize = size
+        self._projects = [ProjectFile("Text Files"), ProjectFile("XDD Files"), ProjectFile("Packet Files")]
+
         self.setWindowTitle("Plot")
         self.setMinimumWidth(int(0.75 * size.width()))
         self.setMinimumHeight(int(0.75 * size.height()))
@@ -69,9 +72,6 @@ class Window(QMainWindow):
 
         ElementsWindowController(self.elementsWindow)
         PeakSearchWindowController(self.peakSearchWindow, PeakSearchWindowModel)
-
-        self._screenSize = size
-        self._projects = list()
 
     def _createActions(self):
         self._actionMap = {}
@@ -154,6 +154,15 @@ class Window(QMainWindow):
         self.form.setAnimated(True)
         self.form.setExpandsOnDoubleClick(False)
         self.form.setMaximumWidth(int(self.size().width() * 0.3))
+        textItem = QTreeWidgetItem()
+        textItem.setText(0, "Text Files")
+        self.form.addTopLevelItem(textItem)
+        projectItem = QTreeWidgetItem()
+        projectItem.setText(0, "XDD Files")
+        self.form.addTopLevelItem(projectItem)
+        packetItem = QTreeWidgetItem()
+        packetItem.setText(0, "Packet Files")
+        self.form.addTopLevelItem(packetItem)
 
     def _placeComponents(self):
         horizontalLayout = QHBoxLayout()
@@ -199,8 +208,6 @@ class Window(QMainWindow):
         fileDialog = QFileDialog(self)
         # Set file mode to existing file
         fileDialog.setFileMode(QFileDialog.FileMode.AnyFile)
-        # Set default directory
-        fileDialog.setDirectory("/Additional/xdd")
         # Set custom file filter to only allow files with .xdd extension
         fileDialog.setNameFilter("XDD files (*.xdd)")
         # Set custom icon for files with .xdd extension
@@ -210,50 +217,28 @@ class Window(QMainWindow):
         fileDialog.exec()
         projectPath = fileDialog.selectedUrls()[0].path()
         if projectPath:
-            for index in range(self.form.topLevelItemCount()):
-                self._projects[index].name = self.form.topLevelItem(index).text(0)
             self.saveProjectTo(projectPath)
 
-    def addProject(self, path):
+    def openSelectedURL(self, path):
         if not self._actionMap["save"].isEnabled():
             self._actionMap["save"].setDisabled(False)
             self._actionMap["save-as"].setDisabled(False)
         if path.endswith(".xdd"):
-            self.addNewXDD(path)
+            files = FileHandler.readFiles(path)
+            for file in files:
+                self.insertFile(file, 1)
         elif path.endswith(".txt"):
-            file = LocalFile(path)
-            fileItem = self.createFileItem(file)
-            if self.form.topLevelItemCount() != 0:
-                if self.form.topLevelItem(0).text(0) == "Text Files":
-                    self._projects[0].files.append(file)
-                    self.form.topLevelItem(0).addChild(fileItem)
-                else:
-                    self.addNewText(file, fileItem)
-            else:
-                self.addNewText(file, fileItem)
+            file = TextFile(path)
+            self.insertFile(file, 0)
 
-    def addNewXDD(self, path):
-        project = ProjectFile(path)
-        self._projects.append(project)
-        projectItem = QTreeWidgetItem()
-        projectItem.setText(0, Path(project.path).stem)
-        for file in project.files:
-            fileItem = self.createFileItem(file)
-            projectItem.addChild(fileItem)
-        self.form.addTopLevelItem(projectItem)
+    def insertFile(self, file, index):
+        fileItem = self.createFileItem(file)
+        self._projects[index].files.append(file)
+        self.form.topLevelItem(index).addChild(fileItem)
 
-    def addNewText(self, file, item):
-        project = ProjectFile()
-        project.files.append(file)
-        self._projects.insert(0, project)
-        textFileItem = QTreeWidgetItem()
-        textFileItem.setText(0, "Text Files")
-        textFileItem.addChild(item)
-        self.form.insertTopLevelItem(0, textFileItem)
-
-    def openNewProject(self, path):
+    def openProjectInNewWindow(self, path):
         newWindow = Window(self._screenSize, self)
-        newWindow.addProject(path)
+        newWindow.openSelectedURL(path)
         newWindow.show()
         PlotWindowController(newWindow)
 
@@ -274,7 +259,7 @@ class Window(QMainWindow):
         return fileItem
 
     def resetWindow(self):
-        self._projects.clear()
+        self._projects = [ProjectFile("Text Files"), ProjectFile("XDD Files"), ProjectFile("Packet Files")]
         self.plotWidget.clear()
         self.form.clear()
 
@@ -352,7 +337,8 @@ class Window(QMainWindow):
         self.elementsWindow.show()
 
     def openPeakSearchWindow(self):
-        if self.form.currentItem().childCount() == 0:
+        item = self.form.currentItem()
+        if item.childCount() == 0 and item.parent() is not None:
             conditionItem = self.form.currentItem()
             fileItem = conditionItem.parent()
             projectItem = fileItem.parent()
@@ -368,13 +354,13 @@ class Window(QMainWindow):
     def saveProjectTo(self, projectPath):
         FileHandler.writeFiles(self._projects, projectPath)
 
-    # def closeEvent(self, event):
-    #     # Intercept the close event
-    #     # Check if the close is initiated by the close button
-    #     if event.spontaneous():
-    #         # Hide the window instead of closing
-    #         self.hide()
-    #         event.ignore()
-    #     else:
-    #         # Handle the close event normally
-    #         event.accept()
+    def closeEvent(self, event):
+        # Intercept the close event
+        # Check if the close is initiated by the close button
+        if event.spontaneous():
+            # Hide the window instead of closing
+            self.hide()
+            event.ignore()
+        else:
+            # Handle the close event normally
+            event.accept()

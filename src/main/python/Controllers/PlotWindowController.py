@@ -22,11 +22,11 @@ class PlotWindowController:
         if label == "open-append":
             path = self._view.openFileDialog()
             if path:
-                self._view.addProject(path)
+                self._view.openSelectedURL(path)
         elif label == "open-as-new-project":
             path = self._view.openFileDialog()
             if path:
-                threading.Thread(target=self._view.openNewProject(path)).start()
+                threading.Thread(target=self._view.openProjectInNewWindow(path)).start()
         elif label == "new":
             self._view.resetWindow()
         elif label == "save-as":
