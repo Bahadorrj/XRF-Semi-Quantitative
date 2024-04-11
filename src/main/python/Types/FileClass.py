@@ -1,7 +1,7 @@
-from dataclasses import dataclass, field, asdict
+from dataclasses import dataclass, field
 from pathlib import Path
 
-from numpy import zeros, uint32
+from numpy import zeros, uint32, ndarray
 
 from python.Logic.Sqlite import DatabaseConnection, getValue
 from python.Types.ConditionClass import Condition
@@ -13,19 +13,15 @@ class File:
     conditions: list = field(init=False, repr=True, default_factory=list)
     counts: list = field(init=False, repr=False, default_factory=list)
 
-    def asDict(self):
-        return asdict(self)
-
 
 @dataclass(order=True)
-class LocalFile(File):
+class TextFile(File):
     path: str
-    name: str = field(init=False)
 
     def __post_init__(self):
         self.name = Path(self.path).stem
-        with open(self.path, 'r') as file:
-            line = file.readline()  # read line
+        with open(self.path, 'r') as f:
+            line = f.readline()  # read line
             counts = zeros(2048, dtype=uint32)
             index = 0
             while line:
@@ -44,4 +40,30 @@ class LocalFile(File):
                         index = 0
                 except ValueError:
                     pass
-                line = file.readline()
+                line = f.readline()
+
+
+@dataclass(order=True)
+class PacketFile(File):
+    type: str = field(default="ANALYSE", init=False)
+
+    def __init__(self, data: str):
+        super().__init__()
+        seperated = data.split('\\')
+        pointer = 0
+        self.type = seperated[pointer]
+        pointer += 1
+        self.name = seperated[pointer]
+        pointer += 1
+        while seperated[pointer] != "-stp":
+            conditionName = seperated[pointer]
+            pointer += 1
+            database = DatabaseConnection.getInstance(":fundamentals.db")
+            conditionID = getValue(database, "conditions", where=f"name = '{conditionName}'")[0]
+            condition = Condition(conditionID)
+            counts = ndarray(2048, dtype=uint32)
+            for i in range(2048):
+                counts[i] = seperated[pointer]
+                pointer += 1
+            self.conditions.append(condition)
+            self.counts.append(counts)
