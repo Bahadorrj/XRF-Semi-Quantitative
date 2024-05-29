@@ -1,0 +1,13 @@
+Windows Registry Editor Version 5.00
+
+[HKEY_CLASSES_ROOT\.atx]
+@="AntiqueXFile"
+
+[HKEY_CLASSES_ROOT\AntiqueXFile]
+@="Antique'X Spectrum"
+
+[HKEY_CLASSES_ROOT\AntiqueXFile\DefaultIcon]
+@="C:\\CSAN.ico"
+
+[HKEY_CLASSES_ROOT\AntiqueXFile\shell\open\command]
+@="\"F:\CSAN\new\exe\1\XRF.exe\" \"%1\""
