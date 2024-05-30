@@ -1,3 +1,4 @@
+import socket
 from dataclasses import dataclass, field
 from json import loads
 from pathlib import Path
@@ -55,6 +56,14 @@ class Analyse:
         self.extension = filename[filename.rfind("."):]
         self.data = data
 
+    def toDict(self) -> dict:
+        return {
+            "filename": self.filename,
+            "name": self.name,
+            "extension": self.extension,
+            "data": self.data
+        }
+
     @classmethod
     def fromTextFile(cls, filename: str) -> 'Analyse':
         data = []
@@ -85,6 +94,20 @@ class Analyse:
                 encryptedText = f.readline()
         data.sort(key=lambda x: x.condition)
         return Analyse(filename, data)
+
+    @classmethod
+    def fromSocket(cls, connection: socket.socket) -> 'Analyse':
+        data = list()
+        received = ""
+        while True:
+            received += connection.recv(10).decode('utf-8')
+            if received[-4:] == 'stp':
+                break
+        jsonText = loads(received)
+        jsonDicts = jsonText.split('-')
+        for d in jsonDicts:
+            data.append(AnalyseData.fromDict(d))
+        return Analyse("untitled", data)
 
 
 class PlotData:
