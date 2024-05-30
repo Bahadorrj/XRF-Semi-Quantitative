@@ -3,7 +3,7 @@ import socket
 import threading
 
 from PyQt6 import QtWidgets, QtGui
-from PyQt6.QtWidgets import QMainWindow, QApplication
+from PyQt6.QtWidgets import QApplication
 
 from python.controllers import GuiHandler, ClientHandler
 from python.utils import paths
@@ -11,14 +11,14 @@ from python.utils.paths import sys
 from python.views.plotwindow import PlotWindow
 
 
-def connectServerAndGUI(host, port, mainWindow: QMainWindow, app: QApplication):
+def connectServerAndGUI(host, port, plotWindow: PlotWindow, app: QApplication):
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         s.bind((host, port))
         s.listen(1)
         logging.info(f"Server listening on {host}:{port}")
         conn, addr = s.accept()
         logging.info(f"Connected to {addr}")
-        guiHandler = GuiHandler(mainWindow)
+        guiHandler = GuiHandler(plotWindow)
         clientHandler = ClientHandler(conn, guiHandler, app)
         threading.Thread(target=clientHandler.handleClient).start()
 

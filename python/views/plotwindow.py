@@ -101,8 +101,15 @@ class ConditionForm(QtWidgets.QListView):
     def _showConditionInList(self, conditionName: str):
         conditionDf = self._df[self._df["name"] == conditionName]
         for index in range(conditionDf.size):
+            item = QtWidgets.QTableWidgetItem()
             value = conditionDf.iat[0, index]
-            item = QtWidgets.QTableWidgetItem(str(value))
+            if index == conditionDf.size - 1:
+                value = bool(value)
+                if value is True:
+                    item.setForeground(QtGui.QColor(0, 255, 0))
+                else:
+                    item.setForeground(QtGui.QColor(255, 0, 0))
+            item.setText(str(value))
             item.setTextAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
             self._tableWidget.setItem(index, 0, item)
 
@@ -339,10 +346,7 @@ class PlotWindow(QtWidgets.QMainWindow):
         elif extension == ".atx":
             analyse = datatypes.Analyse.fromATXFile(filename)
         if analyse is not None and analyse.data:
-            self._analyseFiles.append(analyse)
-            self._addAnalyseFileToTree(analyse)
-            self._actionsMap["save-as"].setDisabled(False)
-            self._actionsMap["new"].setDisabled(False)
+            self.addAnalyse(analyse)
         else:
             messageBox = QtWidgets.QMessageBox(self)
             messageBox.setIcon(QtWidgets.QMessageBox.Icon.Critical)
@@ -351,7 +355,14 @@ class PlotWindow(QtWidgets.QMainWindow):
             messageBox.setStandardButtons(QtWidgets.QMessageBox.StandardButton.Ok)
             messageBox.show()
 
-    def _addAnalyseFileToTree(self, analyse: datatypes.Analyse) -> None:
+    def addAnalyse(self, analyse: datatypes.Analyse) -> None:
+        self._analyseFiles.append(analyse)
+        self._addAnalyseToTree(analyse)
+        if not self._actionsMap["save-as"].isEnabled():
+            self._actionsMap["save-as"].setDisabled(False)
+            self._actionsMap["new"].setDisabled(False)
+
+    def _addAnalyseToTree(self, analyse: datatypes.Analyse) -> None:
         item = QtWidgets.QTreeWidgetItem()
         item.setCheckState(0, QtCore.Qt.CheckState.Unchecked)
         item.setText(0, analyse.name)
@@ -463,4 +474,4 @@ class PlotWindow(QtWidgets.QMainWindow):
         dataIndex = analyseItem.indexOfChild(dataItem)
         data = self._getDataFromIndex(extensionIndex, analyseIndex, dataIndex)
         self._peakSearchWindow.displayAnalyseData(data)
-        self._peakSearchWindow.show()
+        self._peakSearchWindow.showMaximized()

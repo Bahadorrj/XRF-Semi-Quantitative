@@ -1,11 +1,12 @@
 import unittest
 
-from src.main.python.Logic.Sqlite import DatabaseConnection
+from python.utils.database import getDatabase
+from python.utils.paths import resource_path
 
 
 class TestSqlite(unittest.TestCase):
     def setUp(self):
-        self.database = DatabaseConnection.getInstance(":fundamentals.db")
+        self.database = getDatabase(resource_path('../../fundamentals.db'))
 
     def test_connection(self):
         self.assertIsNotNone(self.database.conn, "Database connection was not established")

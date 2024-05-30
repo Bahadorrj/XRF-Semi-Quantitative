@@ -1,3 +1,4 @@
+import logging
 from functools import partial
 
 import numpy as np
@@ -17,6 +18,10 @@ class ElementsTableWidget(QtWidgets.QTableWidget):
     def __init__(self, parent=None):
         super(ElementsTableWidget, self).__init__(parent)
         self.rowIds = list()
+        self.setBaseSection()
+        self.verticalHeader().setSectionResizeMode(QtWidgets.QHeaderView.ResizeMode.ResizeToContents)
+
+    def setBaseSection(self):
         headers = [
             "Element",
             "Type",
@@ -29,37 +34,39 @@ class ElementsTableWidget(QtWidgets.QTableWidget):
         self.setColumnCount(len(headers))
         self.setHorizontalHeaderLabels(headers)
 
+    def setModifiedSections(self):
+        headers = [
+            "",
+            "",
+            "Element",
+            "Type",
+            "Kev",
+            "Low Kev",
+            "High Kev",
+            "Intensity",
+            "Status",
+            "",
+        ]
+        self.setColumnCount(len(headers))
+        self.setHorizontalHeaderLabels(headers)
+
     def setHorizontalHeaderLabels(self, labels: list) -> None:
         for column, label in enumerate(labels):
-            item = QtWidgets.QTableWidgetItem(label)
-            self.setHorizontalHeaderItem(column, item)
             if label:
                 self.horizontalHeader().setSectionResizeMode(
                     column, QtWidgets.QHeaderView.ResizeMode.Stretch
                 )
             else:
                 self.horizontalHeader().setSectionResizeMode(
-                    column, QtWidgets.QHeaderView.ResizeMode.Fixed
+                    column, QtWidgets.QHeaderView.ResizeMode.ResizeToContents
                 )
-            self.horizontalHeader().update()
+            item = QtWidgets.QTableWidgetItem(label)
+            self.setHorizontalHeaderItem(column, item)
 
     def addRow(self, rowId: int, row: pd.Series):
-        self.rowIds.append(rowId)
         if self.rowCount() == 0:
-            headers = [
-                "",
-                "",
-                "Element",
-                "Type",
-                "Kev",
-                "Low Kev",
-                "High Kev",
-                "Intensity",
-                "Status",
-                "",
-            ]
-            self.setColumnCount(len(headers))
-            self.setHorizontalHeaderLabels(headers)
+            self.setModifiedSections()
+        self.rowIds.append(rowId)
         self.setRowCount(self.rowCount() + 1)
         self._createButtons(rowId, row)
         self._createItems(row)
@@ -86,18 +93,25 @@ class ElementsTableWidget(QtWidgets.QTableWidget):
                 button.setStyleSheet(
                     """
                     QPushButton {
-                        background-color: white;
-                        color: black;
+                        font-weight: 600;
+                        font-size: 14px;
+                        color: #fff;
+                        background-color: #0066CC;
+                        padding: 2px 5px;
+                        border: 2px solid #0066cc;
                         border-radius: 5px;
                     }
                     QPushButton:hover {
-                        background-color: #708090;
-                        color: white;
+                        background-color: #fff;
+                        color: #0066cc;
+                        border: 2px solid #0066cc;
                     }
                     QPushButton:pressed {
-                        background-color: #36454F;
-                        color: white;
-                    }"""
+                        background-color: #fff;
+                        color: #011B35;
+                        border: 2px solid #011B35;
+                    }
+                    """
                 )
             self.setCellWidget(rowIndex, column, button)
             button.clicked.connect(partial(self._emitRowChanged, label, rowId))
@@ -137,22 +151,31 @@ class ElementsTableWidget(QtWidgets.QTableWidget):
         super().removeRow(row)
         self.rowIds.pop(row)
 
+    def clear(self):
+        super().clear()
+        self.setRowCount(0)
+        self.rowIds.clear()
+        self.setBaseSection()
+
 
 class PeakSearchWindow(QtWidgets.QMainWindow):
     def __init__(self, parent=None):
-        super(PeakSearchWindow, self).__init__(parent)
-        self._conditionId = None
-        self._x = None
-        self._y = None
-        self._kev = None
-        self._db = getDatabase(resource_path("fundamentals.db"))
-        self._df = self._db.dataframe("SELECT * FROM elements")
-        self._plotDataList = [datatypes.PlotData.fromSeries(rowId, s) for rowId, s in self._df.iterrows()]
-        self.resize(1200, 800)
-        self._createTableWidget()
-        self._createPlotViewBox()
-        self._setupView()
-        self._fillTable()
+        try:
+            super(PeakSearchWindow, self).__init__(parent)
+            self._conditionId = None
+            self._x = None
+            self._y = None
+            self._kev = None
+            self._db = getDatabase(resource_path("fundamentals.db"))
+            self._df = self._db.dataframe("SELECT * FROM elements")
+            self._plotDataList = [datatypes.PlotData.fromSeries(rowId, s) for rowId, s in self._df.iterrows()]
+            self.resize(1200, 800)
+            self._createTableWidget()
+            self._createPlotViewBox()
+            self._setupView()
+            self._fillTable()
+        except Exception as e:
+            logging.exception(e)
 
     def _createTableWidget(self) -> None:
         self._tableWidget = ElementsTableWidget(self)
@@ -161,6 +184,7 @@ class PeakSearchWindow(QtWidgets.QMainWindow):
         self._tableWidget.setAlternatingRowColors(True)
         self._tableWidget.rowChanged.connect(self._rowChanged)
         self._tableWidget.itemClicked.connect(self._itemClicked)
+        self._tableWidget.horizontalHeader().sectionClicked.connect(self._headerClicked)
 
     def _createPlotViewBox(self) -> None:
         self._graphicsLayoutWidget = pg.GraphicsLayoutWidget()
@@ -260,26 +284,32 @@ class PeakSearchWindow(QtWidgets.QMainWindow):
                                           | QtWidgets.QMessageBox.StandardButton.No)
             result = messageBox.exec()
             if result == QtWidgets.QMessageBox.StandardButton.Yes:
-                self._removeData(rowId)
+                data = self._plotDataList[rowId]
+                self._removeData(data)
+                self._popFromTree(data)
         elif buttonLabel == "hide":
-            self._dataVisibilityChanged(rowId)
+            data = self._plotDataList[rowId]
+            self._dataVisibilityChanged(data)
         else:
-            self._dataStatusChanged(rowId)
+            data = self._plotDataList[rowId]
+            self._dataStatusChanged(data)
 
-    def _removeData(self, rowId: int) -> None:
-        data = self._plotDataList[rowId]
-        self._erasePlotData(data)
-        if data.active is False:
-            self._hideCorrelatedToData(data)
-        index = self._tableWidget.rowIds.index(rowId)
+    def _removeData(self, data: datatypes.PlotData) -> None:
+        if data.visible:
+            self._erasePlotData(data)
+            if data.active is False:
+                self._hideCorrelatedToData(data)
+        data.deactivate()
+        self._df.at[data.rowId, "active"] = 0
+
+    def _popFromTree(self, data: datatypes.PlotData) -> None:
+        index = self._tableWidget.rowIds.index(data.rowId)
         self._tableWidget.removeRow(index)
         if self._tableWidget.rowCount() == 0:
-            self._tableWidget.__init__(self)
-        self._df.at[rowId, "active"] = 0
+            self._tableWidget.setBaseSection()
 
-    def _dataVisibilityChanged(self, rowId: int) -> None:
-        data = self._plotDataList[rowId]
-        row = self._tableWidget.getRowById(rowId)
+    def _dataVisibilityChanged(self, data: datatypes.PlotData) -> None:
+        row = self._tableWidget.getRowById(data.rowId)
         hideButton = row.get(1)
         if data.visible:
             self._erasePlotData(data)
@@ -294,11 +324,10 @@ class PeakSearchWindow(QtWidgets.QMainWindow):
             hideButton.setIcon(QtGui.QIcon(resource_path("icons/show.png")))
         data.visible = not data.visible
 
-    def _dataStatusChanged(self, rowId: int) -> None:
-        data = self._plotDataList[rowId]
+    def _dataStatusChanged(self, data: datatypes.PlotData) -> None:
         data.visible = True
         self._erasePlotData(data)
-        row = self._tableWidget.getRowById(rowId)
+        row = self._tableWidget.getRowById(data.rowId)
         intensityItem = row.get("intensity")
         statusItem = row.get("status")
         hideButton = row.get(1)
@@ -354,8 +383,10 @@ class PeakSearchWindow(QtWidgets.QMainWindow):
                     row.get(1).setIcon(QtGui.QIcon(resource_path("icons/show.png")))
                 else:
                     d.neutralize()
-                self._peakPlot.addItem(d.peakLine)
-                self._spectrumPlot.addItem(d.spectrumLine)
+                if d.peakLine not in self._peakPlot.items:
+                    self._peakPlot.addItem(d.peakLine)
+                if d.spectrumLine not in self._spectrumPlot.items:
+                    self._spectrumPlot.addItem(d.spectrumLine)
 
     def _hideCorrelatedToData(self, data: datatypes.PlotData) -> None:
         symbol = self._df.at[data.rowId, 'symbol']
@@ -368,8 +399,10 @@ class PeakSearchWindow(QtWidgets.QMainWindow):
                     row.get(1).setIcon(QtGui.QIcon(resource_path("icons/hide.png")))
                 else:
                     d.deactivate()
-                self._peakPlot.removeItem(d.peakLine)
-                self._spectrumPlot.removeItem(d.spectrumLine)
+                if d.peakLine in self._peakPlot.items:
+                    self._peakPlot.removeItem(d.peakLine)
+                if d.spectrumLine in self._spectrumPlot.items:
+                    self._spectrumPlot.removeItem(d.spectrumLine)
 
     @QtCore.pyqtSlot(QtWidgets.QTableWidgetItem)
     def _itemClicked(self, item: QtWidgets.QTableWidgetItem) -> None:
@@ -377,13 +410,39 @@ class PeakSearchWindow(QtWidgets.QMainWindow):
         data = self._plotDataList[rowId]
         self._hoverOverData(data)
 
+    @QtCore.pyqtSlot(int)
+    def _headerClicked(self, column: int) -> None:
+        if column == 0:
+            messageBox = QtWidgets.QMessageBox()
+            messageBox.setIcon(QtWidgets.QMessageBox.Icon.Warning)
+            messageBox.setText(f"This will deactivate all lines.\n"
+                               f"Are you sure you want to continue?")
+            messageBox.setWindowTitle("Remove All?")
+            messageBox.setStandardButtons(QtWidgets.QMessageBox.StandardButton.Yes
+                                          | QtWidgets.QMessageBox.StandardButton.No)
+            result = messageBox.exec()
+            if result == QtWidgets.QMessageBox.StandardButton.Yes:
+                self._removeAll()
+        elif column == 1:
+            self._hideALL()
+
+    def _removeAll(self):
+        for rowId in self._tableWidget.rowIds:
+            data = self._plotDataList[rowId]
+            self._removeData(data)
+        self._tableWidget.clear()
+
+    def _hideALL(self):
+        pass
+
     def _setCoordinate(self, x: float, y: float) -> None:
         kev = self._kev[int(x)]
         self._coordinateLabel.setText(
             f"""
             <span style="font-size: 14px; 
                         color: rgb(128, 128, 128);
-                        padding: 5px;">x= {x} y= {y} KeV= {kev}</span>
+                        padding: 5px;
+                        letter-spacing: 2px">x= {x} y= {y} KeV= {kev}</span>
             """
         )
 

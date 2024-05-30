@@ -1,40 +1,43 @@
 import logging
+import socket
 import threading
 
-from PyQt6 import QtCore
+from PyQt6 import QtCore, QtWidgets
 
 from python.utils.database import getDatabase
+from python.utils.datatypes import Analyse
 from python.utils.paths import resource_path
+from python.views.plotwindow import PlotWindow
 
 
 class GuiHandler(QtCore.QObject):
     openGuiSignal = QtCore.pyqtSignal()
     hideGuiSignal = QtCore.pyqtSignal()
-    addFileSignal = QtCore.pyqtSignal(str)
+    addAnalyseSignal = QtCore.pyqtSignal(str)
     exit = QtCore.pyqtSignal()
 
-    def __init__(self, mainWindow):
+    def __init__(self, window: PlotWindow):
         super().__init__()
-        self.mainWindow = mainWindow
+        self.window = window
         self.openGuiSignal.connect(self.openGui)
         self.hideGuiSignal.connect(self.hideGui)
-        self.addFileSignal.connect(self.addFile)
+        self.addAnalyseSignal.connect(self.addFile)
         self.exit.connect(self.exitApplication)
 
     def openGui(self):
-        self.mainWindow.showMaximized()
+        self.window.showMaximized()
         logging.info("GUI opened")
 
     def hideGui(self):
-        self.mainWindow.hide()
+        self.window.hide()
 
     def exitApplication(self):
         getDatabase(resource_path('fundamentals.db')).closeConnection()
-        if not self.mainWindow.isHidden():
-            self.mainWindow.close()
+        if not self.window.isHidden():
+            self.window.close()
         logging.info("Application exit")
 
-    def addFile(self, data: str):
+    def addFile(self, analyse: Analyse):
         pass
 
 
@@ -42,7 +45,7 @@ class ClientHandler(QtCore.QObject):
     dataLock = threading.Lock()
     commandLock = threading.Lock()
 
-    def __init__(self, conn, guiHandler, app):
+    def __init__(self, conn: socket.socket, guiHandler: GuiHandler, app: QtWidgets.QApplication):
         super().__init__()
         self.conn = conn
         self.guiHandler = guiHandler
@@ -65,14 +68,7 @@ class ClientHandler(QtCore.QObject):
                     logging.info(massage)
                     self.conn.sendall(massage.encode("utf-8"))
                 elif command == "-als":
-                    with self.dataLock:
-                        data = ""
-                        while True:
-                            data += self.conn.recv(10).decode("utf-8")
-                            if data[-4:] == "-stp":
-                                break
-                        if data:
-                            self.guiHandler.addFileSignal.emit(data)
+                    threading.Thread(target=self.addAnalyse).start()
                 elif command == "-ext":
                     # exit is sent when the VB exe closes
                     self.guiHandler.exit.emit()
@@ -85,3 +81,8 @@ class ClientHandler(QtCore.QObject):
             logging.error(f"Error handling client: {e}", exc_info=True)
         finally:
             self.conn.close()  # Ensure connection is closed
+
+    def addAnalyse(self):
+        with self.dataLock:
+            analyse = Analyse.fromSocket(self.conn)
+            self.guiHandler.addAnalyseSignal.emit(analyse)
