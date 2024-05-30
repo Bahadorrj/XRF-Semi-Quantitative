@@ -3,8 +3,8 @@ from typing import Optional
 import pandas
 from PyQt6 import QtCore, QtWidgets
 
-from python.main.utils import paths
-from python.main.utils.database import getDatabase
+from python.utils import paths
+from python.utils.database import getDatabase
 
 
 class ElementsWindow(QtWidgets.QWidget):

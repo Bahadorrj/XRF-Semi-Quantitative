@@ -6,9 +6,9 @@ import pyqtgraph as pg
 from PyQt6 import QtWidgets, QtCore, QtGui
 from PyQt6.QtCore import pyqtSignal
 
-from python.main.utils import calculation, datatypes
-from python.main.utils.database import getDatabase
-from python.main.utils.paths import resource_path
+from python.utils import calculation, datatypes
+from python.utils.database import getDatabase
+from python.utils.paths import resource_path
 
 
 class ElementsTableWidget(QtWidgets.QTableWidget):

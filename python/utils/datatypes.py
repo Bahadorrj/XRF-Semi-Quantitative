@@ -7,8 +7,8 @@ import numpy as np
 import pandas as pd
 import pyqtgraph as pg
 
-from python.main.utils import calculation
-from python.main.utils import encryption
+from python.utils import calculation
+from python.utils import encryption
 
 
 @dataclass

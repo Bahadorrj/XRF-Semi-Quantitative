@@ -6,12 +6,12 @@ import numpy as np
 import pyqtgraph as pg
 from PyQt6 import QtCore, QtGui, QtWidgets
 
-from python.main.utils import datatypes
-from python.main.utils import encryption
-from python.main.utils import paths
-from python.main.utils.database import getDatabase
-from python.main.views.elementswindow import ElementsWindow
-from python.main.views.peaksearchwindow import PeakSearchWindow
+from python.utils import datatypes
+from python.utils import encryption
+from python.utils.database import getDatabase
+from python.utils.paths import resource_path
+from python.views.elementswindow import ElementsWindow
+from python.views.peaksearchwindow import PeakSearchWindow
 
 COLORS = [
     "#FF0000",
@@ -67,7 +67,7 @@ class ConditionForm(QtWidgets.QListView):
         super(ConditionForm, self).__init__(parent)
         self.setFrameShape(QtWidgets.QFrame.Shape.Box)
         self.setFrameShadow(QtWidgets.QFrame.Shadow.Plain)
-        db = getDatabase(paths.resource_path("fundamentals.db"))
+        db = getDatabase(resource_path("fundamentals.db"))
         self._df = db.dataframe('SELECT * FROM conditions')
         self._createComboBox()
         self._createTable()
@@ -130,7 +130,7 @@ class PlotWindow(QtWidgets.QMainWindow):
         for label in actions:
             action = QtGui.QAction(label)
             key = "-".join(label.lower().split(" "))
-            action.setIcon(QtGui.QIcon(paths.resource_path(f"icons/{key}.png")))
+            action.setIcon(QtGui.QIcon(resource_path(f"icons/{key}.png")))
             if key in ["save-as", "peak-search", "new"]:
                 action.setDisabled(True)
             self._actionsMap[key] = action

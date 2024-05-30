@@ -5,10 +5,10 @@ import threading
 from PyQt6 import QtWidgets, QtGui
 from PyQt6.QtWidgets import QMainWindow, QApplication
 
-from python.main.controllers import GuiHandler, ClientHandler
-from python.main.utils import paths
-from python.main.utils.paths import sys
-from python.main.views.plotwindow import PlotWindow
+from python.controllers import GuiHandler, ClientHandler
+from python.utils import paths
+from python.utils.paths import sys
+from python.views.plotwindow import PlotWindow
 
 
 def connectServerAndGUI(host, port, mainWindow: QMainWindow, app: QApplication):

@@ -3,8 +3,8 @@ import threading
 
 from PyQt6 import QtCore
 
-from python.main.utils.database import getDatabase
-from python.main.utils.paths import resource_path
+from python.utils.database import getDatabase
+from python.utils.paths import resource_path
 
 
 class GuiHandler(QtCore.QObject):

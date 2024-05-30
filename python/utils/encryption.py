@@ -1,6 +1,6 @@
 from cryptography.fernet import Fernet
 
-from python.main.utils import paths
+from python.utils import paths
 
 
 def generateKeyToFile() -> None:
