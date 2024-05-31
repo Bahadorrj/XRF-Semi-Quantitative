@@ -1,4 +1,3 @@
-import logging
 from functools import partial
 
 import numpy as np
@@ -160,22 +159,19 @@ class ElementsTableWidget(QtWidgets.QTableWidget):
 
 class PeakSearchWindow(QtWidgets.QMainWindow):
     def __init__(self, parent=None):
-        try:
-            super(PeakSearchWindow, self).__init__(parent)
-            self._conditionId = None
-            self._x = None
-            self._y = None
-            self._kev = None
-            self._db = getDatabase(resource_path("fundamentals.db"))
-            self._df = self._db.dataframe("SELECT * FROM elements")
-            self._plotDataList = [datatypes.PlotData.fromSeries(rowId, s) for rowId, s in self._df.iterrows()]
-            self.resize(1200, 800)
-            self._createTableWidget()
-            self._createPlotViewBox()
-            self._setupView()
-            self._fillTable()
-        except Exception as e:
-            logging.exception(e)
+        super(PeakSearchWindow, self).__init__(parent)
+        self._conditionId = None
+        self._x = None
+        self._y = None
+        self._kev = None
+        self._db = getDatabase(resource_path("fundamentals.db"))
+        self._df = self._db.dataframe("SELECT * FROM elements")
+        self._plotDataList = [datatypes.PlotData.fromSeries(rowId, s) for rowId, s in self._df.iterrows()]
+        self.resize(1200, 800)
+        self._createTableWidget()
+        self._createPlotViewBox()
+        self._setupView()
+        self._fillTable()
 
     def _createTableWidget(self) -> None:
         self._tableWidget = ElementsTableWidget(self)
