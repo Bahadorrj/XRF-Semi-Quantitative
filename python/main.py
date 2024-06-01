@@ -29,6 +29,6 @@ def main() -> None:
     app = QtWidgets.QApplication(arg)
     app.setWindowIcon(QtGui.QIcon(paths.resource_path('CSAN.ico')))
     window = PlotWindow()
-    # connectServerAndGUI('127.0.0.1', 16000, window, app)
-    window.show()
+    connectServerAndGUI('127.0.0.1', 16000, window, app)
+    # window.show()
     sys.exit(app.exec())

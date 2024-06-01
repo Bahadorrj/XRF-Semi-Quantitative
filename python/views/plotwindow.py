@@ -475,3 +475,14 @@ class PlotWindow(QtWidgets.QMainWindow):
         data = self._getDataFromIndex(extensionIndex, analyseIndex, dataIndex)
         self._peakSearchWindow.displayAnalyseData(data)
         self._peakSearchWindow.showMaximized()
+
+    def closeEvent(self, event):
+        # Intercept the close event
+        # Check if the close is initiated by the close button
+        if event.spontaneous():
+            # Hide the window instead of closing
+            self.hide()
+            event.ignore()
+        else:
+            # Handle the close event normally
+            event.accept()
