@@ -25,7 +25,7 @@ class GuiHandler(QtCore.QObject):
         self.exit.connect(self.exitApplication)
 
     def openGui(self):
-        self.window.showMaximized()
+        self.window.show()
         logging.info("GUI opened")
 
     def hideGui(self):

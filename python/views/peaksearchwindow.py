@@ -461,7 +461,7 @@ class PeakSearchWindow(QtWidgets.QMainWindow):
         minX, maxX = self._zoomRegion.getRegion()
         self._peakPlot.setXRange(minX, maxX, padding=0)
 
-    def _openPopUp(self, event: QtCore.QEvent):
+    def _openPopUp(self, event):
         pos = event.pos()
         if event.button() == QtCore.Qt.MouseButton.RightButton:
             mousePoint = self._peakPlot.vb.mapSceneToView(pos)
