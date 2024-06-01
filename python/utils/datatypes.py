@@ -18,6 +18,8 @@ class AnalyseData:
     x: np.ndarray
     y: np.ndarray
 
+    # TODO general data: dict?
+
     def toDict(self) -> dict:
         return {
             'condition': self.condition,
@@ -49,6 +51,8 @@ class Analyse:
     name: str
     extension: str
     data: list[AnalyseData] = field(default_factory=list)
+
+    # TODO profile: str --cal or def
 
     def __init__(self, filename: str, data: list[AnalyseData]) -> None:
         self.filename = filename

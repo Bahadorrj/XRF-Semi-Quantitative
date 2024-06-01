@@ -118,7 +118,7 @@ class PlotWindow(QtWidgets.QMainWindow):
     def __init__(self):
         super(PlotWindow, self).__init__()
         self.resize(1200, 800)
-        self.setWindowTitle("Plot Window")
+        self.setWindowTitle("XRF Semi Quantitative")
         self._createActions()
         self._createMenuBar()
         self._createToolBar()
@@ -130,6 +130,7 @@ class PlotWindow(QtWidgets.QMainWindow):
 
         self._analyseFiles = list()
         self._elementsWindow: Optional[QtWidgets.QWidget] = None
+        # TODO interferenceWindow
 
     def _createActions(self) -> None:
         self._actionsMap = {}
@@ -347,6 +348,9 @@ class PlotWindow(QtWidgets.QMainWindow):
             analyse = datatypes.Analyse.fromATXFile(filename)
         if analyse is not None and analyse.data:
             self.addAnalyse(analyse)
+            # TODO show dialog for asking for edit privileges
+            # TODO auto save
+            # TODO get raw intensities file if profile == cal and calculate interference coefficient and fill the table
         else:
             messageBox = QtWidgets.QMessageBox(self)
             messageBox.setIcon(QtWidgets.QMessageBox.Icon.Critical)
