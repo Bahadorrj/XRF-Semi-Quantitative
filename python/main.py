@@ -9,6 +9,7 @@ from python.controllers import GuiHandler, ClientHandler
 from python.utils import paths
 from python.utils.paths import sys
 from python.views.plotwindow import PlotWindow
+from python.views.interferencewindow import InterferenceWindow
 
 
 def connectServerAndGUI(host, port, plotWindow: PlotWindow, app: QApplication):
@@ -28,7 +29,7 @@ def main() -> None:
     arg = sys.argv
     app = QtWidgets.QApplication(arg)
     app.setWindowIcon(QtGui.QIcon(paths.resource_path('CSAN.ico')))
-    window = PlotWindow()
+    window = InterferenceWindow()
     # connectServerAndGUI('127.0.0.1', 16000, window, app)
     window.show()
     sys.exit(app.exec())
