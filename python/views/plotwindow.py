@@ -68,7 +68,7 @@ class ConditionForm(QtWidgets.QListView):
         self.setFrameShape(QtWidgets.QFrame.Shape.Box)
         self.setFrameShadow(QtWidgets.QFrame.Shadow.Plain)
         db = getDatabase(resource_path("fundamentals.db"))
-        self._df = db.dataframe('SELECT * FROM conditions')
+        self._df = db.dataframe('SELECT * FROM Conditions')
         self._createComboBox()
         self._createTable()
         mainLayout = QtWidgets.QVBoxLayout(self)

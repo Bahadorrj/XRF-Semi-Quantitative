@@ -142,11 +142,12 @@ class PlotData:
     @classmethod
     def fromSeries(cls, rowId: int, series: pd.Series) -> 'PlotData':
         active = bool(series['active'])
-        value = calculation.evToPx(series['Kev'])
+        value = calculation.evToPx(series['kiloelectron_volt'])
         labels = [series['symbol'], series['radiation_type']]
         spectrumLine = cls._generateLine(value, active=active)
         peakLine = cls._generateLine(value, labels=labels, active=active)
-        rng = (calculation.evToPx(series['low_Kev']), calculation.evToPx(series['high_Kev']))
+        rng = (
+        calculation.evToPx(series['low_kiloelectron_volt']), calculation.evToPx(series['high_kiloelectron_volt']))
         region = cls._generateRegion(rng)
         return PlotData(rowId, spectrumLine, peakLine, region, False, active)
 
