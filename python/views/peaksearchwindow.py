@@ -17,10 +17,11 @@ class ElementsTableWidget(QtWidgets.QTableWidget):
     def __init__(self, parent=None):
         super(ElementsTableWidget, self).__init__(parent)
         self.rowIds = list()
-        self.setBaseSection()
+        self.intensities = list()
+        self.setBaseSections()
         self.verticalHeader().setSectionResizeMode(QtWidgets.QHeaderView.ResizeMode.ResizeToContents)
 
-    def setBaseSection(self):
+    def setBaseSections(self):
         headers = [
             "Element",
             "Type",
@@ -62,13 +63,14 @@ class ElementsTableWidget(QtWidgets.QTableWidget):
             item = QtWidgets.QTableWidgetItem(label)
             self.setHorizontalHeaderItem(column, item)
 
-    def addRow(self, rowId: int, row: pd.Series):
+    def addRow(self, rowId: int, row: pd.Series, intensity: int):
         if self.rowCount() == 0:
             self.setModifiedSections()
         self.rowIds.append(rowId)
+        self.intensities.append(intensity)
         self.setRowCount(self.rowCount() + 1)
         self._createButtons(rowId, row)
-        self._createItems(row)
+        self._createItems(row, intensity)
 
     def _createButtons(self, rowId: int, row: pd.Series) -> None:
         rowIndex = self.rowCount() - 1
@@ -115,18 +117,23 @@ class ElementsTableWidget(QtWidgets.QTableWidget):
             self.setCellWidget(rowIndex, column, button)
             button.clicked.connect(partial(self._emitRowChanged, label, rowId))
 
-    def _createItems(self, row: pd.Series) -> None:
+    def _createItems(self, row: pd.Series, intensity: int) -> None:
         rowIndex = self.rowCount() - 1
         for column, value in enumerate(row):
-            if column == row.shape[0] - 1:
+            if column == 6:
                 mapper = {1: ("Activated", QtGui.QColor(0, 255, 0)), 0: ("Deactivated", QtGui.QColor(255, 0, 0))}
                 label, color = mapper[value]
                 item = QtWidgets.QTableWidgetItem(label)
                 item.setForeground(color)
+            elif column == 5:
+                item = QtWidgets.QTableWidgetItem(str(intensity))
             else:
                 item = QtWidgets.QTableWidgetItem(str(value))
             item.setTextAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
             self.setItem(rowIndex, column + 2, item)
+        item = QtWidgets.QTableWidgetItem(str(intensity))
+        item.setTextAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
+        self.setItem(rowIndex, 7, item)
 
     def getRow(self, row: int) -> dict:
         rowDict = dict()
@@ -154,7 +161,7 @@ class ElementsTableWidget(QtWidgets.QTableWidget):
         super().clear()
         self.setRowCount(0)
         self.rowIds.clear()
-        self.setBaseSection()
+        self.setBaseSections()
 
 
 class PeakSearchWindow(QtWidgets.QMainWindow):
@@ -165,13 +172,13 @@ class PeakSearchWindow(QtWidgets.QMainWindow):
         self._y = None
         self._kev = None
         self._db = getDatabase(resource_path("fundamentals.db"))
-        self._df = self._db.dataframe("SELECT * FROM elements")
+        self._df = self._db.dataframe("SELECT * FROM Lines")
         self._plotDataList = [datatypes.PlotData.fromSeries(rowId, s) for rowId, s in self._df.iterrows()]
         self.resize(1200, 800)
         self._createTableWidget()
         self._createPlotViewBox()
+        self._createMenuBar()
         self._setupView()
-        self._fillTable()
 
     def _createTableWidget(self) -> None:
         self._tableWidget = ElementsTableWidget(self)
@@ -217,6 +224,22 @@ class PeakSearchWindow(QtWidgets.QMainWindow):
         )
         self._coordinateLabel.setAlignment(QtCore.Qt.AlignmentFlag.AlignRight)
 
+    def _createMenuBar(self) -> None:
+        self._menuBar = QtWidgets.QMenuBar()
+        saveAction = self._menuBar.addAction("&Save")
+        saveAction.triggered.connect(self._saveIntensities)
+        self._menuBar.addAction(saveAction)
+        self.setMenuBar(self._menuBar)
+
+    def _saveIntensities(self) -> None:
+        path, _ = QtWidgets.QFileDialog.getSaveFileName(
+            self, "Save calibration results", "./", "Text Files (*.txt)"
+        )
+        with open(path, "w") as f:
+            for rowId, intensity in zip(self._tableWidget.rowIds, self._tableWidget.intensities):
+                symbol = self._df.at[rowId, "symbol"]
+                f.write(f"{symbol}: {intensity}\n")
+
     def _setupView(self) -> None:
         centralWidget = QtWidgets.QSplitter(self)
         centralWidget.setOrientation(QtCore.Qt.Orientation.Vertical)
@@ -238,20 +261,24 @@ class PeakSearchWindow(QtWidgets.QMainWindow):
                     self._addPlotData(data)
 
     def _addPlotData(self, data: datatypes.PlotData) -> None:
+        series: pd.Series = self._df.iloc[data.rowId]
+        minX, maxX = data.region.getRegion()
+        intensity = self._y[int(minX):int(maxX)].sum()
+        self._tableWidget.addRow(data.rowId, series["symbol":"active"], intensity)
         data.region.sigRegionChanged.connect(partial(self._changeRangeOfData, data))
         data.peakLine.sigClicked.connect(partial(self._selectData, data))
         data.spectrumLine.sigClicked.connect(partial(self._selectData, data))
-        series = self._df.iloc[data.rowId]
-        self._tableWidget.addRow(data.rowId, series["symbol":"active"])
 
     @QtCore.pyqtSlot()
     def _changeRangeOfData(self, data: datatypes.PlotData) -> None:
         minX, maxX = data.region.getRegion()
         minKev = self._kev[int(minX)]
         maxKev = self._kev[int(maxX)]
+        intensity = self._y[int(minX):int(maxX)].sum()
         row = self._tableWidget.getRowById(data.rowId)
         row.get("low-kev").setText(str(minKev))
         row.get("high-kev").setText(str(maxKev))
+        row.get("intensity").setText(str(intensity))
         self._df.at[data.rowId, "low-kev"] = minKev
         self._df.at[data.rowId, "high-kev"] = maxKev
 
@@ -302,7 +329,7 @@ class PeakSearchWindow(QtWidgets.QMainWindow):
         index = self._tableWidget.rowIds.index(data.rowId)
         self._tableWidget.removeRow(index)
         if self._tableWidget.rowCount() == 0:
-            self._tableWidget.setBaseSection()
+            self._tableWidget.setBaseSections()
 
     def _dataVisibilityChanged(self, data: datatypes.PlotData) -> None:
         row = self._tableWidget.getRowById(data.rowId)
@@ -324,7 +351,6 @@ class PeakSearchWindow(QtWidgets.QMainWindow):
         data.visible = True
         self._erasePlotData(data)
         row = self._tableWidget.getRowById(data.rowId)
-        intensityItem = row.get("intensity")
         statusItem = row.get("status")
         hideButton = row.get(1)
         hideButton.setIcon(QtGui.QIcon(resource_path("icons/show.png")))
@@ -332,8 +358,6 @@ class PeakSearchWindow(QtWidgets.QMainWindow):
         if data.active:
             data.deactivate()
             self._df.at[data.rowId, 'active'] = 0
-            intensityItem.setText("None")
-            self._df.at[data.rowId, 'intensity'] = np.nan
             statusItem.setText("Deactivated")
             statusItem.setForeground(QtGui.QColor(255, 0, 0))
             statusButton.setText("Activate")
@@ -342,9 +366,6 @@ class PeakSearchWindow(QtWidgets.QMainWindow):
             data.activate()
             self._df.at[data.rowId, 'active'] = 1
             low, high = data.region.getRegion()
-            intensity = self._y[int(low):int(high)].sum()
-            self._df.at[data.rowId, 'intensity'] = intensity
-            intensityItem.setText(str(intensity))
             statusItem.setText("Activated")
             statusItem.setForeground(QtGui.QColor(0, 255, 0))
             statusButton.setText("Deactivate")
@@ -467,8 +488,8 @@ class PeakSearchWindow(QtWidgets.QMainWindow):
             mousePoint = self._peakPlot.vb.mapSceneToView(pos)
             kev = calculation.pxToEv(mousePoint.x())
             self._peakPlot.vb.menu.clear()
-            greater = self._df["low_Kev"] <= kev
-            smaller = kev <= self._df["high_Kev"]
+            greater = self._df["low_kiloelectron_volt"] <= kev
+            smaller = kev <= self._df["high_kiloelectron_volt"]
             mask = np.logical_and(greater, smaller)
             filteredDataframe = self._df[mask]
             for radiationLabel in self._df["radiation_type"].unique():
@@ -532,6 +553,7 @@ class PeakSearchWindow(QtWidgets.QMainWindow):
         self._zoomRegion.setBounds((0, max(self._x)))
         self._zoomRegion.setRegion((0, 100))
         self._peakPlot.setXRange(0, 100, padding=0)
+        self._fillTable()
 
     def closeEvent(self, event):
         self._saveToDatabase()
@@ -539,24 +561,20 @@ class PeakSearchWindow(QtWidgets.QMainWindow):
 
     def _saveToDatabase(self):
         for _, row in self._df.iterrows():
-            if np.isnan(row['intensity']):
-                row['intensity'] = "NULL"
             if row['active'] == 1:
                 query = f"""
-                    UPDATE elements
-                    SET low_Kev = {row['low_Kev']},
-                        high_Kev = {row['high_Kev']},
-                        intensity = {row['intensity']},
+                    UPDATE Lines
+                    SET low_kiloelectron_volt = {row['low_kiloelectron_volt']},
+                        high_kiloelectron_volt = {row['high_kiloelectron_volt']},
                         active = {row['active']},
                         condition_id = {self._conditionId}
-                    WHERE element_id = {row['element_id']};
+                    WHERE line_id = {row['line_id']};
                 """
             else:
                 query = f"""
-                    UPDATE elements
-                    SET intensity = 0,
-                        active = {row['active']},
+                    UPDATE Lines
+                    SET active = {row['active']},
                         condition_id = "NULL"
-                    WHERE element_id = {row['element_id']};
+                    WHERE line_id = {row['line_id']};
                 """
             self._db.executeQuery(query)
