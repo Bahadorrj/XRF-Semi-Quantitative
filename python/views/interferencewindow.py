@@ -1,11 +1,13 @@
 from collections import defaultdict
 
+import numpy as np
 import pandas as pd
+import pyqtgraph as pg
 from PyQt6 import QtCore, QtWidgets, QtGui
 
+from python.utils.color import generateGradiant
 from python.utils.database import getDatabase
 from python.utils.paths import resource_path
-from python.utils.color import generateGradiant
 
 
 class RadiationComboBox(QtWidgets.QComboBox):
@@ -87,7 +89,7 @@ class InterferenceWindow(QtWidgets.QMainWindow):
         self._tableWidget.horizontalHeader().setSectionResizeMode(QtWidgets.QHeaderView.ResizeMode.ResizeToContents)
         self._tableWidget.verticalHeader().setSectionResizeMode(QtWidgets.QHeaderView.ResizeMode.ResizeToContents)
         self._tableWidget.setCurrentCell(0, 0)
-        self._mainLayout.addWidget(self._tableWidget, 0, 1, 4, 1)
+        self._mainLayout.addWidget(self._tableWidget, 0, 1, 5, 1)
         self._tableWidget.cellChanged.connect(self._cellChanged)
         self._tableWidget.cellClicked.connect(self._cellClicked)
 
@@ -171,10 +173,21 @@ class InterferenceWindow(QtWidgets.QMainWindow):
         self._tableWidget.blockSignals(False)
 
     def _createIndexFinderLayout(self) -> None:
+        self._createPlotWidget()
         self._createElementLayout()
         self._createInterfererLayout()
         self._createElementInterferenceTable()
         self._createInterfererInterferenceTable()
+
+    def _createPlotWidget(self) -> None:
+        self._plotWidget = pg.PlotWidget(self)
+        self._plotWidget.setBackground("#fff")
+        # self._plotWidget.setLimits(xMin=0, xMax=10, yMin=0, yMax=100)
+        plotItem = self._plotWidget.getPlotItem()
+        plotItem.setContentsMargins(10, 10, 10, 10)
+        self._plotWidget.setFrameShape(QtWidgets.QFrame.Shape.Box)
+        self._plotWidget.setFrameShadow(QtWidgets.QFrame.Shadow.Plain)
+        self._mainLayout.addWidget(self._plotWidget, 0, 0, 1, 1)
 
     def _createElementLayout(self) -> None:
         horizontalLayout = QtWidgets.QHBoxLayout()
@@ -187,7 +200,7 @@ class InterferenceWindow(QtWidgets.QMainWindow):
         horizontalLayout.addWidget(self._elementSymbol)
         self._elementRadiation = QtWidgets.QComboBox()
         horizontalLayout.addWidget(self._elementRadiation)
-        self._mainLayout.addLayout(horizontalLayout, 0, 0, 1, 1)
+        self._mainLayout.addLayout(horizontalLayout, 1, 0, 1, 1)
         self._elementSymbol.editingFinished.connect(self._elementSelected)
         self._elementRadiation.currentTextChanged.connect(self._elementRadiationChanged)
 
@@ -252,7 +265,7 @@ class InterferenceWindow(QtWidgets.QMainWindow):
         horizontalLayout.addWidget(self._interfererSymbol)
         self._interfererRadiation = QtWidgets.QComboBox()
         horizontalLayout.addWidget(self._interfererRadiation)
-        self._mainLayout.addLayout(horizontalLayout, 2, 0, 1, 1)
+        self._mainLayout.addLayout(horizontalLayout, 3, 0, 1, 1)
         self._interfererSymbol.editingFinished.connect(self._interfererSelected)
         self._interfererRadiation.currentTextChanged.connect(self._interfererRadiationChanged)
 
@@ -315,7 +328,7 @@ class InterferenceWindow(QtWidgets.QMainWindow):
         self._elementInterferenceTable.setEditTriggers(QtWidgets.QAbstractItemView.EditTrigger.NoEditTriggers)
         self._elementInterferenceTable.setFrameShape(QtWidgets.QFrame.Shape.Box)
         self._elementInterferenceTable.setFrameShadow(QtWidgets.QFrame.Shadow.Plain)
-        self._mainLayout.addWidget(self._elementInterferenceTable, 1, 0, 1, 1)
+        self._mainLayout.addWidget(self._elementInterferenceTable, 2, 0, 1, 1)
         self._elementInterferenceTable.cellClicked.connect(self._linkElementTable)
 
     @QtCore.pyqtSlot()
@@ -337,7 +350,7 @@ class InterferenceWindow(QtWidgets.QMainWindow):
         self._interfererInterferenceTable.setEditTriggers(QtWidgets.QAbstractItemView.EditTrigger.NoEditTriggers)
         self._interfererInterferenceTable.setFrameShape(QtWidgets.QFrame.Shape.Box)
         self._interfererInterferenceTable.setFrameShadow(QtWidgets.QFrame.Shadow.Plain)
-        self._mainLayout.addWidget(self._interfererInterferenceTable, 3, 0, 1, 1)
+        self._mainLayout.addWidget(self._interfererInterferenceTable, 4, 0, 1, 1)
         self._interfererInterferenceTable.cellClicked.connect(self._linkInterfererTable)
 
     def _linkInterfererTable(self) -> None:
@@ -354,6 +367,10 @@ class InterferenceWindow(QtWidgets.QMainWindow):
         except ValueError:
             self._tableWidget.item(row, column).setText('')
             return
+        if coefficient > 1:
+            self._tableWidget.item(row, column).setText('')
+            return
+        self._plotCoefficient(coefficient)
         elementSymbol = self._symbols[row]
         elementRadiation = self._tableWidget.cellWidget(row, 0).currentText()
         interfererSymbol = self._symbols[column]
@@ -407,12 +424,22 @@ class InterferenceWindow(QtWidgets.QMainWindow):
 
     @QtCore.pyqtSlot(int, int)
     def _cellClicked(self, row: int, column: int) -> None:
+        if self._tableWidget.currentItem().text():
+            self._plotCoefficient(float(self._tableWidget.currentItem().text()))
+        else:
+            self._plotWidget.clear()
         self._elementSymbol.setText(self._symbols[row])
         self._elementSelected()
         self._elementRadiation.setCurrentIndex(self._tableWidget.cellWidget(row, 0).currentIndex())
         self._interfererSymbol.setText(self._symbols[column])
         self._interfererSelected()
         self._interfererRadiation.setCurrentIndex(self._tableWidget.cellWidget(0, column).currentIndex())
+
+    def _plotCoefficient(self, coefficient: float) -> None:
+        self._plotWidget.clear()
+        y = np.linspace(0, 1, 100)
+        x = np.linspace(0, 100 / coefficient, 100)
+        self._plotWidget.plot(x, y, pen=pg.mkPen(width=1, color='b'))
 
     def closeEvent(self, a0):
         a0.accept()
