@@ -20,6 +20,7 @@ class ElementsTableWidget(QtWidgets.QTableWidget):
         super(ElementsTableWidget, self).__init__(parent)
         self.rowIds = list()
         self.intensities = list()
+        self.setModifiedSections()
 
     def setModifiedSections(self):
         headers = [
@@ -51,8 +52,6 @@ class ElementsTableWidget(QtWidgets.QTableWidget):
             self.setHorizontalHeaderItem(column, item)
 
     def addRow(self, rowId: int, row: pd.Series, intensity: int, conditionId: int) -> None:
-        if self.rowCount() == 0:
-            self.setModifiedSections()
         self.rowIds.append(rowId)
         self.intensities.append(intensity)
         self.setRowCount(self.rowCount() + 1)
@@ -339,24 +338,16 @@ class PeakSearchWindow(QtWidgets.QMainWindow):
         hideButton = row.get(0)
         if data.visible:
             self._erasePlotData(data)
-            # if data.active is False:
-            #     self._hideCorrelatedToData(data)
             hideButton.setIcon(QtGui.QIcon(resource_path("icons/hide.png")))
         else:
             self._selectData(data)
             self._drawPlotData(data)
-            # if data.active is False:
-            #     self._showCorrelatedToData(data)
             hideButton.setIcon(QtGui.QIcon(resource_path("icons/show.png")))
         data.visible = not data.visible
 
     def _dataStatusChanged(self, data: datatypes.PlotData) -> None:
-        data.visible = True
-        self._erasePlotData(data)
         row = self._tableWidget.getRowById(data.rowId)
         statusItem = row.get("status")
-        hideButton = row.get(0)
-        hideButton.setIcon(QtGui.QIcon(resource_path("icons/show.png")))
         statusButton = row.get(self._tableWidget.columnCount() - 1)
         if data.active:
             data.deactivate()
@@ -364,16 +355,39 @@ class PeakSearchWindow(QtWidgets.QMainWindow):
             statusItem.setText("Deactivated")
             statusItem.setForeground(QtGui.QColor(255, 0, 0))
             statusButton.setText("Activate")
-            self._showCorrelatedToData(data)
         else:
-            data.activate()
-            self._df.at[data.rowId, 'active'] = 1
-            statusItem.setText("Activated")
-            statusItem.setForeground(QtGui.QColor(0, 255, 0))
-            statusButton.setText("Deactivate")
-            self._hideCorrelatedToData(data)
-        self._selectData(data)
-        self._drawPlotData(data)
+            symbol = self._df.at[data.rowId, 'symbol']
+            df = self._df.query(f"symbol == '{symbol}' and active == 1")
+            if df.empty:
+                data.activate()
+                self._df.at[data.rowId, 'active'] = 1
+                statusItem.setText("Activated")
+                statusItem.setForeground(QtGui.QColor(0, 255, 0))
+                statusButton.setText("Deactivate")
+            else:
+                messageBox = QtWidgets.QMessageBox(self)
+                messageBox.setIcon(QtWidgets.QMessageBox.Icon.Question)
+                messageBox.setText(
+                    f"One Line Of {symbol} Is Already Identified As The Main Line.\n"
+                    "Activating This Line Will Deactivate The Previous Line And Replace It With The Current.\n"
+                    "Would You Like To Continue?"
+                )
+                messageBox.setWindowTitle("Activation Failed")
+                messageBox.setStandardButtons(
+                    QtWidgets.QMessageBox.StandardButton.Yes | QtWidgets.QMessageBox.StandardButton.No
+                )
+                result = messageBox.exec()
+                if result == QtWidgets.QMessageBox.StandardButton.Yes:
+                    self._dataStatusChanged(self._plotDataList[df.index[0]])
+                    data.activate()
+                    self._df.at[data.rowId, 'active'] = 1
+                    statusItem.setText("Activated")
+                    statusItem.setForeground(QtGui.QColor(0, 255, 0))
+                    statusButton.setText("Deactivate")
+        if data.visible:
+            self._erasePlotData(data)
+            self._selectData(data)
+            self._drawPlotData(data)
 
     def _drawPlotData(self, data: datatypes.PlotData) -> None:
         if data.peakLine not in self._peakPlot.items:
@@ -490,7 +504,6 @@ class PeakSearchWindow(QtWidgets.QMainWindow):
         self._addPlotData(data)
         self._tableWidget.getRowById(rowId).get(1).setIcon(QtGui.QIcon(resource_path('icons/show.png')))
         self._drawPlotData(data)
-        self._showCorrelatedToData(data)
         self._selectData(data)
 
     def addAnalyse(self, analyse: Analyse) -> None:
