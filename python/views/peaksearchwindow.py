@@ -85,15 +85,15 @@ class ElementsTableWidget(QtWidgets.QTableWidget):
             elif label == "condition":
                 widget = QtWidgets.QComboBox()
                 values = [
-                    'Condition 1', 'Condition 2', 'Condition 3',
+                    '', 'Condition 1', 'Condition 2', 'Condition 3',
                     'Condition 4', 'Condition 5', 'Condition 6',
                     'Condition 7', 'Condition 8', 'Condition 9'
                 ]
                 widget.addItems(values)
-                if np.isnan(self.df.at[rowId, 'condition_id']):
-                    widget.setCurrentIndex(-1)
-                else:
-                    widget.setCurrentText(f"Condition {int(self.df.at[rowId, 'condition_id'])}")
+                try:
+                    widget.setCurrentText(f"Condition {int(row['condition_id'])}")
+                except ValueError:
+                    widget.setCurrentIndex(0)
                 widget.setStyleSheet("""
                     QComboBox {
                         border: 1px solid gray;
@@ -378,8 +378,15 @@ class PeakSearchWindow(QtWidgets.QMainWindow):
     def _addPlotData(self, plotData: datatypes.PlotData) -> None:
         series: pd.Series = self._df.iloc[plotData.rowId]
         minX, maxX = plotData.region.getRegion()
-        y = list(filter(lambda d: d.condition == self._conditionId, self._analyse.data))[0].y
-        intensity = y[int(minX):int(maxX)].sum()
+        if np.isnan(series['condition_id']):
+            intensity = "NA"
+        else:
+            # TODO remove when proper analyse files where available
+            try:
+                y = list(filter(lambda d: d.condition == int(series['condition_id']), self._analyse.data))[0].y
+                intensity = y[int(minX):int(maxX)].sum()
+            except IndexError:
+                intensity = "NA"
         self._tableWidget.addRow(plotData.rowId, series["symbol":"active"], intensity)
         plotData.region.sigRegionChanged.connect(partial(self._changeRangeOfData, plotData))
         plotData.peakLine.sigClicked.connect(partial(self._selectData, plotData))
@@ -419,12 +426,15 @@ class PeakSearchWindow(QtWidgets.QMainWindow):
             data = self._plotDataList[rowId]
             self._dataVisibilityChanged(data)
         elif buttonLabel == "condition":
+            row = self._tableWidget.getRow(rowId)
             data = self._plotDataList[rowId]
             minX, maxX = data.region.getRegion()
-            row = self._tableWidget.getRow(rowId)
-            conditionId = int(row.get(7).currentText().split(" ")[-1])
-            y = list(filter(lambda d: d.condition == conditionId, self._analyse.data))[0].y
-            intensity = y[int(minX):int(maxX)].sum()
+            if row.get(7).currentText() != "":
+                conditionId = int(row.get(7).currentText().split(" ")[-1])
+                y = list(filter(lambda d: d.condition == conditionId, self._analyse.data))[0].y
+                intensity = y[int(minX):int(maxX)].sum()
+            else:
+                intensity = "NA"
             row.get("intensity").setText(str(intensity))
         else:
             data = self._plotDataList[rowId]
@@ -601,7 +611,6 @@ class PeakSearchWindow(QtWidgets.QMainWindow):
     def _showPlotData(self, data: datatypes.PlotData) -> None:
         data.visible = True
         self._addPlotData(data)
-        row = self._tableWidget.getRow(data.rowId)
         self._tableWidget.getRow(data.rowId).get(0).setIcon(QtGui.QIcon(resource_path('icons/show.png')))
         self._drawPlotData(data)
         self._selectData(data)
@@ -636,7 +645,7 @@ class PeakSearchWindow(QtWidgets.QMainWindow):
         self._fillTable()
 
     def closeEvent(self, event):
-        # self._saveToDatabase()
+        self._saveToDatabase()
         event.accept()
 
     def mousePressEvent(self, a0):
@@ -645,21 +654,31 @@ class PeakSearchWindow(QtWidgets.QMainWindow):
         return super().mousePressEvent(a0)
 
     def _saveToDatabase(self):
-        for _, row in self._df.iterrows():
-            if row['active'] == 1:
+        for index, row in enumerate(self._tableWidget.rows):
+            if row['status'].text() == "Activated":
+                active = 1
+            else:
+                active = 0
+            try:
+                conditionId = int(row[7].currentText().split(" ")[-1])
+            except ValueError:
+                conditionId = None
+            if conditionId is not None:
                 query = f"""
                     UPDATE Lines
-                    SET low_kiloelectron_volt = {row['low_kiloelectron_volt']},
-                        high_kiloelectron_volt = {row['high_kiloelectron_volt']},
-                        active = {row['active']},
-                        condition_id = {self._conditionId}
-                    WHERE line_id = {row['line_id']};
+                    SET low_kiloelectron_volt = {row['low-kev'].text()},
+                        high_kiloelectron_volt = {row['high-kev'].text()},
+                        active = {active},
+                        condition_id = {conditionId}
+                    WHERE line_id = {index + 1};
                 """
             else:
                 query = f"""
                     UPDATE Lines
-                    SET active = {row['active']},
-                        condition_id = "NULL"
-                    WHERE line_id = {row['line_id']};
+                    SET low_kiloelectron_volt = {row['low-kev'].text()},
+                        high_kiloelectron_volt = {row['high-kev'].text()},
+                        active = {active},
+                        condition_id = NULL
+                    WHERE line_id = {index + 1};
                 """
             self._db.executeQuery(query)
