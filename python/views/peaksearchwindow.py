@@ -579,29 +579,37 @@ class PeakSearchWindow(QtWidgets.QMainWindow):
             greater = self._df["low_kiloelectron_volt"] <= kev
             smaller = kev <= self._df["high_kiloelectron_volt"]
             mask = np.logical_and(greater, smaller)
-            filteredDataframe = self._df[mask]
+            self._elementsInRange = self._df[mask]
             for radiationLabel in self._df["radiation_type"].unique():
-                filteredData = filteredDataframe[filteredDataframe["radiation_type"] == radiationLabel]
+                filteredData = self._elementsInRange[self._elementsInRange["radiation_type"] == radiationLabel]
                 if not filteredData.empty:
                     menu = self._peakPlot.vb.menu.addMenu(radiationLabel)
                     menu.triggered.connect(self._actionClicked)
                     for symbol in filteredData["symbol"]:
                         menu.addAction(symbol)
+            showAllAction = self._peakPlot.vb.menu.addAction("Show All")
+            showAllAction.triggered.connect(self._showAll)
 
     def _actionClicked(self, action: QtGui.QAction):
         elementSymbol = action.text()
         radiationType = action.parent().title()
-        mask = np.logical_and(
-            self._df["symbol"] == elementSymbol,
-            self._df["radiation_type"] == radiationType
-        )
-        rowId = self._df[mask].index.values[0]
+        df = self._elementsInRange.query(f"symbol == '{elementSymbol}' and radiation_type == '{radiationType}'")
+        rowId = df.index.values[0]
         data = self._plotDataList[rowId]
+        self._showPlotData(data)
+
+    def _showPlotData(self, data: datatypes.PlotData) -> None:
         data.visible = True
         self._addPlotData(data)
-        self._tableWidget.getRow(rowId).get(1).setIcon(QtGui.QIcon(resource_path('icons/show.png')))
+        row = self._tableWidget.getRow(data.rowId)
+        self._tableWidget.getRow(data.rowId).get(0).setIcon(QtGui.QIcon(resource_path('icons/show.png')))
         self._drawPlotData(data)
         self._selectData(data)
+
+    def _showAll(self) -> None:
+        for rowId in self._elementsInRange.index:
+            data = self._plotDataList[rowId]
+            self._showPlotData(data)
 
     def addAnalyse(self, analyse: Analyse) -> None:
         self._analyse = analyse
