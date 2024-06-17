@@ -16,11 +16,19 @@ from python.utils.paths import resource_path
 class ElementsTableWidget(QtWidgets.QTableWidget):
     rowChanged = pyqtSignal(str, int)
 
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, df: pd.DataFrame = None):
         super(ElementsTableWidget, self).__init__(parent)
+        self.df = df
         self.rowIds = list()
         self.intensities = list()
+        self.rows = list()
         self.setModifiedSections()
+        self.setStyleSheet("""
+            QTableWidget::item:selected {
+                background-color: rgba(135, 206, 250, 128);  /* LightSkyBlue with 50% opacity */
+                color: black;
+            }
+        """)
 
     def setModifiedSections(self):
         headers = [
@@ -51,14 +59,16 @@ class ElementsTableWidget(QtWidgets.QTableWidget):
             item = QtWidgets.QTableWidgetItem(label)
             self.setHorizontalHeaderItem(column, item)
 
-    def addRow(self, rowId: int, row: pd.Series, intensity: int, conditionId: int) -> None:
+    def addRow(self, rowId: int, row: pd.Series, intensity: int) -> None:
+        self.setRowCount(self.rowCount() + 1)
         self.rowIds.append(rowId)
         self.intensities.append(intensity)
-        self.setRowCount(self.rowCount() + 1)
-        self._createButtons(rowId, row, conditionId)
-        self._createItems(row, intensity)
+        rowAsDict = dict()
+        self._createButtons(rowId, row, rowAsDict)
+        self._createItems(row, intensity, rowAsDict)
+        self.rows.append(rowAsDict)
 
-    def _createButtons(self, rowId: int, row: pd.Series, conditionId: int) -> None:
+    def _createButtons(self, rowId: int, row: pd.Series, rowDict: dict) -> None:
         rowIndex = self.rowCount() - 1
         mapper = {"hide": 0, "condition": 7, "status": 9}
         for label, column in mapper.items():
@@ -80,7 +90,10 @@ class ElementsTableWidget(QtWidgets.QTableWidget):
                     'Condition 7', 'Condition 8', 'Condition 9'
                 ]
                 widget.addItems(values)
-                widget.setCurrentText(f"Condition {conditionId}")
+                if np.isnan(self.df.at[rowId, 'condition_id']):
+                    widget.setCurrentIndex(-1)
+                else:
+                    widget.setCurrentText(f"Condition {int(self.df.at[rowId, 'condition_id'])}")
                 widget.setStyleSheet("""
                     QComboBox {
                         border: 1px solid gray;
@@ -107,7 +120,7 @@ class ElementsTableWidget(QtWidgets.QTableWidget):
                         border-radius: 3px;
                         border: 1px solid gray;
                         selection-background-color: lightgray;
-                        background-color: lightblue; /* Custom background color for the drop-down menu */
+                        background-color: rgba(135, 206, 250, 128); /* Custom background color for the drop-down menu */
                     }
                 """)
                 widget.currentTextChanged.connect(partial(self._emitRowChanged, label, rowId))
@@ -139,9 +152,10 @@ class ElementsTableWidget(QtWidgets.QTableWidget):
                     }
                     """)
                 widget.clicked.connect(partial(self._emitRowChanged, label, rowId))
+            rowDict[column] = widget
             self.setCellWidget(rowIndex, column, widget)
 
-    def _createItems(self, row: pd.Series, intensity: int) -> None:
+    def _createItems(self, row: pd.Series, intensity: int, rowDict: dict) -> None:
         rowIndex = self.rowCount() - 1
         mapper = {
             0: str(row['symbol']),
@@ -161,30 +175,21 @@ class ElementsTableWidget(QtWidgets.QTableWidget):
                     item.setForeground(QtGui.QColor(0, 255, 0))
                 else:
                     item.setForeground(QtGui.QColor(255, 0, 0))
+            key = self.horizontalHeaderItem(column + 1).text().lower().replace(" ", "-")
+            rowDict[key] = item
             self.setItem(rowIndex, column + 1, item)
 
-    def getRow(self, row: int) -> dict:
-        rowDict = dict()
-        for column in range(self.columnCount()):
-            header = self.horizontalHeaderItem(column).text()
-            if header == "" or header == "Condition":
-                rowDict[column] = self.cellWidget(row, column)
-            else:
-                key = header.lower().replace(" ", "-")
-                rowDict[key] = self.item(row, column)
-        return rowDict
-
-    def getRowById(self, rowId: int) -> dict:
-        rowIndex = self.rowIds.index(rowId)
-        return self.getRow(rowIndex)
+    def getRow(self, rowId: int) -> dict:
+        return self.rows[self.rowIds.index(rowId)]
 
     def _emitRowChanged(self, label: str, rowId: int) -> None:
         self.rowChanged.emit(label, rowId)
 
-    def removeRow(self, row):
-        super().removeRow(row)
-        self.rowIds.pop(row)
-        self.intensities.pop(row)
+    def resetTable(self) -> None:
+        self.setRowCount(0)
+        self.rowIds.clear()
+        self.intensities.clear()
+        self.rows.clear()
 
 
 class PeakSearchWindow(QtWidgets.QMainWindow):
@@ -197,24 +202,110 @@ class PeakSearchWindow(QtWidgets.QMainWindow):
         self._df = self._db.dataframe("SELECT * FROM Lines")
         self._plotDataList = [datatypes.PlotData.fromSeries(rowId, s) for rowId, s in self._df.iterrows()]
         self.resize(1200, 800)
+        self._mainLayout = QtWidgets.QVBoxLayout()
+        self._createSearchBar()
         self._createTableWidget()
         self._createPlotViewBox()
         self._createMenuBar()
         self._setupView()
 
+    def _createSearchBar(self) -> None:
+        self._searchedElement = QtWidgets.QLineEdit()
+        self._searchedElement.setStyleSheet("""
+            QLineEdit {
+                border-radius: 5px;
+                border: 1px solid gray;
+                padding: 5px 2px;
+            }
+            QLineEdit:focus {
+                border: 1px solid black;
+            }
+        """)
+        self._searchedElement.setSizePolicy(
+            QtWidgets.QSizePolicy.Policy.Fixed, QtWidgets.QSizePolicy.Policy.Fixed
+        )
+        self._searchedRadiation = QtWidgets.QComboBox()
+        self._searchedRadiation.setStyleSheet("""
+            QComboBox {
+                border: 1px solid gray;
+                border-radius: 3px;
+                padding: 5px;
+                width: 20px;
+            }
+            QComboBox:hover {
+                border: 1px solid black;
+            }
+            QComboBox::drop-down {
+                subcontrol-origin: padding;
+                subcontrol-position: top right;
+                width: 15px;
+                border-left-width: 1px;
+                border-left-color: darkgray;
+                border-left-style: solid;
+                border-top-right-radius: 3px;
+                border-bottom-right-radius: 3px;
+            }
+            QComboBox::down-arrow {
+                image: url(icons/down-arrow-resized.png)
+            }
+            QComboBox QAbstractItemView {
+                border-radius: 3px;
+                border: 1px solid gray;
+                selection-background-color: lightgray;
+                background-color: rgba(135, 206, 250, 128); /* Custom background color for the drop-down menu */
+            }
+        """)
+        hLayout = QtWidgets.QHBoxLayout()
+        label = QtWidgets.QLabel("Element Symbol: ")
+        hLayout.addWidget(label)
+        hLayout.addWidget(self._searchedElement)
+        label = QtWidgets.QLabel("Radiation Type: ")
+        hLayout.addWidget(label)
+        hLayout.addWidget(self._searchedRadiation)
+        spacerItem = QtWidgets.QSpacerItem(
+            0, 0, QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Fixed
+        )
+        hLayout.addItem(spacerItem)
+        self._mainLayout.addLayout(hLayout)
+        self._searchedElement.editingFinished.connect(self._searchElement)
+
+    @QtCore.pyqtSlot()
+    def _searchElement(self) -> None:
+        df = self._df.query(f"symbol == '{self._searchedElement.text()}'")
+        if not df.empty:
+            self._tableWidget.resetTable()
+            for rowId in df.index:
+                data = self._plotDataList[rowId]
+                self._addPlotData(data)
+        else:
+            self._fillTable()
+
     def _createTableWidget(self) -> None:
-        self._tableWidget = ElementsTableWidget(self)
-        self._tableWidget.setMinimumHeight(115)
+        self._tableWidget = ElementsTableWidget(self, df=self._df)
+        self._tableWidget.setSelectionMode(QtWidgets.QTableWidget.SelectionMode.ExtendedSelection)
+        self._tableWidget.setSelectionBehavior(QtWidgets.QTableWidget.SelectionBehavior.SelectRows)
         self._tableWidget.setMaximumHeight(int(self.size().height() / 3))
         self._tableWidget.setAlternatingRowColors(True)
+        self._mainLayout.addWidget(self._tableWidget)
+        self._tableWidget.setFrameShape(QtWidgets.QFrame.Shape.Box)
+        self._tableWidget.setFrameShadow(QtWidgets.QFrame.Shadow.Plain)
         self._tableWidget.rowChanged.connect(self._rowChanged)
         self._tableWidget.itemClicked.connect(self._itemClicked)
 
     def _createPlotViewBox(self) -> None:
+        self._createCoordinateLabel()
         self._graphicsLayoutWidget = pg.GraphicsLayoutWidget()
         self._createPeakPlot()
         self._createSpectrumPlot()
-        self._createCoordinateLabel()
+        self._mainLayout.addWidget(self._graphicsLayoutWidget)
+
+    def _createCoordinateLabel(self) -> None:
+        self._coordinateLabel = QtWidgets.QLabel()
+        self._coordinateLabel.setSizePolicy(
+            QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Fixed
+        )
+        self._coordinateLabel.setAlignment(QtCore.Qt.AlignmentFlag.AlignRight)
+        self._mainLayout.addWidget(self._coordinateLabel)
 
     def _createPeakPlot(self):
         self._peakPlot = self._graphicsLayoutWidget.addPlot(row=0, col=0)
@@ -224,7 +315,7 @@ class PeakSearchWindow(QtWidgets.QMainWindow):
         self._peakPlot.vb.scaleBy(center=(0, 0))
         self._peakPlot.vb.menu.clear()
         self._peakPlot.setMinimumHeight(
-            self._graphicsLayoutWidget.sizeHint().height() * 2 / 3
+            int(self._graphicsLayoutWidget.sizeHint().height() * 3 / 5)
         )
         self._peakPlot.sigRangeChanged.connect(self._adjustZoom)
         self._peakPlot.scene().sigMouseMoved.connect(self._mouseMoved)
@@ -237,13 +328,6 @@ class PeakSearchWindow(QtWidgets.QMainWindow):
         self._spectrumPlot.showGrid(x=True, y=True)
         self._zoomRegion = pg.LinearRegionItem(clipItem=self._spectrumPlot)
         self._zoomRegion.sigRegionChanged.connect(self._showZoomedRegion)
-
-    def _createCoordinateLabel(self) -> None:
-        self._coordinateLabel = QtWidgets.QLabel()
-        self._coordinateLabel.setSizePolicy(
-            QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Fixed
-        )
-        self._coordinateLabel.setAlignment(QtCore.Qt.AlignmentFlag.AlignRight)
 
     def _createMenuBar(self) -> None:
         self._menuBar = QtWidgets.QMenuBar()
@@ -263,19 +347,12 @@ class PeakSearchWindow(QtWidgets.QMainWindow):
                 f.write(f"{symbol}-{radiation}: {intensity}\n")
 
     def _setupView(self) -> None:
-        centralWidget = QtWidgets.QSplitter(self)
-        centralWidget.setOrientation(QtCore.Qt.Orientation.Vertical)
-        centralWidget.addWidget(self._tableWidget)
-        graphicWidget = QtWidgets.QWidget()
-        graphicWidgetLayout = QtWidgets.QVBoxLayout(graphicWidget)
-        graphicWidgetLayout.addWidget(self._coordinateLabel)
-        graphicWidgetLayout.addWidget(self._graphicsLayoutWidget)
-        graphicWidgetLayout.setStretch(1, 1)
-        graphicWidget.setLayout(graphicWidgetLayout)
-        centralWidget.addWidget(graphicWidget)
+        centralWidget = QtWidgets.QWidget()
+        centralWidget.setLayout(self._mainLayout)
         self.setCentralWidget(centralWidget)
 
     def _fillTable(self) -> None:
+        self._tableWidget.resetTable()
         for data in self._plotDataList:
             self._addPlotData(data)
 
@@ -284,7 +361,7 @@ class PeakSearchWindow(QtWidgets.QMainWindow):
         minX, maxX = plotData.region.getRegion()
         y = list(filter(lambda d: d.condition == self._conditionId, self._analyse.data))[0].y
         intensity = y[int(minX):int(maxX)].sum()
-        self._tableWidget.addRow(plotData.rowId, series["symbol":"active"], intensity, self._conditionId)
+        self._tableWidget.addRow(plotData.rowId, series["symbol":"active"], intensity)
         plotData.region.sigRegionChanged.connect(partial(self._changeRangeOfData, plotData))
         plotData.peakLine.sigClicked.connect(partial(self._selectData, plotData))
         plotData.spectrumLine.sigClicked.connect(partial(self._selectData, plotData))
@@ -294,7 +371,7 @@ class PeakSearchWindow(QtWidgets.QMainWindow):
         minX, maxX = data.region.getRegion()
         minKev = self._kev[int(minX)]
         maxKev = self._kev[int(maxX)]
-        row = self._tableWidget.getRowById(data.rowId)
+        row = self._tableWidget.getRow(data.rowId)
         conditionId = int(row.get(7).currentText().split(" ")[-1])
         y = list(filter(lambda d: d.condition == conditionId, self._analyse.data))[0].y
         intensity = y[int(minX):int(maxX)].sum()
@@ -306,7 +383,7 @@ class PeakSearchWindow(QtWidgets.QMainWindow):
 
     @QtCore.pyqtSlot()
     def _selectData(self, data: datatypes.PlotData) -> None:
-        self._tableWidget.setCurrentCell(self._tableWidget.rowIds.index(data.rowId), 0)
+        self._tableWidget.selectRow(data.rowId)
         self._hoverOverData(data)
 
     def _hoverOverData(self, data: datatypes.PlotData):
@@ -324,7 +401,7 @@ class PeakSearchWindow(QtWidgets.QMainWindow):
         elif buttonLabel == "condition":
             data = self._plotDataList[rowId]
             minX, maxX = data.region.getRegion()
-            row = self._tableWidget.getRowById(rowId)
+            row = self._tableWidget.getRow(rowId)
             conditionId = int(row.get(7).currentText().split(" ")[-1])
             y = list(filter(lambda d: d.condition == conditionId, self._analyse.data))[0].y
             intensity = y[int(minX):int(maxX)].sum()
@@ -334,7 +411,7 @@ class PeakSearchWindow(QtWidgets.QMainWindow):
             self._dataStatusChanged(data)
 
     def _dataVisibilityChanged(self, data: datatypes.PlotData) -> None:
-        row = self._tableWidget.getRowById(data.rowId)
+        row = self._tableWidget.getRow(data.rowId)
         hideButton = row.get(0)
         if data.visible:
             self._erasePlotData(data)
@@ -346,7 +423,7 @@ class PeakSearchWindow(QtWidgets.QMainWindow):
         data.visible = not data.visible
 
     def _dataStatusChanged(self, data: datatypes.PlotData) -> None:
-        row = self._tableWidget.getRowById(data.rowId)
+        row = self._tableWidget.getRow(data.rowId)
         statusItem = row.get("status")
         statusButton = row.get(self._tableWidget.columnCount() - 1)
         if data.active:
@@ -412,7 +489,7 @@ class PeakSearchWindow(QtWidgets.QMainWindow):
             if i != data.rowId:
                 d = self._plotDataList[i]
                 if i in self._tableWidget.rowIds:
-                    row = self._tableWidget.getRowById(i)
+                    row = self._tableWidget.getRow(i)
                     row.get(0).setIcon(QtGui.QIcon(resource_path("icons/show.png")))
                 else:
                     d.neutralize()
@@ -428,7 +505,7 @@ class PeakSearchWindow(QtWidgets.QMainWindow):
             if i != data.rowId:
                 d = self._plotDataList[i]
                 if i in self._tableWidget.rowIds:
-                    row = self._tableWidget.getRowById(i)
+                    row = self._tableWidget.getRow(i)
                     row.get(0).setIcon(QtGui.QIcon(resource_path("icons/hide.png")))
                 else:
                     d.deactivate()
@@ -502,7 +579,7 @@ class PeakSearchWindow(QtWidgets.QMainWindow):
         data = self._plotDataList[rowId]
         data.visible = True
         self._addPlotData(data)
-        self._tableWidget.getRowById(rowId).get(1).setIcon(QtGui.QIcon(resource_path('icons/show.png')))
+        self._tableWidget.getRow(rowId).get(1).setIcon(QtGui.QIcon(resource_path('icons/show.png')))
         self._drawPlotData(data)
         self._selectData(data)
 
@@ -533,6 +610,11 @@ class PeakSearchWindow(QtWidgets.QMainWindow):
     def closeEvent(self, event):
         # self._saveToDatabase()
         event.accept()
+
+    def mousePressEvent(self, a0):
+        if not self._searchedElement.geometry().contains(a0.pos()) and self._searchedElement.hasFocus():
+            self._searchedElement.clearFocus()
+        return super().mousePressEvent(a0)
 
     def _saveToDatabase(self):
         for _, row in self._df.iterrows():
