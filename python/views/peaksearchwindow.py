@@ -64,11 +64,11 @@ class ElementsTableWidget(QtWidgets.QTableWidget):
         self.rowIds.append(rowId)
         self.intensities.append(intensity)
         rowAsDict = dict()
-        self._createButtons(rowId, row, rowAsDict)
+        self._createWidgets(rowId, row, rowAsDict)
         self._createItems(row, intensity, rowAsDict)
         self.rows.append(rowAsDict)
 
-    def _createButtons(self, rowId: int, row: pd.Series, rowDict: dict) -> None:
+    def _createWidgets(self, rowId: int, row: pd.Series, rowDict: dict) -> None:
         rowIndex = self.rowCount() - 1
         mapper = {"hide": 0, "condition": 7, "status": 9}
         for label, column in mapper.items():
@@ -255,6 +255,10 @@ class PeakSearchWindow(QtWidgets.QMainWindow):
                 background-color: rgba(135, 206, 250, 128); /* Custom background color for the drop-down menu */
             }
         """)
+        items = self._df['radiation_type'].unique().tolist()
+        items.insert(0, '')
+        self._searchedRadiation.addItems(items)
+        self._searchedRadiation.setCurrentIndex(0)
         hLayout = QtWidgets.QHBoxLayout()
         label = QtWidgets.QLabel("Element Symbol: ")
         hLayout.addWidget(label)
@@ -267,18 +271,33 @@ class PeakSearchWindow(QtWidgets.QMainWindow):
         )
         hLayout.addItem(spacerItem)
         self._mainLayout.addLayout(hLayout)
-        self._searchedElement.editingFinished.connect(self._searchElement)
+        self._searchedElement.editingFinished.connect(self._search)
+        self._searchedRadiation.currentTextChanged.connect(self._search)
 
     @QtCore.pyqtSlot()
-    def _searchElement(self) -> None:
-        df = self._df.query(f"symbol == '{self._searchedElement.text()}'")
+    def _search(self) -> None:
+        symbol = self._searchedElement.text()
+        radiation = self._searchedRadiation.currentText()
+        if symbol != "":
+            df = self._df.query(
+                f"symbol == '{self._searchedElement.text()}'"
+            )
+            if radiation != "":
+                df = df.query(
+                    f"radiation_type == '{self._searchedRadiation.currentText()}'"
+                )
+        elif radiation != "":
+            df = self._df.query(
+                f"radiation_type == '{self._searchedRadiation.currentText()}'"
+            )
+        else:
+            self._fillTable()
+            return
         if not df.empty:
             self._tableWidget.resetTable()
             for rowId in df.index:
                 data = self._plotDataList[rowId]
                 self._addPlotData(data)
-        else:
-            self._fillTable()
 
     def _createTableWidget(self) -> None:
         self._tableWidget = ElementsTableWidget(self, df=self._df)
@@ -365,6 +384,7 @@ class PeakSearchWindow(QtWidgets.QMainWindow):
         plotData.region.sigRegionChanged.connect(partial(self._changeRangeOfData, plotData))
         plotData.peakLine.sigClicked.connect(partial(self._selectData, plotData))
         plotData.spectrumLine.sigClicked.connect(partial(self._selectData, plotData))
+        QtWidgets.QApplication.processEvents()
 
     @QtCore.pyqtSlot()
     def _changeRangeOfData(self, data: datatypes.PlotData) -> None:
