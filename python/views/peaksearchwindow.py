@@ -1,11 +1,10 @@
+from collections import deque
 from functools import partial
 
 import numpy as np
 import pandas as pd
 import pyqtgraph as pg
 from PyQt6 import QtWidgets, QtCore, QtGui
-from PyQt6.QtCore import pyqtSignal
-from PyQt6.QtWidgets import QTableWidgetItem
 
 from python.utils import calculation, datatypes
 from python.utils.database import getDatabase
@@ -13,8 +12,120 @@ from python.utils.datatypes import Analyse
 from python.utils.paths import resource_path
 
 
+class StatusButton(QtWidgets.QPushButton):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.currentText = self.text()
+        self.previousText = self.currentText
+        self.setStyleSheet("""
+                    QPushButton {
+                        width: 75px;
+                        font-weight: 600;
+                        font-size: 14px;
+                        color: #fff;
+                        background-color: #0066CC;
+                        padding: 2px 5px;
+                        border: 2px solid #0066cc;
+                        border-radius: 5px;
+                    }
+                    QPushButton:hover {
+                        background-color: #fff;
+                        color: #0066cc;
+                        border: 2px solid #0066cc;
+                    }
+                    QPushButton:pressed {
+                        background-color: #fff;
+                        color: #011B35;
+                        border: 2px solid #011B35;
+                    }
+                    """)
+
+    def setText(self, text: str) -> None:
+        self.previousText = self.currentText
+        self.currentText = text
+        return super().setText(text)
+
+
+class HideButton(QtWidgets.QPushButton):
+    def __init__(self, parent=None, icon: QtGui.QIcon = None):
+        super().__init__(parent)
+        super().setIcon(icon)
+        self.currentIcon = icon
+        self.previousIcon = self.currentIcon
+        self.setStyleSheet("""
+                    QPushButton {
+                        background-color: transparent;
+                    }
+                """)
+
+    def setIcon(self, icon):
+        self.previousIcon = self.currentIcon
+        self.currentIcon = icon
+        return super().setIcon(icon)
+
+
+class ConditionComboBox(QtWidgets.QComboBox):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setCurrentIndex(0)
+        self.currentText_ = super().currentText()
+        self.previousText = self.currentText_
+        self.setStyleSheet("""
+                    QComboBox {
+                        border: 1px solid gray;
+                        border-radius: 3px;
+                        padding: 1px 18px 1px 3px;
+                    }
+                    QComboBox:hover {
+                        border: 1px solid darkblue;
+                    }
+                    QComboBox::drop-down {
+                        subcontrol-origin: padding;
+                        subcontrol-position: top right;
+                        width: 15px;
+                        border-left-width: 1px;
+                        border-left-color: darkgray;
+                        border-left-style: solid;
+                        border-top-right-radius: 3px;
+                        border-bottom-right-radius: 3px;
+                    }
+                    QComboBox::down-arrow {
+                        image: url(icons/down-arrow-resized.png)
+                    }
+                    QComboBox QAbstractItemView {
+                        border-radius: 3px;
+                        border: 1px solid gray;
+                        selection-background-color: lightgray;
+                        background-color: rgba(135, 206, 250, 128); /* Custom background color for the drop-down menu */
+                    }
+                """)
+        self.currentTextChanged.connect(self._currentTextChanged)
+
+    @QtCore.pyqtSlot(str)
+    def _currentTextChanged(self, text: str) -> None:
+        self.previousText = self.currentText_
+        self.currentText_ = text
+
+    def setCurrentText(self, text: str) -> None:
+        self.previousText = self.currentText_
+        self.currentText_ = text
+        return super().setCurrentText(text)
+
+
+class TableItem(QtWidgets.QTableWidgetItem):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.currentText = self.text()
+        self.previousText = self.currentText
+
+    def setText(self, text: str) -> None:
+        self.previousText = self.currentText
+        self.currentText = text
+        return super().setText(text)
+
+
 class ElementsTableWidget(QtWidgets.QTableWidget):
-    rowChanged = pyqtSignal(str, int)
+    rowChanged = QtCore.pyqtSignal(int, str)
 
     def __init__(self, parent=None, df: pd.DataFrame = None):
         super(ElementsTableWidget, self).__init__(parent)
@@ -59,137 +170,108 @@ class ElementsTableWidget(QtWidgets.QTableWidget):
             item = QtWidgets.QTableWidgetItem(label)
             self.setHorizontalHeaderItem(column, item)
 
-    def addRow(self, rowId: int, row: pd.Series, intensity: int) -> None:
+    def addRow(self, data: datatypes.PlotData, row: pd.Series, intensity: int) -> None:
         self.setRowCount(self.rowCount() + 1)
-        self.rowIds.append(rowId)
+        self.rowIds.append(data.rowId)
         self.intensities.append(intensity)
         rowAsDict = dict()
-        self._createWidgets(rowId, row, rowAsDict)
+        self._createWidgets(data, rowAsDict)
         self._createItems(row, intensity, rowAsDict)
         self.rows.append(rowAsDict)
 
-    def _createWidgets(self, rowId: int, row: pd.Series, rowDict: dict) -> None:
+    def _createWidgets(self, data: datatypes.PlotData, rowDict: dict) -> None:
         rowIndex = self.rowCount() - 1
         mapper = {"hide": 0, "condition": 7, "status": 9}
         for label, column in mapper.items():
             if label == "hide":
-                widget = QtWidgets.QPushButton(
-                    icon=QtGui.QIcon(resource_path(f"icons/{label}.png"))
-                )
-                widget.setStyleSheet("""
-                    QPushButton {
-                        background-color: transparent;
-                    }
-                """)
-                widget.clicked.connect(partial(self._emitRowChanged, label, rowId))
+                widget = self._createHideWidget(data)
             elif label == "condition":
-                widget = QtWidgets.QComboBox()
-                values = [
-                    '', 'Condition 1', 'Condition 2', 'Condition 3',
-                    'Condition 4', 'Condition 5', 'Condition 6',
-                    'Condition 7', 'Condition 8', 'Condition 9'
-                ]
-                widget.addItems(values)
-                try:
-                    widget.setCurrentText(f"Condition {int(row['condition_id'])}")
-                except ValueError:
-                    widget.setCurrentIndex(0)
-                widget.setStyleSheet("""
-                    QComboBox {
-                        border: 1px solid gray;
-                        border-radius: 3px;
-                        padding: 1px 18px 1px 3px;
-                    }
-                    QComboBox:hover {
-                        border: 1px solid darkblue;
-                    }
-                    QComboBox::drop-down {
-                        subcontrol-origin: padding;
-                        subcontrol-position: top right;
-                        width: 15px;
-                        border-left-width: 1px;
-                        border-left-color: darkgray;
-                        border-left-style: solid;
-                        border-top-right-radius: 3px;
-                        border-bottom-right-radius: 3px;
-                    }
-                    QComboBox::down-arrow {
-                        image: url(icons/down-arrow-resized.png)
-                    }
-                    QComboBox QAbstractItemView {
-                        border-radius: 3px;
-                        border: 1px solid gray;
-                        selection-background-color: lightgray;
-                        background-color: rgba(135, 206, 250, 128); /* Custom background color for the drop-down menu */
-                    }
-                """)
-                widget.currentTextChanged.connect(partial(self._emitRowChanged, label, rowId))
+                widget = self._createConditionComboBox(data)
+            elif label == "status":
+                widget = self._createStatusButton(data)
             else:
-                if row['active'] == 0:
-                    widget = QtWidgets.QPushButton("Activate")
-                else:
-                    widget = QtWidgets.QPushButton("Deactivate")
-                widget.setStyleSheet("""
-                    QPushButton {
-                        width: 75px;
-                        font-weight: 600;
-                        font-size: 14px;
-                        color: #fff;
-                        background-color: #0066CC;
-                        padding: 2px 5px;
-                        border: 2px solid #0066cc;
-                        border-radius: 5px;
-                    }
-                    QPushButton:hover {
-                        background-color: #fff;
-                        color: #0066cc;
-                        border: 2px solid #0066cc;
-                    }
-                    QPushButton:pressed {
-                        background-color: #fff;
-                        color: #011B35;
-                        border: 2px solid #011B35;
-                    }
-                    """)
-                widget.clicked.connect(partial(self._emitRowChanged, label, rowId))
+                widget = None
             rowDict[column] = widget
             self.setCellWidget(rowIndex, column, widget)
+
+    def _createHideWidget(self, data: datatypes.PlotData) -> HideButton:
+        if data.visible:
+            widget = HideButton(icon=QtGui.QIcon(resource_path(f"icons/show.png")))
+        else:
+            widget = HideButton(icon=QtGui.QIcon(resource_path(f"icons/hide.png")))
+        widget.clicked.connect(partial(self._emitRowChanged, data.rowId, 'hide'))
+        return widget
+
+    def _createConditionComboBox(self, data: datatypes.PlotData) -> ConditionComboBox:
+        widget = ConditionComboBox()
+        values = [
+            '', 'Condition 1', 'Condition 2', 'Condition 3',
+            'Condition 4', 'Condition 5', 'Condition 6',
+            'Condition 7', 'Condition 8', 'Condition 9'
+        ]
+        widget.addItems(values)
+        if data.active:
+            widget.setDisabled(True)
+        if data.condition is not None:
+            widget.setCurrentText(f"Condition {data.condition}")
+        widget.currentTextChanged.connect(partial(self._emitRowChanged, data.rowId, 'condition'))
+        return widget
+
+    def _createStatusButton(self, data: datatypes.PlotData) -> StatusButton:
+        if not data.active:
+            widget = StatusButton("Activate")
+        else:
+            widget = StatusButton("Deactivate")
+        widget.clicked.connect(partial(self._emitRowChanged, data.rowId, 'status'))
+        return widget
 
     def _createItems(self, row: pd.Series, intensity: int, rowDict: dict) -> None:
         rowIndex = self.rowCount() - 1
         mapper = {
-            0: str(row['symbol']),
-            1: str(row['radiation_type']),
-            2: str(row['kiloelectron_volt']),
-            3: str(row['low_kiloelectron_volt']),
-            4: str(row['high_kiloelectron_volt']),
-            5: str(intensity),
-            6: str(int(row['condition_id'])) if not np.isnan(row['condition_id']) else "",
-            7: "Activated" if row['active'] == 1 else "Deactivated"
+            1: str(row['symbol']),
+            2: str(row['radiation_type']),
+            3: str(row['kiloelectron_volt']),
+            4: str(row['low_kiloelectron_volt']),
+            5: str(row['high_kiloelectron_volt']),
+            6: str(intensity),
+            8: "Activated" if row['active'] == 1 else "Deactivated"
         }
         for column, value in mapper.items():
-            item = QTableWidgetItem(value)
+            item = TableItem(value)
             item.setTextAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
-            if column == 7:
+            if column == 8:
                 if value == "Activated":
                     item.setForeground(QtGui.QColor(0, 255, 0))
                 else:
                     item.setForeground(QtGui.QColor(255, 0, 0))
-            key = self.horizontalHeaderItem(column + 1).text().lower().replace(" ", "-")
-            rowDict[key] = item
-            self.setItem(rowIndex, column + 1, item)
+            rowDict[column] = item
+            self.setItem(rowIndex, column, item)
 
     def getRow(self, rowId: int) -> dict:
         return self.rows[self.rowIds.index(rowId)]
 
-    def _emitRowChanged(self, label: str, rowId: int) -> None:
-        self.rowChanged.emit(label, rowId)
+    def _emitRowChanged(self, rowId: int, label: str) -> None:
+        self.rowChanged.emit(rowId, label)
 
     def resetTable(self) -> None:
         self.setRowCount(0)
         self.rowIds.clear()
         self.intensities.clear()
         self.rows.clear()
+
+    def updateRow(self, rowId: int, values: list) -> None:
+        rowIndex = self.rowIds.index(rowId)
+        self.blockSignals(True)
+        for columnIndex, value in enumerate(values):
+            if columnIndex == 0:
+                self.cellWidget(rowIndex, columnIndex).setIcon(value)
+            elif columnIndex == 7:
+                self.cellWidget(rowIndex, columnIndex).setCurrentText(value)
+            elif columnIndex == 9:
+                self.cellWidget(rowIndex, columnIndex).setText(value)
+            else:
+                self.item(rowIndex, columnIndex).setText(value)
+        self.blockSignals(False)
 
 
 class PeakSearchWindow(QtWidgets.QMainWindow):
@@ -201,13 +283,56 @@ class PeakSearchWindow(QtWidgets.QMainWindow):
         self._db = getDatabase(resource_path("fundamentals.db"))
         self._df = self._db.dataframe("SELECT * FROM Lines")
         self._plotDataList = [datatypes.PlotData.fromSeries(rowId, s) for rowId, s in self._df.iterrows()]
+        self._undoStack = deque()
+        self._redoStack = deque()
         self.resize(1200, 800)
         self._mainLayout = QtWidgets.QVBoxLayout()
+        self._createToolBar()
         self._createSearchBar()
         self._createTableWidget()
         self._createPlotViewBox()
-        self._createMenuBar()
+        # self._createMenuBar()
         self._setupView()
+
+    def _createToolBar(self) -> None:
+        toolBar = QtWidgets.QToolBar(self)
+        toolBar.setIconSize(QtCore.QSize(16, 16))
+        toolBar.setToolButtonStyle(QtCore.Qt.ToolButtonStyle.ToolButtonIconOnly)
+        toolBar.setMovable(False)
+        self._fillToolBarWithActions(toolBar)
+        self.addToolBar(toolBar)
+
+    def _fillToolBarWithActions(self, toolBar: QtWidgets.QToolBar) -> None:
+        self._undoAction = QtGui.QAction(icon=QtGui.QIcon(resource_path("icons/undo.png")))
+        # self._redoAction = QtGui.QAction(icon=QtGui.QIcon(resource_path("icons/redo.png")))
+        self._undoAction.setDisabled(True)
+        # self._redoAction.setDisabled(True)
+        self._undoAction.setShortcut(QtGui.QKeySequence("Ctrl+z"))
+        # self._redoAction.setShortcut(QtGui.QKeySequence("Ctrl+r"))
+        toolBar.addAction(self._undoAction)
+        # toolBar.addAction(self._redoAction)
+        self._undoAction.triggered.connect(self._undo)
+        # self._redoAction.triggered.connect(self._redo)
+
+    def _undo(self) -> None:
+        if self._undoStack:
+            rowId, values, action = self._undoStack.pop()
+            # self._addRowToRedoStack(rowId, action)
+            self._tableWidget.updateRow(rowId, values)
+            if not self._undoStack:
+                self._undoAction.setDisabled(True)
+            # self._redoAction.setDisabled(False)
+            self._rowChanged(rowId, action)
+
+    # def _redo(self) -> None:
+    #     if self._redoStack:
+    #         rowId, values, action = self._redoStack.pop()
+    #         self._addRowToUndoStack(rowId, action)
+    #         self._tableWidget.updateRow(rowId, values)
+    #         if not self._redoStack:
+    #             self._redoAction.setDisabled(True)
+    #         self._undoAction.setDisabled(False)
+    #         self._rowChanged(rowId, action)
 
     def _createSearchBar(self) -> None:
         self._searchedElement = QtWidgets.QLineEdit()
@@ -308,7 +433,7 @@ class PeakSearchWindow(QtWidgets.QMainWindow):
         self._mainLayout.addWidget(self._tableWidget)
         self._tableWidget.setFrameShape(QtWidgets.QFrame.Shape.Box)
         self._tableWidget.setFrameShadow(QtWidgets.QFrame.Shadow.Plain)
-        self._tableWidget.rowChanged.connect(self._rowChanged)
+        self._tableWidget.rowChanged.connect(self._rowChangedSlotHandler)
         self._tableWidget.itemClicked.connect(self._itemClicked)
 
     def _createPlotViewBox(self) -> None:
@@ -375,10 +500,10 @@ class PeakSearchWindow(QtWidgets.QMainWindow):
         for data in self._plotDataList:
             self._addPlotData(data)
 
-    def _addPlotData(self, plotData: datatypes.PlotData) -> None:
-        series: pd.Series = self._df.iloc[plotData.rowId]
-        minX, maxX = plotData.region.getRegion()
-        if np.isnan(series['condition_id']):
+    def _addPlotData(self, data: datatypes.PlotData) -> None:
+        series: pd.Series = self._df.iloc[data.rowId]
+        minX, maxX = data.region.getRegion()
+        if data.condition is None:
             intensity = "NA"
         else:
             # TODO remove when proper analyse files where available
@@ -387,26 +512,38 @@ class PeakSearchWindow(QtWidgets.QMainWindow):
                 intensity = y[int(minX):int(maxX)].sum()
             except IndexError:
                 intensity = "NA"
-        self._tableWidget.addRow(plotData.rowId, series["symbol":"active"], intensity)
-        plotData.region.sigRegionChanged.connect(partial(self._changeRangeOfData, plotData))
-        plotData.peakLine.sigClicked.connect(partial(self._selectData, plotData))
-        plotData.spectrumLine.sigClicked.connect(partial(self._selectData, plotData))
+        self._tableWidget.addRow(data, series["symbol":"active"], intensity)
+        data.region.sigRegionChangeFinished.connect(partial(self._changeRangeOfData, data))
+        data.peakLine.sigClicked.connect(partial(self._selectData, data))
+        data.spectrumLine.sigClicked.connect(partial(self._selectData, data))
         QtWidgets.QApplication.processEvents()
 
     @QtCore.pyqtSlot()
     def _changeRangeOfData(self, data: datatypes.PlotData) -> None:
-        minX, maxX = data.region.getRegion()
-        minKev = self._kev[int(minX)]
-        maxKev = self._kev[int(maxX)]
+        self._addRowToUndoStack(data.rowId, 'region')
+
         row = self._tableWidget.getRow(data.rowId)
-        conditionId = int(row.get(7).currentText().split(" ")[-1])
-        y = list(filter(lambda d: d.condition == conditionId, self._analyse.data))[0].y
-        intensity = y[int(minX):int(maxX)].sum()
-        row.get("low-kev").setText(str(minKev))
-        row.get("high-kev").setText(str(maxKev))
-        row.get("intensity").setText(str(intensity))
-        self._df.at[data.rowId, "low-kev"] = minKev
-        self._df.at[data.rowId, "high-kev"] = maxKev
+
+        minX, maxX = data.region.getRegion()
+        try:
+            minKev = self._kev[int(minX)]
+        except IndexError:
+            minKev = 0
+        try:
+            maxKev = self._kev[int(maxX)]
+        except IndexError:
+            maxKev = self._kev[-1]
+        row.get(4).setText(str(minKev))
+        row.get(5).setText(str(maxKev))
+
+        try:
+            conditionId = data.condition
+            y = list(filter(lambda d: d.condition == conditionId, self._analyse.data))[0].y
+            intensity = y[int(minX):int(maxX)].sum()
+        except IndexError:
+            intensity = "NA"
+        row.get(6).setText(str(intensity))
+
 
     @QtCore.pyqtSlot()
     def _selectData(self, data: datatypes.PlotData) -> None:
@@ -420,25 +557,63 @@ class PeakSearchWindow(QtWidgets.QMainWindow):
             zoomedArea = (minX - 50, maxX + 50)
             self._zoomRegion.setRegion(zoomedArea)
 
-    @QtCore.pyqtSlot(str, int)
-    def _rowChanged(self, buttonLabel: str, rowId: int) -> None:
-        if buttonLabel == "hide":
-            data = self._plotDataList[rowId]
+    def _rowChangedSlotHandler(self, rowId: int, action: str) -> None:
+        self._addRowToUndoStack(rowId, action)
+        self._rowChanged(rowId, action)
+
+    def _rowChanged(self, rowId: int, action: str) -> None:
+        data = self._plotDataList[rowId]
+        if action == "hide":
             self._dataVisibilityChanged(data)
-        elif buttonLabel == "condition":
-            row = self._tableWidget.getRow(rowId)
-            data = self._plotDataList[rowId]
-            minX, maxX = data.region.getRegion()
-            if row.get(7).currentText() != "":
-                conditionId = int(row.get(7).currentText().split(" ")[-1])
-                y = list(filter(lambda d: d.condition == conditionId, self._analyse.data))[0].y
-                intensity = y[int(minX):int(maxX)].sum()
-            else:
-                intensity = "NA"
-            row.get("intensity").setText(str(intensity))
-        else:
-            data = self._plotDataList[rowId]
+        elif action == "condition":
+            self._dataConditionChanged(data)
+        elif action == "status":
             self._dataStatusChanged(data)
+        elif action == "region":
+            self._dataRegionChanged(data)
+
+    def _addRowToUndoStack(self, rowId: int, action: str) -> None:
+        if not self._undoStack:
+            self._undoAction.setDisabled(False)
+        row = self._tableWidget.getRow(rowId)
+        values = list()
+        for index, component in row.items():
+            if isinstance(component, HideButton):
+                if action == "hide":
+                    values.insert(index, component.previousIcon)
+                else:
+                    values.insert(index, component.currentIcon)
+            elif isinstance(component, StatusButton):
+                if action == "status":
+                    values.insert(index, component.previousText)
+                else:
+                    values.insert(index, component.currentText)
+            elif isinstance(component, ConditionComboBox):
+                if action == "condition":
+                    values.insert(index, component.previousText)
+                else:
+                    values.insert(index, component.currentText_)
+            else:
+                values.insert(index, component.currentText)
+        self._undoStack.append((rowId, values, action))
+        print(f"added to undo stack: {values}")
+
+    # def _addRowToRedoStack(self, rowId: int, action: str) -> None:
+    #     if not self._redoStack:
+    #         self._redoAction.setDisabled(False)
+    #     row = self._tableWidget.getRow(rowId)
+    #     values = list()
+    #     for index, component in row.items():
+    #         if isinstance(component, HideButton):
+    #             values.insert(index, component.currentIcon)
+    #         elif isinstance(component, StatusButton):
+    #             values.insert(index, component.currentText)
+    #         elif isinstance(component, ConditionComboBox):
+    #             values.insert(index, component.currentText_)
+    #         else:
+    #             values.insert(index, component.currentText)
+    #     self._redoStack.append((rowId, values, action))
+    #     print(f"added to redo stack:{values}")
 
     def _dataVisibilityChanged(self, data: datatypes.PlotData) -> None:
         row = self._tableWidget.getRow(data.rowId)
@@ -452,49 +627,82 @@ class PeakSearchWindow(QtWidgets.QMainWindow):
             hideButton.setIcon(QtGui.QIcon(resource_path("icons/show.png")))
         data.visible = not data.visible
 
+    def _dataConditionChanged(self, data: datatypes.PlotData) -> None:
+        row = self._tableWidget.getRow(data.rowId)
+        data = self._plotDataList[data.rowId]
+        minX, maxX = data.region.getRegion()
+        if row.get(7).currentText() != "":
+            conditionId = int(row.get(7).currentText().split(" ")[-1])
+            data.condition = conditionId
+            try:
+                y = list(filter(lambda d: d.condition == conditionId, self._analyse.data))[0].y
+                intensity = y[int(minX):int(maxX)].sum()
+            except IndexError:
+                intensity = "NA"
+        else:
+            intensity = "NA"
+        row.get(6).setText(str(intensity))
+
     def _dataStatusChanged(self, data: datatypes.PlotData) -> None:
         row = self._tableWidget.getRow(data.rowId)
-        statusItem = row.get("status")
-        statusButton = row.get(self._tableWidget.columnCount() - 1)
+        statusItem = row.get(8)
+        statusButton = row.get(9)
+        conditionComboBox = row.get(7)
         if data.active:
             data.deactivate()
-            self._df.at[data.rowId, 'active'] = 0
             statusItem.setText("Deactivated")
             statusItem.setForeground(QtGui.QColor(255, 0, 0))
             statusButton.setText("Activate")
+            conditionComboBox.setDisabled(False)
         else:
             symbol = self._df.at[data.rowId, 'symbol']
             df = self._df.query(f"symbol == '{symbol}' and active == 1")
             if df.empty:
-                data.activate()
-                self._df.at[data.rowId, 'active'] = 1
-                statusItem.setText("Activated")
-                statusItem.setForeground(QtGui.QColor(0, 255, 0))
-                statusButton.setText("Deactivate")
+                if conditionComboBox.currentText():
+                    data.activate()
+                    statusItem.setText("Activated")
+                    statusItem.setForeground(QtGui.QColor(0, 255, 0))
+                    statusButton.setText("Deactivate")
+                    conditionComboBox.setDisabled(True)
+                else:
+                    messageBox = QtWidgets.QMessageBox(self)
+                    messageBox.setIcon(QtWidgets.QMessageBox.Icon.Critical)
+                    messageBox.setText(
+                        "No condition is selected. Please select one before activating again."
+                    )
+                    messageBox.setWindowTitle("Activation failed")
+                    messageBox.setStandardButtons(
+                        QtWidgets.QMessageBox.StandardButton.Ok
+                    )
+                    messageBox.exec()
             else:
                 messageBox = QtWidgets.QMessageBox(self)
                 messageBox.setIcon(QtWidgets.QMessageBox.Icon.Question)
                 messageBox.setText(
-                    f"One Line Of {symbol} Is Already Identified As The Main Line.\n"
-                    "Activating This Line Will Deactivate The Previous Line And Replace It With The Current.\n"
-                    "Would You Like To Continue?"
+                    f"One line of {symbol} is already identified as the main line.\n"
+                    "Activating this will replace it with the previous.\n"
+                    "Would you like to continue?"
                 )
-                messageBox.setWindowTitle("Activation Failed")
+                messageBox.setWindowTitle("Activation failed")
                 messageBox.setStandardButtons(
                     QtWidgets.QMessageBox.StandardButton.Yes | QtWidgets.QMessageBox.StandardButton.No
                 )
                 result = messageBox.exec()
                 if result == QtWidgets.QMessageBox.StandardButton.Yes:
                     self._dataStatusChanged(self._plotDataList[df.index[0]])
-                    data.activate()
-                    self._df.at[data.rowId, 'active'] = 1
-                    statusItem.setText("Activated")
-                    statusItem.setForeground(QtGui.QColor(0, 255, 0))
-                    statusButton.setText("Deactivate")
+                    self._dataStatusChanged(data)
         if data.visible:
             self._erasePlotData(data)
             self._selectData(data)
             self._drawPlotData(data)
+
+    def _dataRegionChanged(self, data: datatypes.PlotData) -> None:
+        row = self._tableWidget.getRow(data.rowId)
+        minX = calculation.evToPx(float(row.get(4).text()))
+        maxX = calculation.evToPx(float(row.get(5).text()))
+        data.region.blockSignals(True)
+        data.region.setRegion((minX, maxX))
+        data.region.blockSignals(False)
 
     def _drawPlotData(self, data: datatypes.PlotData) -> None:
         if data.peakLine not in self._peakPlot.items:
@@ -512,54 +720,26 @@ class PeakSearchWindow(QtWidgets.QMainWindow):
         if data.region in self._peakPlot.items:
             self._peakPlot.removeItem(data.region)
 
-    def _showCorrelatedToData(self, data: datatypes.PlotData) -> None:
-        symbol = self._df.at[data.rowId, 'symbol']
-        correlatedIndexes = self._df[self._df['symbol'] == symbol].index
-        for i in correlatedIndexes:
-            if i != data.rowId:
-                d = self._plotDataList[i]
-                if i in self._tableWidget.rowIds:
-                    row = self._tableWidget.getRow(i)
-                    row.get(0).setIcon(QtGui.QIcon(resource_path("icons/show.png")))
-                else:
-                    d.neutralize()
-                if d.peakLine not in self._peakPlot.items:
-                    self._peakPlot.addItem(d.peakLine)
-                if d.spectrumLine not in self._spectrumPlot.items:
-                    self._spectrumPlot.addItem(d.spectrumLine)
-
-    def _hideCorrelatedToData(self, data: datatypes.PlotData) -> None:
-        symbol = self._df.at[data.rowId, 'symbol']
-        correlatedIndexes = self._df[self._df['symbol'] == symbol].index
-        for i in correlatedIndexes:
-            if i != data.rowId:
-                d = self._plotDataList[i]
-                if i in self._tableWidget.rowIds:
-                    row = self._tableWidget.getRow(i)
-                    row.get(0).setIcon(QtGui.QIcon(resource_path("icons/hide.png")))
-                else:
-                    d.deactivate()
-                if d.peakLine in self._peakPlot.items:
-                    self._peakPlot.removeItem(d.peakLine)
-                if d.spectrumLine in self._spectrumPlot.items:
-                    self._spectrumPlot.removeItem(d.spectrumLine)
-
     @QtCore.pyqtSlot(QtWidgets.QTableWidgetItem)
     def _itemClicked(self, item: QtWidgets.QTableWidgetItem) -> None:
         rowId = self._tableWidget.rowIds[item.row()]
         data = self._plotDataList[rowId]
-        self._hoverOverData(data)
+        if data.visible:
+            self._hoverOverData(data)
 
     def _setCoordinate(self, x: float, y: float) -> None:
-        kev = self._kev[int(x)]
-        self._coordinateLabel.setText(
-            f"""
-            <span style="font-size: 14px; 
-                        color: rgb(128, 128, 128);
-                        padding: 5px;
-                        letter-spacing: 2px">x= {x} y= {y} KeV= {kev}</span>
-            """
-        )
+        try:
+            kev = self._kev[int(x)]
+            self._coordinateLabel.setText(
+                f"""
+                <span style="font-size: 14px; 
+                            color: rgb(128, 128, 128);
+                            padding: 5px;
+                            letter-spacing: 2px">x= {x} y= {y} KeV= {kev}</span>
+                """
+            )
+        except IndexError:
+            pass
 
     def _adjustZoom(self, window, viewRange):
         rng = viewRange[0]
@@ -642,10 +822,11 @@ class PeakSearchWindow(QtWidgets.QMainWindow):
         self._zoomRegion.setBounds((0, max(x)))
         self._zoomRegion.setRegion((0, 100))
         self._peakPlot.setXRange(0, 100, padding=0)
+        self._setCoordinate(0, 0)
         self._fillTable()
 
     def closeEvent(self, event):
-        self._saveToDatabase()
+        # self._saveToDatabase()
         event.accept()
 
     def mousePressEvent(self, a0):
@@ -655,7 +836,7 @@ class PeakSearchWindow(QtWidgets.QMainWindow):
 
     def _saveToDatabase(self):
         for index, row in enumerate(self._tableWidget.rows):
-            if row['status'].text() == "Activated":
+            if row.get(8).text() == "Activated":
                 active = 1
             else:
                 active = 0
@@ -666,8 +847,8 @@ class PeakSearchWindow(QtWidgets.QMainWindow):
             if conditionId is not None:
                 query = f"""
                     UPDATE Lines
-                    SET low_kiloelectron_volt = {row['low-kev'].text()},
-                        high_kiloelectron_volt = {row['high-kev'].text()},
+                    SET low_kiloelectron_volt = {row[4].text()},
+                        high_kiloelectron_volt = {row[5].text()},
                         active = {active},
                         condition_id = {conditionId}
                     WHERE line_id = {index + 1};
@@ -675,8 +856,8 @@ class PeakSearchWindow(QtWidgets.QMainWindow):
             else:
                 query = f"""
                     UPDATE Lines
-                    SET low_kiloelectron_volt = {row['low-kev'].text()},
-                        high_kiloelectron_volt = {row['high-kev'].text()},
+                    SET low_kiloelectron_volt = {row[4].text()},
+                        high_kiloelectron_volt = {row[5].text()},
                         active = {active},
                         condition_id = NULL
                     WHERE line_id = {index + 1};
