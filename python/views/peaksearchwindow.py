@@ -285,6 +285,7 @@ class PeakSearchWindow(QtWidgets.QMainWindow):
         self._plotDataList = [datatypes.PlotData.fromSeries(rowId, s) for rowId, s in self._df.iterrows()]
         self._undoStack = deque()
         self._redoStack = deque()
+        self._flag = False
         self.resize(1200, 800)
         self._mainLayout = QtWidgets.QVBoxLayout()
         self._createToolBar()
@@ -304,35 +305,36 @@ class PeakSearchWindow(QtWidgets.QMainWindow):
 
     def _fillToolBarWithActions(self, toolBar: QtWidgets.QToolBar) -> None:
         self._undoAction = QtGui.QAction(icon=QtGui.QIcon(resource_path("icons/undo.png")))
-        # self._redoAction = QtGui.QAction(icon=QtGui.QIcon(resource_path("icons/redo.png")))
+        self._redoAction = QtGui.QAction(icon=QtGui.QIcon(resource_path("icons/redo.png")))
         self._undoAction.setDisabled(True)
-        # self._redoAction.setDisabled(True)
+        self._redoAction.setDisabled(True)
         self._undoAction.setShortcut(QtGui.QKeySequence("Ctrl+z"))
-        # self._redoAction.setShortcut(QtGui.QKeySequence("Ctrl+r"))
+        self._redoAction.setShortcut(QtGui.QKeySequence("Ctrl+r"))
         toolBar.addAction(self._undoAction)
-        # toolBar.addAction(self._redoAction)
+        toolBar.addAction(self._redoAction)
         self._undoAction.triggered.connect(self._undo)
-        # self._redoAction.triggered.connect(self._redo)
+        self._redoAction.triggered.connect(self._redo)
 
     def _undo(self) -> None:
         if self._undoStack:
             rowId, values, action = self._undoStack.pop()
-            # self._addRowToRedoStack(rowId, action)
+            self._addRowToRedoStack(rowId, action)
             self._tableWidget.updateRow(rowId, values)
             if not self._undoStack:
                 self._undoAction.setDisabled(True)
-            # self._redoAction.setDisabled(False)
+                self._flag = True
+            self._redoAction.setDisabled(False)
             self._rowChanged(rowId, action)
 
-    # def _redo(self) -> None:
-    #     if self._redoStack:
-    #         rowId, values, action = self._redoStack.pop()
-    #         self._addRowToUndoStack(rowId, action)
-    #         self._tableWidget.updateRow(rowId, values)
-    #         if not self._redoStack:
-    #             self._redoAction.setDisabled(True)
-    #         self._undoAction.setDisabled(False)
-    #         self._rowChanged(rowId, action)
+    def _redo(self) -> None:
+        if self._redoStack:
+            rowId, values, action = self._redoStack.pop()
+            self._addRowToUndoStack(rowId, action)
+            self._tableWidget.updateRow(rowId, values)
+            if not self._redoStack:
+                self._redoAction.setDisabled(True)
+            self._undoAction.setDisabled(False)
+            self._rowChanged(rowId, action)
 
     def _createSearchBar(self) -> None:
         self._searchedElement = QtWidgets.QLineEdit()
@@ -544,7 +546,6 @@ class PeakSearchWindow(QtWidgets.QMainWindow):
             intensity = "NA"
         row.get(6).setText(str(intensity))
 
-
     @QtCore.pyqtSlot()
     def _selectData(self, data: datatypes.PlotData) -> None:
         self._tableWidget.selectRow(data.rowId)
@@ -575,6 +576,9 @@ class PeakSearchWindow(QtWidgets.QMainWindow):
     def _addRowToUndoStack(self, rowId: int, action: str) -> None:
         if not self._undoStack:
             self._undoAction.setDisabled(False)
+        if self._flag:
+            self._redoStack.clear()
+            self._redoAction.setDisabled(True)
         row = self._tableWidget.getRow(rowId)
         values = list()
         for index, component in row.items():
@@ -598,22 +602,31 @@ class PeakSearchWindow(QtWidgets.QMainWindow):
         self._undoStack.append((rowId, values, action))
         print(f"added to undo stack: {values}")
 
-    # def _addRowToRedoStack(self, rowId: int, action: str) -> None:
-    #     if not self._redoStack:
-    #         self._redoAction.setDisabled(False)
-    #     row = self._tableWidget.getRow(rowId)
-    #     values = list()
-    #     for index, component in row.items():
-    #         if isinstance(component, HideButton):
-    #             values.insert(index, component.currentIcon)
-    #         elif isinstance(component, StatusButton):
-    #             values.insert(index, component.currentText)
-    #         elif isinstance(component, ConditionComboBox):
-    #             values.insert(index, component.currentText_)
-    #         else:
-    #             values.insert(index, component.currentText)
-    #     self._redoStack.append((rowId, values, action))
-    #     print(f"added to redo stack:{values}")
+    def _addRowToRedoStack(self, rowId: int, action: str) -> None:
+        if not self._redoStack:
+            self._redoAction.setDisabled(False)
+        row = self._tableWidget.getRow(rowId)
+        values = list()
+        for index, component in row.items():
+            if isinstance(component, HideButton):
+                if action == "hide":
+                    values.insert(index, component.previousIcon)
+                else:
+                    values.insert(index, component.currentIcon)
+            elif isinstance(component, StatusButton):
+                if action == "status":
+                    values.insert(index, component.previousText)
+                else:
+                    values.insert(index, component.currentText)
+            elif isinstance(component, ConditionComboBox):
+                if action == "condition":
+                    values.insert(index, component.currentText_)
+                else:
+                    values.insert(index, component.previousText)
+            else:
+                values.insert(index, component.currentText)
+        self._redoStack.append((rowId, values, action))
+        print(f"added to redo stack:{values}")
 
     def _dataVisibilityChanged(self, data: datatypes.PlotData) -> None:
         row = self._tableWidget.getRow(data.rowId)
