@@ -743,7 +743,7 @@ class PeakSearchWindow(QtWidgets.QMainWindow):
 
     @QtCore.pyqtSlot(QtWidgets.QTableWidgetItem)
     def _itemClicked(self, item: QtWidgets.QTableWidgetItem) -> None:
-        rowId = self._tableWidget.rowIds[item.row()]
+        rowId = self._tableWidget.rowIds.index([item.row()])
         data = self._plotDataList[rowId]
         if data.visible:
             self._hoverOverData(data)
