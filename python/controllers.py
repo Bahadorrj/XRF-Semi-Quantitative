@@ -13,7 +13,7 @@ from python.views.plotwindow import PlotWindow
 class GuiHandler(QtCore.QObject):
     openGuiSignal = QtCore.pyqtSignal()
     hideGuiSignal = QtCore.pyqtSignal()
-    addAnalyseSignal = QtCore.pyqtSignal(str)
+    addAnalyseSignal = QtCore.pyqtSignal(Analyse)
     exit = QtCore.pyqtSignal()
 
     def __init__(self, window: PlotWindow):
@@ -38,7 +38,7 @@ class GuiHandler(QtCore.QObject):
         logging.info("Application exit")
 
     def addFile(self, analyse: Analyse):
-        pass
+        self.window.addAnalyse(analyse)
 
 
 class ClientHandler(QtCore.QObject):
