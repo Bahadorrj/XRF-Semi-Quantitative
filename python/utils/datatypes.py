@@ -116,18 +116,14 @@ class Analyse:
 
 class PlotData:
     def __init__(self, rowId: int, spectrumLine: pg.InfiniteLine, peakLine: pg.InfiniteLine,
-                 region: pg.LinearRegionItem, visible: bool, active: bool):
+                 region: pg.LinearRegionItem, visible: bool, active: bool, condition: int):
         self.rowId = rowId
         self.spectrumLine = spectrumLine
         self.peakLine = peakLine
         self.region = region
         self.visible = visible
         self.active = active
-
-    def neutralize(self):
-        self.active = None
-        self.peakLine.setPen(pg.mkPen(color=(255, 165, 0, 150), width=1))
-        self.spectrumLine.setPen(pg.mkPen(color=(255, 165, 0, 150), width=1))
+        self.condition = condition
 
     def activate(self):
         self.active = True
@@ -147,9 +143,14 @@ class PlotData:
         spectrumLine = cls._generateLine(value, active=active)
         peakLine = cls._generateLine(value, labels=labels, active=active)
         rng = (
-        calculation.evToPx(series['low_kiloelectron_volt']), calculation.evToPx(series['high_kiloelectron_volt']))
+            calculation.evToPx(series['low_kiloelectron_volt']), calculation.evToPx(series['high_kiloelectron_volt'])
+        )
         region = cls._generateRegion(rng)
-        return PlotData(rowId, spectrumLine, peakLine, region, False, active)
+        try:
+            conditionId = int(series['condition_id'])
+        except ValueError:
+            conditionId = None
+        return PlotData(rowId, spectrumLine, peakLine, region, False, active, conditionId)
 
     @staticmethod
     def _generateLine(value: float, **kwargs) -> pg.InfiniteLine:
@@ -174,7 +175,8 @@ class PlotData:
 
     @staticmethod
     def _generateRegion(rng: Union[list[float, float], tuple[float, float]]):
-        region = pg.LinearRegionItem()
+        region = pg.LinearRegionItem(swapMode='push')
         region.setZValue(10)
         region.setRegion(rng)
+        region.setBounds((0, 2048))
         return region
