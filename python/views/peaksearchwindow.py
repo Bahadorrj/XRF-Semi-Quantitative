@@ -309,12 +309,11 @@ class PeakSearchWindow(QtWidgets.QMainWindow):
         self._undoAction.setDisabled(True)
         # self._redoAction.setDisabled(True)
         self._undoAction.setShortcut(QtGui.QKeySequence("Ctrl+z"))
-        #         self._redoAction.setShortcut(QtGui.QKeySequence("Ctrl+r"))
+        # self._redoAction.setShortcut(QtGui.QKeySequence("Ctrl+r"))
         toolBar.addAction(self._undoAction)
-        #         toolBar.addAction(self._redoAction)
+        # toolBar.addAction(self._redoAction)
         self._undoAction.triggered.connect(self._undo)
-
-    #         self._redoAction.triggered.connect(self._redo)
+        # self._redoAction.triggered.connect(self._redo)
 
     def _undo(self) -> None:
         if self._undoStack:
@@ -549,8 +548,10 @@ class PeakSearchWindow(QtWidgets.QMainWindow):
 
     @QtCore.pyqtSlot()
     def _selectData(self, data: datatypes.PlotData) -> None:
-        self._tableWidget.selectRow(data.rowId)
-        self._hoverOverData(data)
+        if data.rowId in self._tableWidget.rowIds:
+            index = self._tableWidget.rowIds.index(data.rowId)
+            self._tableWidget.selectRow(index)
+            self._hoverOverData(data)
 
     def _hoverOverData(self, data: datatypes.PlotData):
         minX, maxX = data.region.getRegion()
@@ -601,7 +602,7 @@ class PeakSearchWindow(QtWidgets.QMainWindow):
             else:
                 values.insert(index, component.currentText)
         self._undoStack.append((rowId, values, action))
-        print(f"added to undo stack : {values}-{action}")
+        # print(f"added to undo stack : {values}-{action}")
 
     # def _addRowToRedoStack(self, rowId: int, action: str) -> None:
     #     if not self._redoStack:
