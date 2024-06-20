@@ -432,13 +432,16 @@ class PlotWindow(QtWidgets.QMainWindow):
             self._plot(x, y, pg.mkPen(color=color, width=2))
 
     def _getDataFromIndex(self, extensionIndex: int, analyseIndex: int, dataIndex: int) -> datatypes.AnalyseData:
+        return self._getAnalyseFromIndex(extensionIndex, analyseIndex).data[dataIndex]
+
+    def _getAnalyseFromIndex(self, extensionIndex: int, analyseIndex: int) -> datatypes.Analyse:
         mapper = {0: ".txt", 1: ".atx"}
         analyse = list(
             filter(
                 lambda a: a.extension == mapper[extensionIndex], self._analyseFiles
             )
         )[analyseIndex]
-        return analyse.data[dataIndex]
+        return analyse
 
     def _setPlotLimits(self, maxIntensity: int) -> None:
         xMin = -100
@@ -476,17 +479,18 @@ class PlotWindow(QtWidgets.QMainWindow):
         extensionIndex = self._treeWidget.indexOfTopLevelItem(extensionItem)
         analyseIndex = extensionItem.indexOfChild(analyseItem)
         dataIndex = analyseItem.indexOfChild(dataItem)
-        data = self._getDataFromIndex(extensionIndex, analyseIndex, dataIndex)
-        self._peakSearchWindow.displayAnalyseData(data)
-        self._peakSearchWindow.showMaximized()
+        analyse = self._getAnalyseFromIndex(extensionIndex, analyseIndex)
+        self._peakSearchWindow.addAnalyse(analyse)
+        self._peakSearchWindow.show()
+        self._peakSearchWindow.displayAnalyseData(dataIndex)
 
-    def closeEvent(self, event):
-        # Intercept the close event
-        # Check if the close is initiated by the close button
-        if event.spontaneous():
-            # Hide the window instead of closing
-            self.hide()
-            event.ignore()
-        else:
-            # Handle the close event normally
-            event.accept()
+    # def closeEvent(self, event):
+    #     # Intercept the close event
+    #     # Check if the close is initiated by the close button
+    #     if event.spontaneous():
+    #         # Hide the window instead of closing
+    #         self.hide()
+    #         event.ignore()
+    #     else:
+    #         # Handle the close event normally
+    #         event.accept()

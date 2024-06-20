@@ -744,7 +744,7 @@ class PeakSearchWindow(QtWidgets.QMainWindow):
 
     @QtCore.pyqtSlot(QtWidgets.QTableWidgetItem)
     def _itemClicked(self, item: QtWidgets.QTableWidgetItem) -> None:
-        rowId = self._tableWidget.rowIds.index([item.row()])
+        rowId = self._tableWidget.rowIds.index(item.row())
         data = self._plotDataList[rowId]
         if data.visible:
             self._hoverOverData(data)
@@ -845,10 +845,11 @@ class PeakSearchWindow(QtWidgets.QMainWindow):
         self._zoomRegion.setRegion((0, 100))
         self._peakPlot.setXRange(0, 100, padding=0)
         self._setCoordinate(0, 0)
+        QtWidgets.QApplication.processEvents()
         self._fillTable()
 
     def closeEvent(self, event):
-        # self._saveToDatabase()
+        self._saveToDatabase()
         event.accept()
 
     def mousePressEvent(self, a0):
@@ -856,32 +857,37 @@ class PeakSearchWindow(QtWidgets.QMainWindow):
             self._searchedElement.clearFocus()
         return super().mousePressEvent(a0)
 
-    def _saveToDatabase(self):
-        for index, row in enumerate(self._tableWidget.rows):
-            if row.get(8).text() == "Activated":
-                active = 1
-            else:
-                active = 0
-            try:
-                conditionId = int(row[7].currentText().split(" ")[-1])
-            except ValueError:
-                conditionId = None
-            if conditionId is not None:
-                query = f"""
-                    UPDATE Lines
-                    SET low_kiloelectron_volt = {row[4].text()},
-                        high_kiloelectron_volt = {row[5].text()},
-                        active = {active},
-                        condition_id = {conditionId}
-                    WHERE line_id = {index + 1};
-                """
-            else:
-                query = f"""
-                    UPDATE Lines
-                    SET low_kiloelectron_volt = {row[4].text()},
-                        high_kiloelectron_volt = {row[5].text()},
-                        active = {active},
-                        condition_id = NULL
-                    WHERE line_id = {index + 1};
-                """
-            self._db.executeQuery(query)
+    def _saveToDatabase(self) -> None:
+        if not self._undoStack:
+            return
+        while self._undoStack:
+            rowId, values, action = self._undoStack.popleft()
+            if action != 'hide':
+                row = self._tableWidget.getRow(rowId)
+                if row.get(8).text() == "Activated":
+                    active = 1
+                else:
+                    active = 0
+                try:
+                    conditionId = int(row[7].currentText().split(" ")[-1])
+                except ValueError:
+                    conditionId = None
+                if conditionId is not None:
+                    query = f"""
+                        UPDATE Lines
+                        SET low_kiloelectron_volt = {row[4].text()},
+                            high_kiloelectron_volt = {row[5].text()},
+                            active = {active},
+                            condition_id = {conditionId}
+                        WHERE line_id = {rowId + 1};
+                    """
+                else:
+                    query = f"""
+                        UPDATE Lines
+                        SET low_kiloelectron_volt = {row[4].text()},
+                            high_kiloelectron_volt = {row[5].text()},
+                            active = {active},
+                            condition_id = NULL
+                        WHERE line_id = {rowId + 1};
+                    """
+                self._db.executeQuery(query)
