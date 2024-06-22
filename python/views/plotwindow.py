@@ -1,6 +1,6 @@
 from functools import partial
 from json import dumps
-from typing import Optional
+from typing import Optional, Union
 
 import numpy as np
 import pyqtgraph as pg
@@ -62,6 +62,175 @@ class SaveDialog(QtWidgets.QDialog):
         self.listWidget.addItems(items)
 
 
+class CalibrationDialog(QtWidgets.QDialog):
+    def __init__(self, parent=None):
+        super(CalibrationDialog, self).__init__(parent)
+        self._db = getDatabase(resource_path("fundamentals.db"))
+        self._df = self._db.dataframe("SELECT * FROM Elements")
+        self.element = None
+        self.concentration = None
+        self.path = None
+        self.setWindowTitle("Set Calibration Parameters")
+        self.setFixedSize(500, 200)
+        self._setUpView()
+
+    def _setUpView(self) -> None:
+        horizontalLayout = QtWidgets.QHBoxLayout(self)
+        gridLayout = QtWidgets.QGridLayout()
+        gridLayout.setContentsMargins(7, 7, 7, 7)
+        self._filePathLineEdit = self._createLineEdit()
+        gridLayout.addWidget(self._filePathLineEdit, 3, 1, 1, 1)
+        spacerItem = QtWidgets.QSpacerItem(
+            0, 0, QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Expanding
+        )
+        gridLayout.addItem(spacerItem, 2, 0, 1, 1)
+        self._openButton = self._createButton()
+        gridLayout.addWidget(self._openButton, 3, 2, 1, 1)
+        label = self._createLabel("Concentration")
+        gridLayout.addWidget(label, 1, 0, 1, 1)
+        self._elementComboBox = self._createComboBox()
+        gridLayout.addWidget(self._elementComboBox, 0, 1, 1, 1)
+        label = self._createLabel("Element")
+        gridLayout.addWidget(label, 0, 0, 1, 1)
+        label = self._createLabel("File Path")
+        gridLayout.addWidget(label, 3, 0, 1, 1)
+        self._concentrationSpinBox = self._createSpinBox()
+        gridLayout.addWidget(self._concentrationSpinBox, 1, 1, 1, 1)
+        gridLayout.setColumnStretch(1, 1)
+        horizontalLayout.addLayout(gridLayout)
+        buttonBox = self._createButtonBox()
+        horizontalLayout.addWidget(buttonBox)
+
+    def _createLabel(self, text: str) -> QtWidgets.QLabel:
+        label = QtWidgets.QLabel(self)
+        label.setText(text)
+        label.setAlignment(QtCore.Qt.AlignmentFlag.AlignVCenter)
+        label.setSizePolicy(QtWidgets.QSizePolicy.Policy.Fixed, QtWidgets.QSizePolicy.Policy.Fixed)
+        return label
+
+    def _createLineEdit(self) -> QtWidgets.QLineEdit:
+        lineEdit = QtWidgets.QLineEdit(self)
+        lineEdit.setStyleSheet("""
+            QLineEdit {
+                border-radius: 5px;
+                border: 1px solid gray;
+                padding: 2px;
+            }
+            QLineEdit:hover {
+                border: 1px solid darkblue;
+            }
+            QLineEdit:focus {
+                border: 1px solid black;
+            }
+        """)
+        return lineEdit
+
+    def _createButton(self) -> QtWidgets.QPushButton:
+        button = QtWidgets.QPushButton(self)
+        button.setIcon(QtGui.QIcon(resource_path("icons/open.png")))
+        button.setStyleSheet("""
+            QPushButton {
+                background-color: transparent;
+                padding: 2px;
+                border-radius: 3px;
+                border: 1px solid gray;
+            }
+            QPushButton:hover {
+                background-color: lightgray;
+            }
+        """)
+        button.clicked.connect(self._setPath)
+        return button
+
+    @QtCore.pyqtSlot()
+    def _setPath(self) -> None:
+        self.path = self.parent().showFileDialog(QtWidgets.QFileDialog.AcceptMode.AcceptOpen)
+        if self.path is not None:
+            self._filePathLineEdit.setText(self.path)
+
+    def _createComboBox(self) -> QtWidgets.QComboBox:
+        comboBox = QtWidgets.QComboBox(self)
+        comboBox.setSizePolicy(QtWidgets.QSizePolicy.Policy.Fixed, QtWidgets.QSizePolicy.Policy.Fixed)
+        comboBox.setStyleSheet("""
+            QComboBox {
+                border: 1px solid gray;
+                border-radius: 3px;
+                padding: 1px 34px 1px 3px;
+            }
+            QComboBox:hover {
+                border: 1px solid darkblue;
+            }
+            QComboBox:focus {
+                border: 1px solid black;
+            }
+            QComboBox::drop-down {
+                subcontrol-origin: padding;
+                subcontrol-position: top right;
+                width: 15px;
+                border-left-width: 1px;
+                border-left-color: darkgray;
+                border-left-style: solid;
+                border-top-right-radius: 3px;
+                border-bottom-right-radius: 3px;
+            }
+            QComboBox::down-arrow {
+                image: url(icons/down-arrow-resized.png)
+            }
+            QComboBox QAbstractItemView {
+                border-radius: 3px;
+                border: 1px solid gray;
+                selection-background-color: gray;
+                background-color: lightgray; /* Custom background color for the drop-down menu */
+            }
+        """)
+        comboBox.addItems(self._df['symbol'].tolist())
+        comboBox.setCurrentIndex(0)
+        self.element = comboBox.itemText(0)
+        comboBox.currentTextChanged.connect(self._setElement)
+        return comboBox
+
+    @QtCore.pyqtSlot(str)
+    def _setElement(self, text: str) -> None:
+        self.element = text
+
+    def _createSpinBox(self) -> QtWidgets.QDoubleSpinBox:
+        spinBox = QtWidgets.QDoubleSpinBox(self)
+        spinBox.setSizePolicy(
+            QtWidgets.QSizePolicy.Policy.Fixed, QtWidgets.QSizePolicy.Policy.Fixed
+        )
+        spinBox.setStyleSheet("""
+            QDoubleSpinBox {
+                border-radius: 3px;
+                border: 1px solid gray;
+                padding: 1px 20px 1px 3px;
+            }
+            QDoubleSpinBox:hover {
+                border: 1px solid darkblue;
+            }
+            QDoubleSpinBox:focus {
+                border: 1px solid black;
+            }
+        """)
+        spinBox.setValue(100)
+        spinBox.setDecimals(1)
+        self.concentration = spinBox.value()
+        spinBox.valueChanged.connect(self._setConcentration)
+        return spinBox
+
+    @QtCore.pyqtSlot(float)
+    def _setConcentration(self, value: float) -> None:
+        self.concentration = value
+
+    def _createButtonBox(self) -> QtWidgets.QDialogButtonBox:
+        buttonBox = QtWidgets.QDialogButtonBox(self)
+        buttonBox.setOrientation(QtCore.Qt.Orientation.Vertical)
+        buttonBox.setStandardButtons(
+            QtWidgets.QDialogButtonBox.StandardButton.Cancel | QtWidgets.QDialogButtonBox.StandardButton.Ok
+        )
+        buttonBox.accepted.connect(self.accept)
+        buttonBox.rejected.connect(self.reject)
+        return buttonBox
+
 class ConditionForm(QtWidgets.QListView):
     def __init__(self, parent=None):
         super(ConditionForm, self).__init__(parent)
@@ -82,7 +251,7 @@ class ConditionForm(QtWidgets.QListView):
 
     def _createComboBox(self):
         self._selectorComboBox = QtWidgets.QComboBox(self)
-        self._selectorComboBox.addItems(self._df["name"])
+        self._selectorComboBox.addItems(self._df.query("active == 1")["name"])
         self._selectorComboBox.currentTextChanged.connect(self._showConditionInList)
 
     def _createTable(self):
@@ -128,13 +297,16 @@ class PlotWindow(QtWidgets.QMainWindow):
         self._createCoordinateLabel()
         self._setUpView()
 
+        self._indexOfFile = None
         self._analyseFiles = list()
-        self._elementsWindow: Optional[QtWidgets.QWidget] = None
+        self._elementsWindow: Optional[ElementsWindow] = None
+        self._calibrationDialog: Optional[CalibrationDialog] = None
+        self._peakSearchWindow: Optional[PeakSearchWindow] = None
         # TODO interferenceWindow
 
     def _createActions(self) -> None:
         self._actionsMap = {}
-        actions = ["New", "Open", "Save as", "Close", "Peak Search", "Elements"]
+        actions = ["New", "Open", "Save as", "Close", "Peak Search", "Elements", "Add Calibration"]
         for label in actions:
             action = QtGui.QAction(label)
             key = "-".join(label.lower().split(" "))
@@ -159,6 +331,8 @@ class PlotWindow(QtWidgets.QMainWindow):
             self._elementsWindow.show()
         elif key == "peak-search":
             self._showPeakSearchWindow()
+        elif key == "add-calibration":
+            self._openCalibrationDialog()
 
     def _createMenus(self) -> None:
         self._menusMap = {}
@@ -171,8 +345,11 @@ class PlotWindow(QtWidgets.QMainWindow):
 
     def _fillMenusWithActions(self) -> None:
         self._menusMap["file"].addAction(self._actionsMap["new"])
+        self._menusMap["file"].addSeparator()
         self._menusMap["file"].addAction(self._actionsMap["open"])
+        self._menusMap["file"].addAction(self._actionsMap["add-calibration"])
         self._menusMap["file"].addAction(self._actionsMap["save-as"])
+        self._menusMap["file"].addSeparator()
         self._menusMap["file"].addAction(self._actionsMap["close"])
 
     def _createMenuBar(self) -> None:
@@ -189,6 +366,7 @@ class PlotWindow(QtWidgets.QMainWindow):
 
     def _fillToolBarWithActions(self, toolBar: QtWidgets.QToolBar) -> None:
         toolBar.addAction(self._actionsMap["open"])
+        toolBar.addAction(self._actionsMap["add-calibration"])
         toolBar.addAction(self._actionsMap["save-as"])
         toolBar.addAction(self._actionsMap["elements"])
         toolBar.addAction(self._actionsMap["peak-search"])
@@ -308,7 +486,7 @@ class PlotWindow(QtWidgets.QMainWindow):
         mainWidget.setLayout(vlayout)
         self.setCentralWidget(mainWidget)
 
-    def _getFileNameFromDialog(self, mode: QtWidgets.QFileDialog.AcceptMode):
+    def _getFileNameFromDialog(self, mode: QtWidgets.QFileDialog.AcceptMode) -> None:
         if mode == QtWidgets.QFileDialog.AcceptMode.AcceptSave:
             saveDialog = SaveDialog(self)
             saveDialog.fillList(list(map(lambda x: x.name, self._analyseFiles)))
@@ -316,19 +494,23 @@ class PlotWindow(QtWidgets.QMainWindow):
             result = saveDialog.exec()
             if result:
                 self._indexOfFile = saveDialog.listWidget.currentRow()
-                self._showFileDialog(mode)
+                path = self.showFileDialog(mode)
+                self._configureSaveOrOpen(mode, path)
         elif mode == QtWidgets.QFileDialog.AcceptMode.AcceptOpen:
-            self._showFileDialog(mode)
+            path = self.showFileDialog(mode)
+            self._configureSaveOrOpen(mode, path)
 
-    def _showFileDialog(self, mode: QtWidgets.QFileDialog.AcceptMode):
+    def showFileDialog(self, mode: QtWidgets.QFileDialog.AcceptMode) -> Optional[str]:
         fileDialog = QtWidgets.QFileDialog(self)
         fileDialog.setFileMode(QtWidgets.QFileDialog.FileMode.AnyFile)
         fileDialog.setNameFilters(
             ["Antique'X Spectrum (*.atx)", "Text Spectrum (*.txt)"]
         )
         fileDialog.setAcceptMode(mode)
-        fileDialog.fileSelected.connect(partial(self._configureSaveOrOpen, mode))
-        fileDialog.exec()
+        result = fileDialog.exec()
+        if result == 1:
+            return fileDialog.selectedFiles()[0] if fileDialog.selectedFiles() else None
+        return None
 
     @QtCore.pyqtSlot(str)
     def _configureSaveOrOpen(
@@ -359,17 +541,20 @@ class PlotWindow(QtWidgets.QMainWindow):
             messageBox.setStandardButtons(QtWidgets.QMessageBox.StandardButton.Ok)
             messageBox.show()
 
-    def addAnalyse(self, analyse: datatypes.Analyse) -> None:
+    def addAnalyse(self, analyse: Union[datatypes.Analyse, datatypes.CalibrationAnalyse]) -> None:
         self._analyseFiles.append(analyse)
         self._addAnalyseToTree(analyse)
         if not self._actionsMap["save-as"].isEnabled():
             self._actionsMap["save-as"].setDisabled(False)
             self._actionsMap["new"].setDisabled(False)
 
-    def _addAnalyseToTree(self, analyse: datatypes.Analyse) -> None:
+    def _addAnalyseToTree(self, analyse: Union[datatypes.Analyse, datatypes.CalibrationAnalyse]) -> None:
         item = QtWidgets.QTreeWidgetItem()
         item.setCheckState(0, QtCore.Qt.CheckState.Unchecked)
-        item.setText(0, analyse.name)
+        if isinstance(analyse, datatypes.CalibrationAnalyse):
+            item.setText(0, f"{analyse.name} - CAL")
+        else:
+            item.setText(0, analyse.name)
         for index, data in enumerate(analyse.data):
             child = QtWidgets.QTreeWidgetItem()
             child.setText(1, f"Condition {data.condition}")
@@ -472,7 +657,7 @@ class PlotWindow(QtWidgets.QMainWindow):
                         f.write(str(i) + "\n")
 
     def _showPeakSearchWindow(self):
-        self._peakSearchWindow = PeakSearchWindow(self)
+        self._peakSearchWindow = PeakSearchWindow()
         dataItem = self._treeWidget.currentItem()
         analyseItem = dataItem.parent()
         extensionItem = analyseItem.parent()
@@ -483,6 +668,22 @@ class PlotWindow(QtWidgets.QMainWindow):
         self._peakSearchWindow.addAnalyse(analyse)
         self._peakSearchWindow.show()
         self._peakSearchWindow.displayAnalyseData(dataIndex)
+
+    def _openCalibrationDialog(self) -> None:
+        self._calibrationDialog = CalibrationDialog(self)
+        self._calibrationDialog.show()
+        self._calibrationDialog.accepted.connect(self.addCalibration)
+
+    def addCalibration(self) -> None:
+        path = self._calibrationDialog.path
+        if path:
+            if path.endswith(".txt"):
+                analyse = datatypes.CalibrationAnalyse.fromTextFile(path)
+            else:
+                analyse = datatypes.CalibrationAnalyse.fromATXFile(path)
+            analyse.concentration = self._calibrationDialog.concentration
+            analyse.element = self._calibrationDialog.element
+            self.addAnalyse(analyse)
 
     # def closeEvent(self, event):
     #     # Intercept the close event

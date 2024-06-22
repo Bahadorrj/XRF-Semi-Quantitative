@@ -47,12 +47,10 @@ class AnalyseData:
 
 @dataclass
 class Analyse:
-    filename: str
-    name: str
-    extension: str
+    filename: str = field(default=None)
+    name: str = field(default=None)
+    extension: str = field(default=None)
     data: list[AnalyseData] = field(default_factory=list)
-
-    # TODO profile: str --cal or def
 
     def __init__(self, filename: str, data: list[AnalyseData]) -> None:
         self.filename = filename
@@ -112,6 +110,31 @@ class Analyse:
         for d in jsonDicts:
             data.append(AnalyseData.fromDict(d))
         return Analyse("untitled", data)
+
+
+@dataclass
+class CalibrationAnalyse(Analyse):
+    element: str = field(default=None)
+    concentration: float = field(default=None)
+    sampleType: str = field(default=None)
+
+    def __init__(self, filename: str, data: list[AnalyseData]) -> None:
+        super().__init__(filename, data)
+
+    @classmethod
+    def fromTextFile(cls, filename: str) -> 'CalibrationAnalyse':
+        analyse = super().fromTextFile(filename)
+        return CalibrationAnalyse(filename, analyse.data)
+
+    @classmethod
+    def fromATXFile(cls, filename: str) -> 'Analyse':
+        analyse = super().fromATXFile(filename)
+        return CalibrationAnalyse(filename, analyse.data)
+
+    @classmethod
+    def fromSocket(cls, connection: socket.socket) -> 'Analyse':
+        analyse = super().fromSocket(connection)
+        return CalibrationAnalyse("untitled", analyse.data)
 
 
 class PlotData:

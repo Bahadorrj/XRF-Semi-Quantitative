@@ -13,8 +13,8 @@ class ElementsWindow(QtWidgets.QWidget):
         self.resize(1200, 800)
         self.setWindowTitle('Elements')
         db = getDatabase(paths.resource_path("fundamentals.db"))
-        self._df = db.dataframe('SELECT * FROM elements')
-        query = "SELECT * FROM elements WHERE element_id IN (SELECT element_id FROM UQ ORDER BY element_id)"
+        self._df = db.dataframe('SELECT * FROM Lines')
+        query = "SELECT * FROM Lines WHERE element_id IN (SELECT element_id FROM UQ ORDER BY element_id)"
         self._uqr = db.dataframe(query)
         self._mainLayout = QtWidgets.QVBoxLayout(self)
         self._createFilterLayout()
@@ -65,7 +65,7 @@ class ElementsWindow(QtWidgets.QWidget):
                         try:
                             value = int(value)
                         except ValueError:
-                            pass
+                            value = ""
                     elif df.columns[column] == 'active':
                         value = bool(value)
                         if value is True:

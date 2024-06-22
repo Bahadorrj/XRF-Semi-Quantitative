@@ -37,7 +37,13 @@ def fill_interferences(database, lines: pd.DataFrame):
 
 
 if __name__ == '__main__':
-    db = getDatabase(resource_path('../views/fundamentals.db'))
+    db = getDatabase(resource_path('../../fundamentals.db'))
     df = db.dataframe('SELECT * FROM Lines')
-    fill_interferences(db, df)
+    for row in df.itertuples():
+        query = f"""
+        UPDATE Lines 
+        SET element_id = (SELECT element_id FROM Elements WHERE atomic_number = {row.atomic_number})
+        WHERE line_id = {row.line_id};
+        """
+        db.executeQuery(query)
     db.closeConnection()
