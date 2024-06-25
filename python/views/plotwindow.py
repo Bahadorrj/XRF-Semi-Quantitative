@@ -643,10 +643,9 @@ class PlotWindow(QtWidgets.QMainWindow):
         if filename.endswith(".atx"):
             key = encryption.loadKey()
             with open(filename, "wb") as f:
-                for d in analyse.data:
-                    jsonText = dumps(d.toDict())
-                    encryptedText = encryption.encryptText(jsonText, key)
-                    f.write(encryptedText + b"\n")
+                jsonText = dumps(analyse.toDict())
+                encryptedText = encryption.encryptText(jsonText, key)
+                f.write(encryptedText + b"\n")
         elif filename.endswith(".txt"):
             with open(filename, "w") as f:
                 for data in analyse.data:

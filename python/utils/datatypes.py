@@ -50,21 +50,34 @@ class Analyse:
     filename: str = field(default=None)
     name: str = field(default=None)
     extension: str = field(default=None)
+    generalData: dict = field(default_factory=dict)
     data: list[AnalyseData] = field(default_factory=list)
 
-    def __init__(self, filename: str, data: list[AnalyseData]) -> None:
+    def __init__(self, filename: str, data: list[AnalyseData], **kwargs) -> None:
         self.filename = filename
         self.name = Path(filename).stem
         self.extension = filename[filename.rfind("."):]
         self.data = data
+        for key, value in kwargs.items():
+            if key in ['generalData', 'concentrations']:
+                setattr(self, key, value)
 
     def toDict(self) -> dict:
         return {
             "filename": self.filename,
             "name": self.name,
             "extension": self.extension,
-            "data": self.data
+            "data": [d.toDict() for d in self.data]
         }
+
+    @classmethod
+    def fromDict(cls, analyseDict: dict) -> 'Analyse':
+        filename = analyseDict.pop('filename')
+        dataList = analyseDict.pop('data')
+        data = []
+        for dataDict in dataList:
+            data.append(AnalyseData.fromDict(dataDict))
+        return Analyse(filename, data, **analyseDict)
 
     @classmethod
     def fromTextFile(cls, filename: str) -> 'Analyse':
@@ -89,13 +102,9 @@ class Analyse:
         key = encryption.loadKey()
         with open(filename, 'r') as f:
             encryptedText = f.readline()
-            while encryptedText:
-                decryptedText = encryption.decryptText(encryptedText, key)
-                jsonDict = loads(decryptedText)
-                data.append(AnalyseData.fromDict(jsonDict))
-                encryptedText = f.readline()
-        data.sort(key=lambda x: x.condition)
-        return Analyse(filename, data)
+            decryptedText = encryption.decryptText(encryptedText, key)
+            jsonDict = loads(decryptedText)
+        return Analyse.fromDict(jsonDict)
 
     @classmethod
     def fromSocket(cls, connection: socket.socket) -> 'Analyse':
@@ -115,16 +124,23 @@ class Analyse:
 @dataclass
 class CalibrationAnalyse(Analyse):
     element: str = field(default=None)
-    concentration: float = field(default=None)
+    concentrations: dict = field(default_factory=dict)
     sampleType: str = field(default=None)
 
-    def __init__(self, filename: str, data: list[AnalyseData]) -> None:
-        super().__init__(filename, data)
+    def __init__(self, filename: str, data: list[AnalyseData], concentration: dict, **kwargs) -> None:
+        super().__init__(filename, data, **kwargs)
+        self.concentrations = concentration
 
     @classmethod
     def fromTextFile(cls, filename: str) -> 'CalibrationAnalyse':
         analyse = super().fromTextFile(filename)
-        return CalibrationAnalyse(filename, analyse.data)
+        with open(filename, 'r') as f:
+            line = f.readline()
+            while line:
+                if "concentrations" in line:
+                    concentrationDict = loads(line)
+                    return CalibrationAnalyse(filename, analyse.data, concentrationDict)
+                line = f.readline()
 
     @classmethod
     def fromATXFile(cls, filename: str) -> 'Analyse':
@@ -161,12 +177,13 @@ class PlotData:
     @classmethod
     def fromSeries(cls, rowId: int, series: pd.Series) -> 'PlotData':
         active = bool(series['active'])
-        value = calculation.evToPx(series['kiloelectron_volt'])
-        labels = [series['symbol'], series['radiation_type']]
+        value = calculation.evToPx(float(series['kiloelectron_volt']))
+        labels = [str(series['symbol']), str(series['radiation_type'])]
         spectrumLine = cls._generateLine(value, active=active)
         peakLine = cls._generateLine(value, labels=labels, active=active)
         rng = (
-            calculation.evToPx(series['low_kiloelectron_volt']), calculation.evToPx(series['high_kiloelectron_volt'])
+            calculation.evToPx(float(series['low_kiloelectron_volt'])),
+            calculation.evToPx(float(series['high_kiloelectron_volt']))
         )
         region = cls._generateRegion(rng)
         try:
