@@ -6,7 +6,7 @@ from PyQt6 import QtCore, QtWidgets
 
 from python.utils.database import getDatabase
 from python.utils.datatypes import Analyse
-from python.utils.paths import resource_path
+from python.utils.paths import resourcePath
 from python.views.plotwindow import PlotWindow
 
 
@@ -32,7 +32,7 @@ class GuiHandler(QtCore.QObject):
         self.window.hide()
 
     def exitApplication(self):
-        getDatabase(resource_path('fundamentals.db')).closeConnection()
+        getDatabase(resourcePath('fundamentals.db')).closeConnection()
         if not self.window.isHidden():
             self.window.close()
         logging.info("Application exit")

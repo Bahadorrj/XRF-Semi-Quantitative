@@ -1,6 +1,6 @@
 from functools import partial
 from json import dumps
-from typing import Optional, Union
+from typing import Optional
 
 import numpy as np
 import pyqtgraph as pg
@@ -9,7 +9,7 @@ from PyQt6 import QtCore, QtGui, QtWidgets
 from python.utils import datatypes
 from python.utils import encryption
 from python.utils.database import getDatabase
-from python.utils.paths import resource_path
+from python.utils.paths import resourcePath
 from python.views.elementswindow import ElementsWindow
 from python.views.peaksearchwindow import PeakSearchWindow
 
@@ -61,182 +61,12 @@ class SaveDialog(QtWidgets.QDialog):
     def fillList(self, items: list):
         self.listWidget.addItems(items)
 
-
-class CalibrationDialog(QtWidgets.QDialog):
-    def __init__(self, parent=None):
-        super(CalibrationDialog, self).__init__(parent)
-        self._db = getDatabase(resource_path("fundamentals.db"))
-        self._df = self._db.dataframe("SELECT * FROM Elements")
-        self.element = None
-        self.concentration = None
-        self.path = None
-        self.setWindowTitle("Set Calibration Parameters")
-        self.setFixedSize(500, 200)
-        self._setUpView()
-
-    def _setUpView(self) -> None:
-        horizontalLayout = QtWidgets.QHBoxLayout(self)
-        gridLayout = QtWidgets.QGridLayout()
-        gridLayout.setContentsMargins(7, 7, 7, 7)
-        self._filePathLineEdit = self._createLineEdit()
-        gridLayout.addWidget(self._filePathLineEdit, 3, 1, 1, 1)
-        spacerItem = QtWidgets.QSpacerItem(
-            0, 0, QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Expanding
-        )
-        gridLayout.addItem(spacerItem, 2, 0, 1, 1)
-        self._openButton = self._createButton()
-        gridLayout.addWidget(self._openButton, 3, 2, 1, 1)
-        label = self._createLabel("Concentration")
-        gridLayout.addWidget(label, 1, 0, 1, 1)
-        self._elementComboBox = self._createComboBox()
-        gridLayout.addWidget(self._elementComboBox, 0, 1, 1, 1)
-        label = self._createLabel("Element")
-        gridLayout.addWidget(label, 0, 0, 1, 1)
-        label = self._createLabel("File Path")
-        gridLayout.addWidget(label, 3, 0, 1, 1)
-        self._concentrationSpinBox = self._createSpinBox()
-        gridLayout.addWidget(self._concentrationSpinBox, 1, 1, 1, 1)
-        gridLayout.setColumnStretch(1, 1)
-        horizontalLayout.addLayout(gridLayout)
-        buttonBox = self._createButtonBox()
-        horizontalLayout.addWidget(buttonBox)
-
-    def _createLabel(self, text: str) -> QtWidgets.QLabel:
-        label = QtWidgets.QLabel(self)
-        label.setText(text)
-        label.setAlignment(QtCore.Qt.AlignmentFlag.AlignVCenter)
-        label.setSizePolicy(QtWidgets.QSizePolicy.Policy.Fixed, QtWidgets.QSizePolicy.Policy.Fixed)
-        return label
-
-    def _createLineEdit(self) -> QtWidgets.QLineEdit:
-        lineEdit = QtWidgets.QLineEdit(self)
-        lineEdit.setStyleSheet("""
-            QLineEdit {
-                border-radius: 5px;
-                border: 1px solid gray;
-                padding: 2px;
-            }
-            QLineEdit:hover {
-                border: 1px solid darkblue;
-            }
-            QLineEdit:focus {
-                border: 1px solid black;
-            }
-        """)
-        return lineEdit
-
-    def _createButton(self) -> QtWidgets.QPushButton:
-        button = QtWidgets.QPushButton(self)
-        button.setIcon(QtGui.QIcon(resource_path("icons/open.png")))
-        button.setStyleSheet("""
-            QPushButton {
-                background-color: transparent;
-                padding: 2px;
-                border-radius: 3px;
-                border: 1px solid gray;
-            }
-            QPushButton:hover {
-                background-color: lightgray;
-            }
-        """)
-        button.clicked.connect(self._setPath)
-        return button
-
-    @QtCore.pyqtSlot()
-    def _setPath(self) -> None:
-        self.path = self.parent().showFileDialog(QtWidgets.QFileDialog.AcceptMode.AcceptOpen)
-        if self.path is not None:
-            self._filePathLineEdit.setText(self.path)
-
-    def _createComboBox(self) -> QtWidgets.QComboBox:
-        comboBox = QtWidgets.QComboBox(self)
-        comboBox.setSizePolicy(QtWidgets.QSizePolicy.Policy.Fixed, QtWidgets.QSizePolicy.Policy.Fixed)
-        comboBox.setStyleSheet("""
-            QComboBox {
-                border: 1px solid gray;
-                border-radius: 3px;
-                padding: 1px 34px 1px 3px;
-            }
-            QComboBox:hover {
-                border: 1px solid darkblue;
-            }
-            QComboBox:focus {
-                border: 1px solid black;
-            }
-            QComboBox::drop-down {
-                subcontrol-origin: padding;
-                subcontrol-position: top right;
-                width: 15px;
-                border-left-width: 1px;
-                border-left-color: darkgray;
-                border-left-style: solid;
-                border-top-right-radius: 3px;
-                border-bottom-right-radius: 3px;
-            }
-            QComboBox::down-arrow {
-                image: url(icons/down-arrow-resized.png)
-            }
-            QComboBox QAbstractItemView {
-                border-radius: 3px;
-                border: 1px solid gray;
-                selection-background-color: gray;
-                background-color: lightgray; /* Custom background color for the drop-down menu */
-            }
-        """)
-        comboBox.addItems(self._df['symbol'].tolist())
-        comboBox.setCurrentIndex(0)
-        self.element = comboBox.itemText(0)
-        comboBox.currentTextChanged.connect(self._setElement)
-        return comboBox
-
-    @QtCore.pyqtSlot(str)
-    def _setElement(self, text: str) -> None:
-        self.element = text
-
-    def _createSpinBox(self) -> QtWidgets.QDoubleSpinBox:
-        spinBox = QtWidgets.QDoubleSpinBox(self)
-        spinBox.setSizePolicy(
-            QtWidgets.QSizePolicy.Policy.Fixed, QtWidgets.QSizePolicy.Policy.Fixed
-        )
-        spinBox.setStyleSheet("""
-            QDoubleSpinBox {
-                border-radius: 3px;
-                border: 1px solid gray;
-                padding: 1px 20px 1px 3px;
-            }
-            QDoubleSpinBox:hover {
-                border: 1px solid darkblue;
-            }
-            QDoubleSpinBox:focus {
-                border: 1px solid black;
-            }
-        """)
-        spinBox.setValue(100)
-        spinBox.setDecimals(1)
-        self.concentration = spinBox.value()
-        spinBox.valueChanged.connect(self._setConcentration)
-        return spinBox
-
-    @QtCore.pyqtSlot(float)
-    def _setConcentration(self, value: float) -> None:
-        self.concentration = value
-
-    def _createButtonBox(self) -> QtWidgets.QDialogButtonBox:
-        buttonBox = QtWidgets.QDialogButtonBox(self)
-        buttonBox.setOrientation(QtCore.Qt.Orientation.Vertical)
-        buttonBox.setStandardButtons(
-            QtWidgets.QDialogButtonBox.StandardButton.Cancel | QtWidgets.QDialogButtonBox.StandardButton.Ok
-        )
-        buttonBox.accepted.connect(self.accept)
-        buttonBox.rejected.connect(self.reject)
-        return buttonBox
-
 class ConditionForm(QtWidgets.QListView):
     def __init__(self, parent=None):
         super(ConditionForm, self).__init__(parent)
         self.setFrameShape(QtWidgets.QFrame.Shape.Box)
         self.setFrameShadow(QtWidgets.QFrame.Shadow.Plain)
-        db = getDatabase(resource_path("fundamentals.db"))
+        db = getDatabase(resourcePath("fundamentals.db"))
         self._df = db.dataframe('SELECT * FROM Conditions')
         self._createComboBox()
         self._createTable()
@@ -300,7 +130,6 @@ class PlotWindow(QtWidgets.QMainWindow):
         self._indexOfFile = None
         self._analyseFiles = list()
         self._elementsWindow: Optional[ElementsWindow] = None
-        self._calibrationDialog: Optional[CalibrationDialog] = None
         self._peakSearchWindow: Optional[PeakSearchWindow] = None
         # TODO interferenceWindow
 
@@ -310,7 +139,7 @@ class PlotWindow(QtWidgets.QMainWindow):
         for label in actions:
             action = QtGui.QAction(label)
             key = "-".join(label.lower().split(" "))
-            action.setIcon(QtGui.QIcon(resource_path(f"icons/{key}.png")))
+            action.setIcon(QtGui.QIcon(resourcePath(f"icons/{key}.png")))
             if key in ["save-as", "peak-search", "new"]:
                 action.setDisabled(True)
             self._actionsMap[key] = action
@@ -332,7 +161,7 @@ class PlotWindow(QtWidgets.QMainWindow):
         elif key == "peak-search":
             self._showPeakSearchWindow()
         elif key == "add-calibration":
-            self._openCalibrationDialog()
+            self.addCalibration()
 
     def _createMenus(self) -> None:
         self._menusMap = {}
@@ -486,7 +315,7 @@ class PlotWindow(QtWidgets.QMainWindow):
         mainWidget.setLayout(vlayout)
         self.setCentralWidget(mainWidget)
 
-    def _getFileNameFromDialog(self, mode: QtWidgets.QFileDialog.AcceptMode) -> None:
+    def _getFileNameFromDialog(self, mode: QtWidgets.QFileDialog.AcceptMode) -> Optional[str]:
         if mode == QtWidgets.QFileDialog.AcceptMode.AcceptSave:
             saveDialog = SaveDialog(self)
             saveDialog.fillList(list(map(lambda x: x.name, self._analyseFiles)))
@@ -495,10 +324,14 @@ class PlotWindow(QtWidgets.QMainWindow):
             if result:
                 self._indexOfFile = saveDialog.listWidget.currentRow()
                 path = self.showFileDialog(mode)
-                self._configureSaveOrOpen(mode, path)
+                if path:
+                    self._configureSaveOrOpen(mode, path)
+                return path
         elif mode == QtWidgets.QFileDialog.AcceptMode.AcceptOpen:
             path = self.showFileDialog(mode)
-            self._configureSaveOrOpen(mode, path)
+            if path:
+                self._configureSaveOrOpen(mode, path)
+            return path
 
     def showFileDialog(self, mode: QtWidgets.QFileDialog.AcceptMode) -> Optional[str]:
         fileDialog = QtWidgets.QFileDialog(self)
@@ -513,9 +346,7 @@ class PlotWindow(QtWidgets.QMainWindow):
         return None
 
     @QtCore.pyqtSlot(str)
-    def _configureSaveOrOpen(
-            self, mode: QtWidgets.QFileDialog.AcceptMode, filename: str
-    ) -> None:
+    def _configureSaveOrOpen(self, mode: QtWidgets.QFileDialog.AcceptMode, filename: str) -> None:
         if mode == QtWidgets.QFileDialog.AcceptMode.AcceptOpen:
             self.addAnalyseFile(filename)
         elif mode == QtWidgets.QFileDialog.AcceptMode.AcceptSave:
@@ -541,20 +372,17 @@ class PlotWindow(QtWidgets.QMainWindow):
             messageBox.setStandardButtons(QtWidgets.QMessageBox.StandardButton.Ok)
             messageBox.show()
 
-    def addAnalyse(self, analyse: Union[datatypes.Analyse, datatypes.CalibrationAnalyse]) -> None:
+    def addAnalyse(self, analyse: datatypes.Analyse) -> None:
         self._analyseFiles.append(analyse)
         self._addAnalyseToTree(analyse)
         if not self._actionsMap["save-as"].isEnabled():
             self._actionsMap["save-as"].setDisabled(False)
             self._actionsMap["new"].setDisabled(False)
 
-    def _addAnalyseToTree(self, analyse: Union[datatypes.Analyse, datatypes.CalibrationAnalyse]) -> None:
+    def _addAnalyseToTree(self, analyse: datatypes.Analyse) -> None:
         item = QtWidgets.QTreeWidgetItem()
         item.setCheckState(0, QtCore.Qt.CheckState.Unchecked)
-        if isinstance(analyse, datatypes.CalibrationAnalyse):
-            item.setText(0, f"{analyse.name} - CAL")
-        else:
-            item.setText(0, analyse.name)
+        item.setText(0, analyse.name)
         for index, data in enumerate(analyse.data):
             child = QtWidgets.QTreeWidgetItem()
             child.setText(1, f"Condition {data.condition}")
@@ -564,14 +392,14 @@ class PlotWindow(QtWidgets.QMainWindow):
             colorButton.setColor(COLORS[index])
             colorButton.sigColorChanged.connect(self._drawCanvas)
             self._treeWidget.setItemWidget(child, 2, colorButton)
-        mapper = {".txt": 0, ".atx": 1}
+        mapper = {"txt": 0, "atx": 1}
         self._treeWidget.topLevelItem(mapper[analyse.extension]).addChild(item)
 
     def resetWindow(self):
         messageBox = QtWidgets.QMessageBox(self)
-        messageBox.setWindowTitle("Reset Window?")
+        messageBox.setWindowTitle("Reset window")
         messageBox.setText(
-            "This Will Clear All Added Files. " "Do You Want To Continue?"
+            "This will clear all added files.\nDo you want to continue?"
         )
         messageBox.setStandardButtons(
             QtWidgets.QMessageBox.StandardButton.Yes
@@ -620,7 +448,7 @@ class PlotWindow(QtWidgets.QMainWindow):
         return self._getAnalyseFromIndex(extensionIndex, analyseIndex).data[dataIndex]
 
     def _getAnalyseFromIndex(self, extensionIndex: int, analyseIndex: int) -> datatypes.Analyse:
-        mapper = {0: ".txt", 1: ".atx"}
+        mapper = {0: "txt", 1: "atx"}
         analyse = list(
             filter(
                 lambda a: a.extension == mapper[extensionIndex], self._analyseFiles
@@ -668,21 +496,9 @@ class PlotWindow(QtWidgets.QMainWindow):
         self._peakSearchWindow.show()
         self._peakSearchWindow.displayAnalyseData(dataIndex)
 
-    def _openCalibrationDialog(self) -> None:
-        self._calibrationDialog = CalibrationDialog(self)
-        self._calibrationDialog.show()
-        self._calibrationDialog.accepted.connect(self.addCalibration)
-
-    def addCalibration(self) -> None:
-        path = self._calibrationDialog.path
-        if path:
-            if path.endswith(".txt"):
-                analyse = datatypes.CalibrationAnalyse.fromTextFile(path)
-            else:
-                analyse = datatypes.CalibrationAnalyse.fromATXFile(path)
-            analyse.concentration = self._calibrationDialog.concentration
-            analyse.element = self._calibrationDialog.element
-            self.addAnalyse(analyse)
+    def addCalibration(self):
+        # TODO
+        pass
 
     # def closeEvent(self, event):
     #     # Intercept the close event

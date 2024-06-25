@@ -12,7 +12,7 @@ class ElementsWindow(QtWidgets.QWidget):
         super().__init__(parent)
         self.resize(1200, 800)
         self.setWindowTitle('Elements')
-        db = getDatabase(paths.resource_path("fundamentals.db"))
+        db = getDatabase(paths.resourcePath("fundamentals.db"))
         self._df = db.dataframe('SELECT * FROM Lines')
         query = "SELECT * FROM Lines WHERE element_id IN (SELECT element_id FROM UQ ORDER BY element_id)"
         self._uqr = db.dataframe(query)

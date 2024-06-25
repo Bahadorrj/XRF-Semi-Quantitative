@@ -15,7 +15,7 @@ def generateKeyToFile() -> None:
 
 
 def loadKey() -> bytes:
-    with open(paths.resource_path('secret.key'), 'rb') as f:
+    with open(paths.resourcePath('secret.key'), 'rb') as f:
         return f.read()
 
 

@@ -18,8 +18,6 @@ class AnalyseData:
     x: np.ndarray
     y: np.ndarray
 
-    # TODO general data: dict?
-
     def toDict(self) -> dict:
         return {
             'condition': self.condition,
@@ -50,37 +48,40 @@ class Analyse:
     filename: str = field(default=None)
     name: str = field(default=None)
     extension: str = field(default=None)
-    generalData: dict = field(default_factory=dict)
+    sampleType: str = field(default=None)
+    generalData: dict = field(default=dict)
     data: list[AnalyseData] = field(default_factory=list)
+    concentrations: dict = field(default=dict)
 
-    def __init__(self, filename: str, data: list[AnalyseData], **kwargs) -> None:
-        self.filename = filename
-        self.name = Path(filename).stem
-        self.extension = filename[filename.rfind("."):]
-        self.data = data
+    def __init__(self, **kwargs) -> None:
+        if "data" not in kwargs:
+            raise Exception("Data is required for initialization in class Analyse")
         for key, value in kwargs.items():
-            if key in ['generalData', 'concentrations']:
-                setattr(self, key, value)
+            setattr(self, key, value)
+            if key == "filename":
+                setattr(self, 'name', Path(value).stem)
+                setattr(self, "extension", value.split(".")[-1])
 
     def toDict(self) -> dict:
         return {
-            "filename": self.filename,
-            "name": self.name,
-            "extension": self.extension,
-            "data": [d.toDict() for d in self.data]
+            "filename": getattr(self, "filename"),
+            "name": getattr(self, "name"),
+            "extension": getattr(self, "extension"),
+            "sampleType": getattr(self, "sampleType"),
+            "generalData": getattr(self, "generalData"),
+            "data": [d.toDict() for d in getattr(self, "data")],
+            "concentrations": getattr(self, "concentrations")
         }
 
     @classmethod
     def fromDict(cls, analyseDict: dict) -> 'Analyse':
-        filename = analyseDict.pop('filename')
-        dataList = analyseDict.pop('data')
-        data = []
-        for dataDict in dataList:
-            data.append(AnalyseData.fromDict(dataDict))
-        return Analyse(filename, data, **analyseDict)
+        analyseDict['data'] = [AnalyseData.fromDict(dataDict) for dataDict in analyseDict['data']]
+        return cls(**analyseDict)
 
     @classmethod
     def fromTextFile(cls, filename: str) -> 'Analyse':
+        # TODO this type has to change in future
+        analyseDict = {}
         data = []
         with open(filename, 'r') as f:
             lines = list(map(lambda s: s.strip(), f.readlines()))
@@ -94,63 +95,28 @@ class Analyse:
                         data.append(analyseData)
                 stop += 1
         data.sort(key=lambda x: x.condition)
-        return Analyse(filename, data)
+        analyseDict['data'] = data
+        analyseDict['filename'] = filename
+        return cls(**analyseDict)
 
     @classmethod
     def fromATXFile(cls, filename: str) -> 'Analyse':
-        data = list()
         key = encryption.loadKey()
         with open(filename, 'r') as f:
             encryptedText = f.readline()
             decryptedText = encryption.decryptText(encryptedText, key)
-            jsonDict = loads(decryptedText)
-        return Analyse.fromDict(jsonDict)
+            analyseDict = loads(decryptedText)
+        return cls.fromDict(analyseDict)
 
     @classmethod
     def fromSocket(cls, connection: socket.socket) -> 'Analyse':
-        data = list()
         received = ""
         while True:
             received += connection.recv(10).decode('utf-8')
             if received[-4:] == 'stp':
                 break
-        jsonText = loads(received)
-        jsonDicts = jsonText.split('-')
-        for d in jsonDicts:
-            data.append(AnalyseData.fromDict(d))
-        return Analyse("untitled", data)
-
-
-@dataclass
-class CalibrationAnalyse(Analyse):
-    element: str = field(default=None)
-    concentrations: dict = field(default_factory=dict)
-    sampleType: str = field(default=None)
-
-    def __init__(self, filename: str, data: list[AnalyseData], concentration: dict, **kwargs) -> None:
-        super().__init__(filename, data, **kwargs)
-        self.concentrations = concentration
-
-    @classmethod
-    def fromTextFile(cls, filename: str) -> 'CalibrationAnalyse':
-        analyse = super().fromTextFile(filename)
-        with open(filename, 'r') as f:
-            line = f.readline()
-            while line:
-                if "concentrations" in line:
-                    concentrationDict = loads(line)
-                    return CalibrationAnalyse(filename, analyse.data, concentrationDict)
-                line = f.readline()
-
-    @classmethod
-    def fromATXFile(cls, filename: str) -> 'Analyse':
-        analyse = super().fromATXFile(filename)
-        return CalibrationAnalyse(filename, analyse.data)
-
-    @classmethod
-    def fromSocket(cls, connection: socket.socket) -> 'Analyse':
-        analyse = super().fromSocket(connection)
-        return CalibrationAnalyse("untitled", analyse.data)
+        analyseDict = loads(received)
+        return cls.fromDict(analyseDict)
 
 
 class PlotData:

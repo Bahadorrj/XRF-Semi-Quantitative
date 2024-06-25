@@ -10,7 +10,7 @@ from PyQt6 import QtWidgets, QtCore, QtGui
 from python.utils import calculation, datatypes
 from python.utils.database import getDatabase
 from python.utils.datatypes import Analyse
-from python.utils.paths import resource_path
+from python.utils.paths import resourcePath
 
 
 class StatusButton(QtWidgets.QPushButton):
@@ -205,9 +205,9 @@ class ElementsTableWidget(QtWidgets.QTableWidget):
 
     def _createHideWidget(self, data: datatypes.PlotData) -> HideButton:
         if data.visible:
-            widget = HideButton(icon=QtGui.QIcon(resource_path(f"icons/show.png")))
+            widget = HideButton(icon=QtGui.QIcon(resourcePath(f"icons/show.png")))
         else:
-            widget = HideButton(icon=QtGui.QIcon(resource_path(f"icons/hide.png")))
+            widget = HideButton(icon=QtGui.QIcon(resourcePath(f"icons/hide.png")))
         widget.clicked.connect(partial(self._emitRowChanged, data.rowId, "hide"))
         return widget
 
@@ -298,7 +298,7 @@ class PeakSearchWindow(QtWidgets.QMainWindow):
         self._analyse = None
         self._conditionId = None
         self._kev = None
-        self._db = getDatabase(resource_path("fundamentals.db"))
+        self._db = getDatabase(resourcePath("fundamentals.db"))
         self._df = self._db.dataframe("SELECT * FROM Lines")
         self._plotDataList = [
             datatypes.PlotData.fromSeries(rowId, s) for rowId, s in self._df.iterrows()
@@ -325,7 +325,7 @@ class PeakSearchWindow(QtWidgets.QMainWindow):
 
     def _fillToolBarWithActions(self, toolBar: QtWidgets.QToolBar) -> None:
         self._undoAction = QtGui.QAction(
-            icon=QtGui.QIcon(resource_path("icons/undo.png"))
+            icon=QtGui.QIcon(resourcePath("icons/undo.png"))
         )
         # self._redoAction = QtGui.QAction(icon=QtGui.QIcon(resource_path("icons/redo.png")))
         self._undoAction.setDisabled(True)
@@ -678,11 +678,11 @@ class PeakSearchWindow(QtWidgets.QMainWindow):
         hideButton = row.get(0)
         if data.visible:
             self._erasePlotData(data)
-            hideButton.setIcon(QtGui.QIcon(resource_path("icons/hide.png")))
+            hideButton.setIcon(QtGui.QIcon(resourcePath("icons/hide.png")))
         else:
             self._selectData(data)
             self._drawPlotData(data)
-            hideButton.setIcon(QtGui.QIcon(resource_path("icons/show.png")))
+            hideButton.setIcon(QtGui.QIcon(resourcePath("icons/show.png")))
         data.visible = not data.visible
         return True
 
@@ -864,7 +864,7 @@ class PeakSearchWindow(QtWidgets.QMainWindow):
         data.visible = True
         self._addPlotData(data)
         self._tableWidget.getRow(data.rowId).get(0).setIcon(
-            QtGui.QIcon(resource_path("icons/show.png"))
+            QtGui.QIcon(resourcePath("icons/show.png"))
         )
         self._drawPlotData(data)
         self._selectData(data)

@@ -1,7 +1,7 @@
 import pandas as pd
 
 from python.utils.database import getDatabase
-from python.utils.paths import resource_path
+from python.utils.paths import resourcePath
 
 
 def fill_interferences(database, lines: pd.DataFrame):
@@ -37,7 +37,7 @@ def fill_interferences(database, lines: pd.DataFrame):
 
 
 if __name__ == '__main__':
-    db = getDatabase(resource_path('../../fundamentals.db'))
+    db = getDatabase(resourcePath('../../fundamentals.db'))
     df = db.dataframe('SELECT * FROM Lines')
     for row in df.itertuples():
         query = f"""

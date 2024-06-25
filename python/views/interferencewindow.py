@@ -7,7 +7,7 @@ from PyQt6 import QtCore, QtWidgets, QtGui
 
 from python.utils.color import generateGradiant
 from python.utils.database import getDatabase
-from python.utils.paths import resource_path
+from python.utils.paths import resourcePath
 
 
 class RadiationComboBox(QtWidgets.QComboBox):
@@ -64,7 +64,7 @@ class InterferenceTableWidget(QtWidgets.QTableWidget):
 class InterferenceWindow(QtWidgets.QMainWindow):
     def __init__(self, parent=None) -> None:
         super(InterferenceWindow, self).__init__(parent)
-        self._db = getDatabase(resource_path('fundamentals.db'))
+        self._db = getDatabase(resourcePath('fundamentals.db'))
         self._interferenceDf = self._db.dataframe('SELECT * FROM Interferences')
         self._initialInterferenceDf = self._interferenceDf.copy()
         self._linesDf = self._db.dataframe('SELECT * FROM Lines')
