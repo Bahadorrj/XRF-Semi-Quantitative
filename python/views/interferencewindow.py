@@ -69,10 +69,9 @@ class InterferenceWindow(QtWidgets.QMainWindow):
         self._initialInterferenceDf = self._interferenceDf.copy()
         self._linesDf = self._db.dataframe('SELECT * FROM Lines')
         self._symbols = self._linesDf['symbol'].unique().tolist()
-        self._symbols.insert(0, '')
         self.resize(1200, 800)
         self._mainLayout = QtWidgets.QGridLayout()
-        self._createIndexFinderLayout()
+        # self._createIndexFinderLayout()
         self._createTableWidget()
         self._mainLayout.setColumnStretch(1, 2)
         centralWidget = QtWidgets.QWidget(self)
@@ -83,8 +82,10 @@ class InterferenceWindow(QtWidgets.QMainWindow):
         self._tableWidget = InterferenceTableWidget(self)
         self._tableWidget.setColumnCount(len(self._symbols))
         self._tableWidget.setHorizontalHeaderLabels(self._symbols)
-        self._tableWidget.setRowCount(len(self._symbols))
-        self._tableWidget.setVerticalHeaderLabels(self._symbols)
+        vHeader = self._symbols.copy()
+        vHeader.insert(0, "")
+        self._tableWidget.setRowCount(len(vHeader))
+        self._tableWidget.setVerticalHeaderLabels(vHeader)
         self._fillTable()
         self._tableWidget.horizontalHeader().setSectionResizeMode(QtWidgets.QHeaderView.ResizeMode.ResizeToContents)
         self._tableWidget.verticalHeader().setSectionResizeMode(QtWidgets.QHeaderView.ResizeMode.ResizeToContents)
@@ -103,11 +104,6 @@ class InterferenceWindow(QtWidgets.QMainWindow):
         for row in self._linesDf.itertuples(index=False):
             symbol = row.symbol
             self._hComboBoxMap[symbol].addItem(f"{row.radiation_type}")
-            self._vComboBoxMap[symbol].addItem(f"{row.radiation_type}")
-        for symbol, comboBox in self._vComboBoxMap.items():
-            row = self._symbols.index(symbol)
-            self._tableWidget.setCellWidget(row, 0, comboBox)
-            comboBox.currentTextChanged.connect(self._changeRowRadiation)
         for symbol, comboBox in self._hComboBoxMap.items():
             column = self._symbols.index(symbol)
             self._tableWidget.setCellWidget(0, column, comboBox)
@@ -119,37 +115,28 @@ class InterferenceWindow(QtWidgets.QMainWindow):
                 item = QtWidgets.QTableWidgetItem()
                 item.setTextAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
                 self._tableWidget.setItem(i, j, item)
-        for i in range(1, self._tableWidget.rowCount()):
-            self._addRow(i, "Ka")
+        for i in range(self._tableWidget.columnCount()):
+            self._fillColumn(i, "Ka")
 
-    def _addRow(self, index: int, radiation: str) -> None:
-        symbol = self._symbols[index]
-        df = self._interferenceDf[self._interferenceDf['coefficient'].notna()].query(
-            f"line1_symbol == '{symbol}' and line1_radiation_type == '{radiation}'"
-        )
-        for row in df.itertuples():
-            if self._hComboBoxMap[row.line2_symbol].currentText() == row.line2_radiation_type:
-                rowIndex = self._symbols.index(row.line1_symbol)
-                columnIndex = self._symbols.index(row.line2_symbol)
-                item = self._tableWidget.item(rowIndex, columnIndex)
-                item.setText(str(row.coefficient))
-
-    def _clearRow(self, rowIndex: int) -> None:
-        for i in range(1, self._tableWidget.columnCount()):
-            item = self._tableWidget.item(rowIndex, i)
-            item.setText("")
-
-    def _addColumn(self, index: int, radiation: str) -> None:
-        symbol = self._symbols[index]
-        df = self._interferenceDf[self._interferenceDf['coefficient'].notna()].query(
-            f"line1_symbol == '{symbol}' and line1_radiation_type == '{radiation}'"
-        )
-        for row in df.itertuples():
-            if self._vComboBoxMap[row.line2_symbol].currentText() == row.line2_radiation_type:
-                rowIndex = self._symbols.index(row.line2_symbol)
-                columnIndex = self._symbols.index(row.line1_symbol)
-                item = self._tableWidget.item(rowIndex, columnIndex)
-                item.setText(str(row.coefficient))
+    def _fillColumn(self, index: int, interfererRadiation: str) -> None:
+        interfererSymbol = self._symbols[index]
+        query = f"""
+            SELECT line_id FROM Lines WHERE symbol = '{interfererSymbol}' AND radiation_type = '{interfererRadiation}';
+        """
+        interfererLineId = self._db.executeQuery(query).fetchone()[0]
+        for rowIndex in range(1, self._tableWidget.rowCount()):
+            symbol = self._symbols[rowIndex - 1]
+            query = f"""
+                SELECT coefficient 
+                FROM Interferences 
+                WHERE line1_id = (SELECT line_id FROM Lines WHERE symbol = '{symbol}' AND active = 1) 
+                AND line2_id = {interfererLineId}
+            """
+            if tmp := self._db.executeQuery(query).fetchone():
+                coefficient = tmp[0]
+                if coefficient is not None:
+                    item = self._tableWidget.item(rowIndex, index)
+                    item.setText(str(coefficient))
 
     def _clearColumn(self, columnIndex: int) -> None:
         for i in range(1, self._tableWidget.rowCount()):
@@ -157,19 +144,11 @@ class InterferenceWindow(QtWidgets.QMainWindow):
             item.setText("")
 
     @QtCore.pyqtSlot(str)
-    def _changeRowRadiation(self, radiation: str) -> None:
-        self._tableWidget.blockSignals(True)
-        rowIndex = self._tableWidget.currentRow()
-        self._clearRow(rowIndex)
-        self._addRow(rowIndex, radiation)
-        self._tableWidget.blockSignals(False)
-
-    @QtCore.pyqtSlot(str)
     def _changeColumnRadiation(self, radiation: str) -> None:
         self._tableWidget.blockSignals(True)
         columnIndex = self._tableWidget.currentColumn()
         self._clearColumn(columnIndex)
-        self._addColumn(columnIndex, radiation)
+        self._fillColumn(columnIndex, radiation)
         self._tableWidget.blockSignals(False)
 
     def _createIndexFinderLayout(self) -> None:

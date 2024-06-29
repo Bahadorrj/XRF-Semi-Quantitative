@@ -69,8 +69,3 @@ def writeToDatabase(filename: str):
             """
             db.executeQuery(query)
     db.closeConnection()
-
-
-if __name__ == "__main__":
-    path = r"F:\CSAN\XRF-Semi-Quantitative\Additional\cal\Au.txt"
-    writeToDatabase(path)

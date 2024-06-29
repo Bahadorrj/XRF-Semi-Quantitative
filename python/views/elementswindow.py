@@ -14,7 +14,7 @@ class ElementsWindow(QtWidgets.QWidget):
         self.setWindowTitle('Elements')
         db = getDatabase(paths.resourcePath("fundamentals.db"))
         self._df = db.dataframe('SELECT * FROM Lines')
-        query = "SELECT * FROM Lines WHERE element_id IN (SELECT element_id FROM UQ ORDER BY element_id)"
+        query = "SELECT * FROM Lines WHERE line_id IN (SELECT line_id FROM UQ ORDER BY line_id)"
         self._uqr = db.dataframe(query)
         self._mainLayout = QtWidgets.QVBoxLayout(self)
         self._createFilterLayout()

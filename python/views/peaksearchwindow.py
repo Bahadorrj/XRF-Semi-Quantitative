@@ -181,11 +181,11 @@ class ElementsTableWidget(QtWidgets.QTableWidget):
 
     def addRow(self, data: datatypes.PlotData, row: pd.Series, intensity: int) -> None:
         self.setRowCount(self.rowCount() + 1)
-        self.rowIds.append(data.rowId)
-        self.intensities.append(intensity)
         rowAsDict = dict()
         self._createWidgets(data, rowAsDict)
         self._createItems(row, intensity, rowAsDict)
+        self.rowIds.append(data.rowId)
+        self.intensities.append(intensity)
         self.rows.append(rowAsDict)
 
     def _createWidgets(self, data: datatypes.PlotData, rowDict: dict) -> None:
@@ -312,7 +312,7 @@ class PeakSearchWindow(QtWidgets.QMainWindow):
         self._createSearchBar()
         self._createTableWidget()
         self._createPlotViewBox()
-        self._createMenuBar()
+        # self._createMenuBar()
         self._setupView()
 
     def _createToolBar(self) -> None:
@@ -412,6 +412,8 @@ class PeakSearchWindow(QtWidgets.QMainWindow):
         items.insert(0, "")
         self._searchedRadiation.addItems(items)
         self._searchedRadiation.setCurrentIndex(0)
+        self._searchedElement.setDisabled(True)
+        self._searchedRadiation.setDisabled(True)
         hLayout = QtWidgets.QHBoxLayout()
         label = QtWidgets.QLabel("Element Symbol: ")
         hLayout.addWidget(label)
@@ -548,7 +550,7 @@ class PeakSearchWindow(QtWidgets.QMainWindow):
                         self._analyse.data,
                     )
                 )[0].y
-                intensity = y[int(minX): int(maxX)].sum()
+                intensity = y[round(minX):round(maxX)].sum()
             except IndexError:
                 intensity = "NA"
         self._tableWidget.addRow(data, series["symbol":"active"], intensity)
@@ -579,10 +581,8 @@ class PeakSearchWindow(QtWidgets.QMainWindow):
 
         try:
             conditionId = data.condition
-            y = list(filter(lambda d: d.condition == conditionId, self._analyse.data))[
-                0
-            ].y
-            intensity = y[int(minX): int(maxX)].sum()
+            y = list(filter(lambda d: d.condition == conditionId, self._analyse.data))[0].y
+            intensity = y[round(minX):round(maxX)].sum()
         except IndexError:
             intensity = "NA"
         row.get(6).setText(str(intensity))
@@ -615,6 +615,7 @@ class PeakSearchWindow(QtWidgets.QMainWindow):
             return self._dataStatusChanged(data)
         elif action == "region":
             return self._dataRegionChanged(data)
+        return False
 
     def _addRowToUndoStack(self, rowId: int, action: str) -> None:
         if not self._undoStack:
@@ -693,11 +694,12 @@ class PeakSearchWindow(QtWidgets.QMainWindow):
         if row.get(7).currentText() != "":
             conditionId = int(row.get(7).currentText().split(" ")[-1])
             data.condition = conditionId
+            self._df.at[data.rowId, "condition_id"] = conditionId
             try:
                 y = list(
                     filter(lambda d: d.condition == conditionId, self._analyse.data)
                 )[0].y
-                intensity = y[int(minX): int(maxX)].sum()
+                intensity = y[round(minX): round(maxX)].sum()
             except IndexError:
                 intensity = "NA"
         else:
@@ -708,12 +710,13 @@ class PeakSearchWindow(QtWidgets.QMainWindow):
     def _dataStatusChanged(self, data: datatypes.PlotData) -> bool:
         changed = False
         row = self._tableWidget.getRow(data.rowId)
+        conditionComboBox = row.get(7)
         statusItem = row.get(8)
         statusButton = row.get(9)
-        conditionComboBox = row.get(7)
         if data.active:
             changed = True
             data.deactivate()
+            self._df.at[data.rowId, "active"] = 0
             statusItem.setText("Deactivated")
             statusItem.setForeground(QtGui.QColor(255, 0, 0))
             statusButton.setText("Activate")
@@ -725,6 +728,7 @@ class PeakSearchWindow(QtWidgets.QMainWindow):
                 if conditionComboBox.currentText():
                     changed = True
                     data.activate()
+                    self._df.at[data.rowId, "active"] = 1
                     statusItem.setText("Activated")
                     statusItem.setForeground(QtGui.QColor(0, 255, 0))
                     statusButton.setText("Deactivate")
@@ -765,8 +769,12 @@ class PeakSearchWindow(QtWidgets.QMainWindow):
 
     def _dataRegionChanged(self, data: datatypes.PlotData) -> bool:
         row = self._tableWidget.getRow(data.rowId)
-        minX = calculation.evToPx(float(row.get(4).text()))
-        maxX = calculation.evToPx(float(row.get(5).text()))
+        lowKev = float(row.get(4).text())
+        highKev = float(row.get(5).text())
+        minX = calculation.evToPx(lowKev)
+        maxX = calculation.evToPx(highKev)
+        self._df.at[data.rowId, "low_kiloelectron_volt"] = lowKev
+        self._df.at[data.rowId, "high_kiloelectron_volt"] = highKev
         data.region.blockSignals(True)
         data.region.setRegion((minX, maxX))
         data.region.blockSignals(False)
@@ -790,7 +798,7 @@ class PeakSearchWindow(QtWidgets.QMainWindow):
 
     @QtCore.pyqtSlot(QtWidgets.QTableWidgetItem)
     def _itemClicked(self, item: QtWidgets.QTableWidgetItem) -> None:
-        rowId = self._tableWidget.rowIds.index(item.row())
+        rowId = self._tableWidget.rowIds[item.row()]
         data = self._plotDataList[rowId]
         if data.visible:
             self._hoverOverData(data)
@@ -897,12 +905,9 @@ class PeakSearchWindow(QtWidgets.QMainWindow):
         self._zoomRegion.setRegion((0, 100))
         self._peakPlot.setXRange(0, 100, padding=0)
         self._setCoordinate(0, 0)
-        QtWidgets.QApplication.processEvents()
         self._fillTable()
-
-    def closeEvent(self, event):
-        self._saveToDatabase()
-        event.accept()
+        self._searchedElement.setDisabled(False)
+        self._searchedRadiation.setDisabled(False)
 
     def mousePressEvent(self, a0):
         if (
@@ -912,37 +917,19 @@ class PeakSearchWindow(QtWidgets.QMainWindow):
             self._searchedElement.clearFocus()
         return super().mousePressEvent(a0)
 
+    def closeEvent(self, a0):
+        self._saveToDatabase()
+        return super().closeEvent(a0)
+
     def _saveToDatabase(self) -> None:
-        if not self._undoStack:
-            return
-        while self._undoStack:
-            rowId, values, action = self._undoStack.popleft()
-            if action != "hide":
-                row = self._tableWidget.getRow(rowId)
-                if row.get(8).text() == "Activated":
-                    active = 1
-                else:
-                    active = 0
-                try:
-                    conditionId = int(row[7].currentText().split(" ")[-1])
-                except ValueError:
-                    conditionId = None
-                if conditionId is not None:
-                    query = f"""
-                        UPDATE Lines
-                        SET low_kiloelectron_volt = {row[4].text()},
-                            high_kiloelectron_volt = {row[5].text()},
-                            active = {active},
-                            condition_id = {conditionId}
-                        WHERE line_id = {rowId + 1};
-                    """
-                else:
-                    query = f"""
-                        UPDATE Lines
-                        SET low_kiloelectron_volt = {row[4].text()},
-                            high_kiloelectron_volt = {row[5].text()},
-                            active = {active},
-                            condition_id = NULL
-                        WHERE line_id = {rowId + 1};
-                    """
-                self._db.executeQuery(query)
+        for row in self._df.itertuples(index=False):
+            conditionId = row.condition_id
+            query = f"""
+                UPDATE Lines
+                SET low_kiloelectron_volt = {row.low_kiloelectron_volt},
+                    high_kiloelectron_volt = {row.high_kiloelectron_volt},
+                    active = {row.active},
+                    condition_id = {int(conditionId) if not np.isnan(conditionId) else "NULL"}
+                WHERE line_id = {row.line_id};
+            """
+            self._db.executeQuery(query)

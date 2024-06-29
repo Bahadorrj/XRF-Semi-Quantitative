@@ -48,14 +48,17 @@ class Analyse:
     filename: str = field(default=None)
     name: str = field(default=None)
     extension: str = field(default=None)
-    sampleType: str = field(default=None)
-    generalData: dict = field(default=dict)
+    generalData: dict[str] = field(default_factory=dict)
     data: list[AnalyseData] = field(default_factory=list)
-    concentrations: dict = field(default=dict)
+    concentrations: dict[str, float] = field(default_factory=dict)
 
     def __init__(self, **kwargs) -> None:
         if "data" not in kwargs:
-            raise Exception("Data is required for initialization in class Analyse")
+            raise ValueError("Data is required for initialization in class Analyse")
+        if "concentrations" not in kwargs:
+            self.concentrations = {}
+        if "generalData" not in kwargs:
+            self.generalData = {}
         for key, value in kwargs.items():
             setattr(self, key, value)
             if key == "filename":
@@ -67,7 +70,6 @@ class Analyse:
             "filename": getattr(self, "filename"),
             "name": getattr(self, "name"),
             "extension": getattr(self, "extension"),
-            "sampleType": getattr(self, "sampleType"),
             "generalData": getattr(self, "generalData"),
             "data": [d.toDict() for d in getattr(self, "data")],
             "concentrations": getattr(self, "concentrations")
@@ -80,7 +82,7 @@ class Analyse:
 
     @classmethod
     def fromTextFile(cls, filename: str) -> 'Analyse':
-        # TODO this type has to change in future
+        # TODO this has to change in future
         analyseDict = {}
         data = []
         with open(filename, 'r') as f:
@@ -88,12 +90,13 @@ class Analyse:
             start = 0
             stop = 0
             for line in lines:
-                if "<<data>>" in line.lower() and stop != 0:
+                if "<<EndData>>" in line:
                     analyseData = AnalyseData.fromList(lines[start:stop])
                     start = stop
                     if analyseData.y.size != 0:
                         data.append(analyseData)
-                stop += 1
+                else:
+                    stop += 1
         data.sort(key=lambda x: x.condition)
         analyseDict['data'] = data
         analyseDict['filename'] = filename

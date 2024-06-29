@@ -6,7 +6,7 @@ import numpy as np
 import pyqtgraph as pg
 from PyQt6 import QtCore, QtGui, QtWidgets
 
-from python.utils import datatypes
+from python.utils import calculation, datatypes
 from python.utils import encryption
 from python.utils.database import getDatabase
 from python.utils.paths import resourcePath
@@ -61,13 +61,14 @@ class SaveDialog(QtWidgets.QDialog):
     def fillList(self, items: list):
         self.listWidget.addItems(items)
 
+
 class ConditionForm(QtWidgets.QListView):
     def __init__(self, parent=None):
         super(ConditionForm, self).__init__(parent)
         self.setFrameShape(QtWidgets.QFrame.Shape.Box)
         self.setFrameShadow(QtWidgets.QFrame.Shadow.Plain)
         db = getDatabase(resourcePath("fundamentals.db"))
-        self._df = db.dataframe('SELECT * FROM Conditions')
+        self._df = db.dataframe("SELECT * FROM Conditions")
         self._createComboBox()
         self._createTable()
         mainLayout = QtWidgets.QVBoxLayout(self)
@@ -94,7 +95,9 @@ class ConditionForm(QtWidgets.QListView):
         )
         self._tableWidget.horizontalHeader().setVisible(False)
         self._tableWidget.setAlternatingRowColors(True)
-        self._tableWidget.setEditTriggers(QtWidgets.QTreeWidget.EditTrigger.NoEditTriggers)
+        self._tableWidget.setEditTriggers(
+            QtWidgets.QTreeWidget.EditTrigger.NoEditTriggers
+        )
         self._showConditionInList("Condition 1")
 
     def _showConditionInList(self, conditionName: str):
@@ -127,15 +130,27 @@ class PlotWindow(QtWidgets.QMainWindow):
         self._createCoordinateLabel()
         self._setUpView()
 
+        self._db = getDatabase(resourcePath("fundamentals.db"))
         self._indexOfFile = None
         self._analyseFiles = list()
         self._elementsWindow: Optional[ElementsWindow] = None
         self._peakSearchWindow: Optional[PeakSearchWindow] = None
         # TODO interferenceWindow
 
+        calibration = datatypes.Analyse.fromATXFile("Additional/atx/test.atx")
+        self.addCalibration(calibration)
+
     def _createActions(self) -> None:
         self._actionsMap = {}
-        actions = ["New", "Open", "Save as", "Close", "Peak Search", "Elements", "Add Calibration"]
+        actions = [
+            "New",
+            "Open",
+            "Save as",
+            "Close",
+            "Peak Search",
+            "Elements",
+            "Add Calibration",
+        ]
         for label in actions:
             action = QtGui.QAction(label)
             key = "-".join(label.lower().split(" "))
@@ -148,9 +163,17 @@ class PlotWindow(QtWidgets.QMainWindow):
     @QtCore.pyqtSlot()
     def _actionTriggered(self, key: str):
         if key == "open":
-            self._getFileNameFromDialog(QtWidgets.QFileDialog.AcceptMode.AcceptOpen)
+            path = self._getFileNameFromDialog(
+                QtWidgets.QFileDialog.AcceptMode.AcceptOpen
+            )
+            if path is not None:
+                self._addAnalyseFile(path)
         elif key == "save-as":
-            self._getFileNameFromDialog(QtWidgets.QFileDialog.AcceptMode.AcceptSave)
+            path = self._getFileNameFromDialog(
+                QtWidgets.QFileDialog.AcceptMode.AcceptSave
+            )
+            if path is not None:
+                self.saveFile(path)
         elif key == "new":
             self.resetWindow()
         elif key == "close":
@@ -161,7 +184,13 @@ class PlotWindow(QtWidgets.QMainWindow):
         elif key == "peak-search":
             self._showPeakSearchWindow()
         elif key == "add-calibration":
-            self.addCalibration()
+            path = self._getFileNameFromDialog(
+                QtWidgets.QFileDialog.AcceptMode.AcceptOpen
+            )
+            if path is not None:
+                analyse = self._constructAnalyseFromFilename(path)
+                if analyse.concentrations:
+                    self.addCalibration(analyse)
 
     def _createMenus(self) -> None:
         self._menusMap = {}
@@ -286,9 +315,9 @@ class PlotWindow(QtWidgets.QMainWindow):
     @QtCore.pyqtSlot(QtWidgets.QTreeWidgetItem)
     def _togglePeakSearchAction(self, item: QtWidgets.QTreeWidgetItem):
         if "condition" in item.text(1).lower():
-            self._actionsMap['peak-search'].setDisabled(False)
+            self._actionsMap["peak-search"].setDisabled(False)
         else:
-            self._actionsMap['peak-search'].setDisabled(True)
+            self._actionsMap["peak-search"].setDisabled(True)
 
     def _createListWidget(self):
         self._formWidget = ConditionForm(self)
@@ -315,7 +344,9 @@ class PlotWindow(QtWidgets.QMainWindow):
         mainWidget.setLayout(vlayout)
         self.setCentralWidget(mainWidget)
 
-    def _getFileNameFromDialog(self, mode: QtWidgets.QFileDialog.AcceptMode) -> Optional[str]:
+    def _getFileNameFromDialog(
+            self, mode: QtWidgets.QFileDialog.AcceptMode
+    ) -> Optional[str]:
         if mode == QtWidgets.QFileDialog.AcceptMode.AcceptSave:
             saveDialog = SaveDialog(self)
             saveDialog.fillList(list(map(lambda x: x.name, self._analyseFiles)))
@@ -323,17 +354,13 @@ class PlotWindow(QtWidgets.QMainWindow):
             result = saveDialog.exec()
             if result:
                 self._indexOfFile = saveDialog.listWidget.currentRow()
-                path = self.showFileDialog(mode)
-                if path:
-                    self._configureSaveOrOpen(mode, path)
+                path = self._showFileDialog(mode)
                 return path
         elif mode == QtWidgets.QFileDialog.AcceptMode.AcceptOpen:
-            path = self.showFileDialog(mode)
-            if path:
-                self._configureSaveOrOpen(mode, path)
+            path = self._showFileDialog(mode)
             return path
 
-    def showFileDialog(self, mode: QtWidgets.QFileDialog.AcceptMode) -> Optional[str]:
+    def _showFileDialog(self, mode: QtWidgets.QFileDialog.AcceptMode) -> Optional[str]:
         fileDialog = QtWidgets.QFileDialog(self)
         fileDialog.setFileMode(QtWidgets.QFileDialog.FileMode.AnyFile)
         fileDialog.setNameFilters(
@@ -345,20 +372,8 @@ class PlotWindow(QtWidgets.QMainWindow):
             return fileDialog.selectedFiles()[0] if fileDialog.selectedFiles() else None
         return None
 
-    @QtCore.pyqtSlot(str)
-    def _configureSaveOrOpen(self, mode: QtWidgets.QFileDialog.AcceptMode, filename: str) -> None:
-        if mode == QtWidgets.QFileDialog.AcceptMode.AcceptOpen:
-            self.addAnalyseFile(filename)
-        elif mode == QtWidgets.QFileDialog.AcceptMode.AcceptSave:
-            self.saveFile(filename)
-
-    def addAnalyseFile(self, filename: str) -> None:
-        analyse = None
-        extension = filename[-4:]
-        if extension == ".txt":
-            analyse = datatypes.Analyse.fromTextFile(filename)
-        elif extension == ".atx":
-            analyse = datatypes.Analyse.fromATXFile(filename)
+    def _addAnalyseFile(self, filename: str) -> None:
+        analyse = self._constructAnalyseFromFilename(filename)
         if analyse is not None and analyse.data:
             self.addAnalyse(analyse)
             # TODO show dialog for asking for edit privileges
@@ -371,6 +386,14 @@ class PlotWindow(QtWidgets.QMainWindow):
             messageBox.setText("Make Sure You Are Opening The Right File")
             messageBox.setStandardButtons(QtWidgets.QMessageBox.StandardButton.Ok)
             messageBox.show()
+
+    def _constructAnalyseFromFilename(self, filename: str) -> datatypes.Analyse:
+        extension = filename[-4:]
+        if extension == ".txt":
+            analyse = datatypes.Analyse.fromTextFile(filename)
+        elif extension == ".atx":
+            analyse = datatypes.Analyse.fromATXFile(filename)
+        return analyse
 
     def addAnalyse(self, analyse: datatypes.Analyse) -> None:
         self._analyseFiles.append(analyse)
@@ -398,9 +421,7 @@ class PlotWindow(QtWidgets.QMainWindow):
     def resetWindow(self):
         messageBox = QtWidgets.QMessageBox(self)
         messageBox.setWindowTitle("Reset window")
-        messageBox.setText(
-            "This will clear all added files.\nDo you want to continue?"
-        )
+        messageBox.setText("This will clear all added files.\nDo you want to continue?")
         messageBox.setStandardButtons(
             QtWidgets.QMessageBox.StandardButton.Yes
             | QtWidgets.QMessageBox.StandardButton.No
@@ -434,7 +455,7 @@ class PlotWindow(QtWidgets.QMainWindow):
         self._plotWidget.clear()
         attrs = self._findActivePlotAttrs()
         maxIntensity = 0
-        for index, attr in enumerate(attrs):
+        for attr in attrs:
             extensionIndex, analyseIndex, dataIndex, color = attr
             data = self._getDataFromIndex(extensionIndex, analyseIndex, dataIndex)
             x, y = data.x, data.y
@@ -444,15 +465,17 @@ class PlotWindow(QtWidgets.QMainWindow):
                 self._setPlotLimits(maxIntensity)
             self._plot(x, y, pg.mkPen(color=color, width=2))
 
-    def _getDataFromIndex(self, extensionIndex: int, analyseIndex: int, dataIndex: int) -> datatypes.AnalyseData:
+    def _getDataFromIndex(
+            self, extensionIndex: int, analyseIndex: int, dataIndex: int
+    ) -> datatypes.AnalyseData:
         return self._getAnalyseFromIndex(extensionIndex, analyseIndex).data[dataIndex]
 
-    def _getAnalyseFromIndex(self, extensionIndex: int, analyseIndex: int) -> datatypes.Analyse:
+    def _getAnalyseFromIndex(
+            self, extensionIndex: int, analyseIndex: int
+    ) -> datatypes.Analyse:
         mapper = {0: "txt", 1: "atx"}
         analyse = list(
-            filter(
-                lambda a: a.extension == mapper[extensionIndex], self._analyseFiles
-            )
+            filter(lambda a: a.extension == mapper[extensionIndex], self._analyseFiles)
         )[analyseIndex]
         return analyse
 
@@ -496,10 +519,6 @@ class PlotWindow(QtWidgets.QMainWindow):
         self._peakSearchWindow.show()
         self._peakSearchWindow.displayAnalyseData(dataIndex)
 
-    def addCalibration(self):
-        # TODO
-        pass
-
     # def closeEvent(self, event):
     #     # Intercept the close event
     #     # Check if the close is initiated by the close button
@@ -510,3 +529,73 @@ class PlotWindow(QtWidgets.QMainWindow):
     #     else:
     #         # Handle the close event normally
     #         event.accept()
+
+    def addCalibration(self, calibration: datatypes.Analyse) -> None:
+        self._addCalibrationToCalibrationTable(calibration)
+        # self._addCalibrationToInterferenceTable(calibration)
+
+    def _addCalibrationToCalibrationTable(self, calibration: datatypes.Analyse) -> None:
+        for calibrationSymbol, concentration in calibration.concentrations.items():
+            query = f"""
+                SELECT condition_id, low_kiloelectron_volt, high_kiloelectron_volt
+                FROM Lines
+                WHERE symbol = '{calibrationSymbol}';
+            """
+            rows: list[tuple] = self._db.executeQuery(query).fetchall()
+            for row in rows:
+                conditionId, lowKev, highKev = row
+                if tmp := list(filter(lambda d: d.condition == conditionId, calibration.data)):
+                    data = tmp[0]
+                    intensity = (
+                        data
+                        .y[int(calculation.evToPx(lowKev)):int(calculation.evToPx(highKev))]
+                        .sum()
+                    )
+                    # TODO general data
+                    query = f"""
+                        INSERT INTO Calibrations (element_id, intensity, concentration)
+                        VALUES (
+                            (SELECT element_id FROM Elements WHERE symbol = '{calibrationSymbol}'),
+                            {intensity},
+                            {concentration}
+                        );
+                    """
+                    self._db.executeQuery(query)
+
+    def _addCalibrationToInterferenceTable(self, calibration: datatypes.Analyse) -> None:
+        calibrationSymbol = calibration.name
+        query = f"""
+            SELECT line_id, low_kiloelectron_volt, high_kiloelectron_volt, condition_id 
+            FROM Lines 
+            WHERE symbol = '{calibrationSymbol}' AND active = 1;
+        """
+        calibrationLineId, calibrationLowKev, calibrationHighKev, calibrationConditionId = self._db.executeQuery(
+            query
+        ).fetchone()
+        if tmp := list(filter(lambda d: d.condition == calibrationConditionId, calibration.data)):
+            data = tmp[0]
+            calibrationIntensity = (
+                data
+                .y[int(calculation.evToPx(calibrationLowKev)):int(calculation.evToPx(calibrationHighKev))]
+                .sum()
+            )
+            for symbol, concentration in calibration.concentrations.items():
+                if symbol != calibrationSymbol:
+                    query = f"""
+                        SELECT line_id, low_kiloelectron_volt, high_kiloelectron_volt 
+                        FROM Lines 
+                        WHERE symbol = '{symbol}';
+                    """
+                    rows = self._db.executeQuery(query).fetchall()
+                    for row in rows:
+                        interfererLineId, lowKev, highKev = row
+                        intensity = (
+                            data
+                            .y[int(calculation.evToPx(lowKev)):int(calculation.evToPx(highKev))]
+                            .sum()
+                        )
+                        query = f"""
+                            INSERT INTO Interferences (line1_id, line2_id, coefficient)
+                            VALUES ({calibrationLineId}, {interfererLineId}, {calibrationIntensity / intensity});
+                        """
+                        self._db.executeQuery(query)
