@@ -137,9 +137,6 @@ class PlotWindow(QtWidgets.QMainWindow):
         self._peakSearchWindow: Optional[PeakSearchWindow] = None
         # TODO interferenceWindow
 
-        calibration = datatypes.Analyse.fromATXFile("Additional/atx/test.atx")
-        self.addCalibration(calibration)
-
     def _createActions(self) -> None:
         self._actionsMap = {}
         actions = [
@@ -389,6 +386,7 @@ class PlotWindow(QtWidgets.QMainWindow):
 
     def _constructAnalyseFromFilename(self, filename: str) -> datatypes.Analyse:
         extension = filename[-4:]
+        analyse: Optional[datatypes.Analyse] = None
         if extension == ".txt":
             analyse = datatypes.Analyse.fromTextFile(filename)
         elif extension == ".atx":
@@ -490,7 +488,7 @@ class PlotWindow(QtWidgets.QMainWindow):
         self._plotWidget.plot(x, y, pen=pen)
 
     def saveFile(self, filename: str) -> None:
-        analyse = self._analyseFiles[self._indexOfFile]
+        analyse = self._constructAnalyseFromFilename(filename)
         if filename.endswith(".atx"):
             key = encryption.loadKey()
             with open(filename, "wb") as f:
@@ -498,6 +496,7 @@ class PlotWindow(QtWidgets.QMainWindow):
                 encryptedText = encryption.encryptText(jsonText, key)
                 f.write(encryptedText + b"\n")
         elif filename.endswith(".txt"):
+            analyse.extension = "txt"
             with open(filename, "w") as f:
                 for data in analyse.data:
                     f.write("<<Data>>\n")
