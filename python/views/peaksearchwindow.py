@@ -865,22 +865,11 @@ class PeakSearchWindow(QtWidgets.QMainWindow):
             f"symbol == '{elementSymbol}' and radiation_type == '{radiationType}'"
         )
         rowId = df.index.values[0]
-        data = self._plotDataList[rowId]
-        self._showPlotData(data)
-
-    def _showPlotData(self, data: datatypes.PlotData) -> None:
-        data.visible = True
-        self._addPlotData(data)
-        self._tableWidget.getRow(data.rowId).get(0).setIcon(
-            QtGui.QIcon(resourcePath("icons/show.png"))
-        )
-        self._drawPlotData(data)
-        self._selectData(data)
+        self._tableWidget.rowChanged.emit(rowId, "hide")
 
     def _showAll(self) -> None:
         for rowId in self._elementsInRange.index:
-            data = self._plotDataList[rowId]
-            self._showPlotData(data)
+            self._tableWidget.rowChanged.emit(rowId, "hide")
 
     def addAnalyse(self, analyse: Analyse) -> None:
         self._analyse = analyse
@@ -918,7 +907,7 @@ class PeakSearchWindow(QtWidgets.QMainWindow):
         return super().mousePressEvent(a0)
 
     def closeEvent(self, a0):
-        self._saveToDatabase()
+        # self._saveToDatabase()
         return super().closeEvent(a0)
 
     def _saveToDatabase(self) -> None:

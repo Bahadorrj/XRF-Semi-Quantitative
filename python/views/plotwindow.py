@@ -137,6 +137,10 @@ class PlotWindow(QtWidgets.QMainWindow):
         self._peakSearchWindow: Optional[PeakSearchWindow] = None
         # TODO interferenceWindow
 
+        # self.addAnalyse(
+        #     datatypes.Analyse.fromTextFile(r"F:\CSAN\XRF-Semi-Quantitative\Additional\Pure samples\8 Mehr\Au.txt")
+        # )
+
     def _createActions(self) -> None:
         self._actionsMap = {}
         actions = [
