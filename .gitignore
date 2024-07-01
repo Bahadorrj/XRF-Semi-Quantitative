@@ -357,7 +357,6 @@ fabric.properties
 
 /Exe
 /Additional
-*.db
 /VB
 /UML
 *.ui
