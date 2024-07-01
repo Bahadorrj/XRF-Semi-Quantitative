@@ -135,7 +135,7 @@ class PlotWindow(QtWidgets.QMainWindow):
         self._analyseFiles = list()
         self._elementsWindow: Optional[ElementsWindow] = None
         self._peakSearchWindow: Optional[PeakSearchWindow] = None
-        # TODO interferenceWindow
+        # TODO instantiate interference window
 
         # self.addAnalyse(
         #     datatypes.Analyse.fromTextFile(r"F:\CSAN\XRF-Semi-Quantitative\Additional\Pure samples\8 Mehr\Au.txt")
@@ -378,8 +378,7 @@ class PlotWindow(QtWidgets.QMainWindow):
         if analyse is not None and analyse.data:
             self.addAnalyse(analyse)
             # TODO show dialog for asking for edit privileges
-            # TODO auto save
-            # TODO get raw intensities file if profile == cal and calculate interference coefficient and fill the table
+            # TODO auto save?
         else:
             messageBox = QtWidgets.QMessageBox(self)
             messageBox.setIcon(QtWidgets.QMessageBox.Icon.Critical)
@@ -534,10 +533,14 @@ class PlotWindow(QtWidgets.QMainWindow):
     #         event.accept()
 
     def addCalibration(self, calibration: datatypes.Analyse) -> None:
-        self._addCalibrationToCalibrationTable(calibration)
+        # TODO fill Calibrations and Interferences tables
+        # TODO auto save?
+        # self._addCalibrationToCalibrationTable(calibration)
         # self._addCalibrationToInterferenceTable(calibration)
+        pass
 
     def _addCalibrationToCalibrationTable(self, calibration: datatypes.Analyse) -> None:
+        # TODO complete method
         for calibrationSymbol, concentration in calibration.concentrations.items():
             query = f"""
                 SELECT condition_id, low_kiloelectron_volt, high_kiloelectron_volt
@@ -554,7 +557,6 @@ class PlotWindow(QtWidgets.QMainWindow):
                         .y[int(calculation.evToPx(lowKev)):int(calculation.evToPx(highKev))]
                         .sum()
                     )
-                    # TODO general data
                     query = f"""
                         INSERT INTO Calibrations (element_id, intensity, concentration)
                         VALUES (
@@ -566,6 +568,7 @@ class PlotWindow(QtWidgets.QMainWindow):
                     self._db.executeQuery(query)
 
     def _addCalibrationToInterferenceTable(self, calibration: datatypes.Analyse) -> None:
+        # TODO complete method
         calibrationSymbol = calibration.name
         query = f"""
             SELECT line_id, low_kiloelectron_volt, high_kiloelectron_volt, condition_id 

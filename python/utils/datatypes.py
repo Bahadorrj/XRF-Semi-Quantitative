@@ -50,13 +50,17 @@ class Analyse:
     extension: str = field(default=None)
     generalData: dict[str] = field(default_factory=dict)
     data: list[AnalyseData] = field(default_factory=list)
+    classification: str = field(default=None)
     concentrations: dict[str, float] = field(default_factory=dict)
 
     def __init__(self, **kwargs) -> None:
         if "data" not in kwargs:
             raise ValueError("Data is required for initialization in class Analyse")
         if "concentrations" not in kwargs:
+            self.classification = "DEF"
             self.concentrations = {}
+        else:
+            self.classification = "CAL"
         if "generalData" not in kwargs:
             self.generalData = {}
         for key, value in kwargs.items():
@@ -82,7 +86,7 @@ class Analyse:
 
     @classmethod
     def fromTextFile(cls, filename: str) -> 'Analyse':
-        # TODO this has to change in future
+        # TODO change in future
         analyseDict = {}
         data = []
         with open(filename, 'r') as f:
@@ -139,6 +143,7 @@ class PlotData:
         self.spectrumLine.setPen(pg.mkPen(color=(0, 255, 0, 150), width=2))
 
     def deactivate(self):
+        # TODO set color based on radiation type
         self.active = False
         self.peakLine.setPen(pg.mkPen(color=(255, 0, 0, 150), width=2))
         self.spectrumLine.setPen(pg.mkPen(color=(255, 0, 0, 150), width=2))
@@ -163,6 +168,7 @@ class PlotData:
 
     @staticmethod
     def _generateLine(value: float, **kwargs) -> pg.InfiniteLine:
+        # TODO if kwargs['active'] constant line else dash dot line
         line = pg.InfiniteLine()
         line.setAngle(90)
         line.setMovable(False)
@@ -173,6 +179,7 @@ class PlotData:
                 if val is True:
                     line.setPen(pg.mkPen(color=(0, 255, 0, 150), width=2))
                 else:
+                    # TODO set color based on radiation type
                     line.setPen(pg.mkPen(color=(255, 0, 0, 150), width=2))
             if key == 'labels':
                 for label in val:

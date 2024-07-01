@@ -875,6 +875,7 @@ class PeakSearchWindow(QtWidgets.QMainWindow):
         self._analyse = analyse
 
     def displayAnalyseData(self, analyseDataIndex: int) -> None:
+        # TODO if analyse.classification == "DEF" remove region privileges
         analyseData = self._analyse.data[analyseDataIndex]
         self._peakPlot.clear()
         self._spectrumPlot.clear()
