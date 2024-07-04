@@ -7,6 +7,7 @@ from typing import Union
 import numpy as np
 import pandas as pd
 import pyqtgraph as pg
+from PyQt6.QtCore import Qt
 
 from python.utils import calculation
 from python.utils import encryption
@@ -151,10 +152,8 @@ class PlotData:
     @classmethod
     def fromSeries(cls, rowId: int, series: pd.Series) -> 'PlotData':
         active = bool(series['active'])
-        value = calculation.evToPx(float(series['kiloelectron_volt']))
-        labels = [str(series['symbol']), str(series['radiation_type'])]
-        spectrumLine = cls._generateLine(value, active=active)
-        peakLine = cls._generateLine(value, labels=labels, active=active)
+        spectrumLine = cls._generateLine(series)
+        peakLine = cls._generateLine(series, lineType="peak")
         rng = (
             calculation.evToPx(float(series['low_kiloelectron_volt'])),
             calculation.evToPx(float(series['high_kiloelectron_volt']))
@@ -167,26 +166,44 @@ class PlotData:
         return PlotData(rowId, spectrumLine, peakLine, region, False, active, conditionId)
 
     @staticmethod
-    def _generateLine(value: float, **kwargs) -> pg.InfiniteLine:
+    def _generateLine(series: pd.Series, lineType: str = "spectrum") -> pg.InfiniteLine:
         # TODO if kwargs['active'] constant line else dash dot line
+        value = calculation.evToPx(float(series['kiloelectron_volt']))
         line = pg.InfiniteLine()
         line.setAngle(90)
         line.setMovable(False)
         line.setValue(value)
-        pos = 1
-        for key, val in kwargs.items():
-            if key == 'active':
-                if val is True:
-                    line.setPen(pg.mkPen(color=(0, 255, 0, 150), width=2))
-                else:
-                    # TODO set color based on radiation type
-                    line.setPen(pg.mkPen(color=(255, 0, 0, 150), width=2))
-            if key == 'labels':
-                for label in val:
-                    pos -= 0.1
-                    pg.InfLineLabel(
-                        line, text=label, movable=False, position=pos
-                    )
+        active = bool(series['active'])
+        pen = pg.mkPen()
+        if active:
+            pen.setStyle(Qt.PenStyle.SolidLine)
+        else:
+            pen.setStyle(Qt.PenStyle.DashLine)
+        radiation = series['radiation_type']
+        match radiation:
+            case "Ka":
+                pen.setColor(pg.mkColor("#00FFFF"))
+            case "Kb":
+                pen.setColor(pg.mkColor("#FF00FF"))
+            case "La":
+                pen.setColor(pg.mkColor("#FFFF00"))
+            case "Lb":
+                pen.setColor(pg.mkColor("#00FF00"))
+            case "Ly":
+                pen.setColor(pg.mkColor("#FFA500"))
+            case "Ma":
+                pen.setColor(pg.mkColor("#ADD8E6"))
+        if lineType == "peak":
+            pen.setWidth(2)
+            pos = 1
+            for label in [radiation, series['symbol']]:
+                pos -= 0.1
+                pg.InfLineLabel(
+                    line, text=label, movable=False, position=pos
+                )
+        else:
+            pen.setWidth(1)
+        line.setPen(pen)
         return line
 
     @staticmethod
