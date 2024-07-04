@@ -785,7 +785,7 @@ class PeakSearchWindow(QtWidgets.QMainWindow):
             self._peakPlot.addItem(data.peakLine)
         if data.spectrumLine not in self._spectrumPlot.items:
             self._spectrumPlot.addItem(data.spectrumLine)
-        if data.region not in self._peakPlot.items and data.active is False:
+        if self._analyse.classification == "CAL" and data.region not in self._peakPlot.items and data.active is False:
             self._peakPlot.addItem(data.region)
 
     def _erasePlotData(self, data: datatypes.PlotData) -> None:
