@@ -164,17 +164,29 @@ class PlotWindow(QtWidgets.QMainWindow):
     @QtCore.pyqtSlot()
     def _actionTriggered(self, key: str):
         if key == "open":
-            path = self._getFileNameFromDialog(
-                QtWidgets.QFileDialog.AcceptMode.AcceptOpen
+            fileNames, filters = QtWidgets.QFileDialog.getOpenFileNames(
+                self,
+                "Open File",
+                "./",
+                "Antique'X Spectrum (*.atx);;Text Spectrum (*.txt)"
             )
-            if path is not None:
-                self._addAnalyseFile(path)
+            if fileNames:
+                for fileName in fileNames:
+                    self._addAnalyseFromFileName(fileName)
+                mapper = {"Text Spectrum (*.txt)": 0, "Antique'X Spectrum (*.atx)": 1}
+                topLevelItem = self._treeWidget.topLevelItem(mapper[filters])
+                if not topLevelItem.isExpanded():
+                    self._treeWidget.expandItem(topLevelItem)
         elif key == "save-as":
-            path = self._getFileNameFromDialog(
-                QtWidgets.QFileDialog.AcceptMode.AcceptSave
-            )
-            if path is not None:
-                self.saveFile(path)
+            # TODO
+            # selectedPaths = self._getFileNameFromDialog(
+            #     QtWidgets.QFileDialog.AcceptMode.AcceptOpen
+            # )
+            # if selectedPaths is not None:
+            #     for path in selectedPaths:
+            #         self.saveFile(path)
+            fileName = self._getSaveFileName()
+            self.saveFile(fileName)
         elif key == "new":
             self.resetWindow()
         elif key == "close":
@@ -185,13 +197,17 @@ class PlotWindow(QtWidgets.QMainWindow):
         elif key == "peak-search":
             self._showPeakSearchWindow()
         elif key == "add-calibration":
-            path = self._getFileNameFromDialog(
-                QtWidgets.QFileDialog.AcceptMode.AcceptOpen
+            fileNames, filters = QtWidgets.QFileDialog.getOpenFileNames(
+                self,
+                "Open File",
+                "./",
+                "Antique'X Spectrum (*.atx);;Text Spectrum (*.txt)"
             )
-            if path is not None:
-                analyse = self._constructAnalyseFromFilename(path)
-                if analyse.concentrations:
-                    self.addCalibration(analyse)
+            if fileNames:
+                for fileName in fileNames:
+                    analyse = self._constructAnalyseFromFilename(fileName)
+                    if analyse.classification == "CAL":
+                        self.addCalibration(analyse)
 
     def _createMenus(self) -> None:
         self._menusMap = {}
@@ -296,9 +312,9 @@ class PlotWindow(QtWidgets.QMainWindow):
                 background: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1, stop: 0 #6b9be8, stop: 1 #577fbf);
             }
 
-            # QTreeView::branch:has-siblings:!adjoins-item {
-            #     border-image: url(icons/vline.png) 0;
-            # }
+            QTreeView::branch:has-siblings:!adjoins-item {
+                border-image: url(icons/vline.png) 0;
+            }
 
             QTreeView::branch:has-siblings:adjoins-item {
                 border-image: url(icons/branch-more.png) 0;
@@ -352,7 +368,7 @@ class PlotWindow(QtWidgets.QMainWindow):
 
     @QtCore.pyqtSlot(QtWidgets.QTreeWidgetItem)
     def _togglePeakSearchAction(self, item: QtWidgets.QTreeWidgetItem):
-        if "condition" in item.text(1).lower():
+        if "condition" in item.text(0).lower():
             self._actionsMap["peak-search"].setDisabled(False)
         else:
             self._actionsMap["peak-search"].setDisabled(True)
@@ -382,35 +398,22 @@ class PlotWindow(QtWidgets.QMainWindow):
         mainWidget.setLayout(vlayout)
         self.setCentralWidget(mainWidget)
 
-    def _getFileNameFromDialog(
-            self, mode: QtWidgets.QFileDialog.AcceptMode
-    ) -> Optional[str]:
-        if mode == QtWidgets.QFileDialog.AcceptMode.AcceptSave:
-            saveDialog = SaveDialog(self)
-            saveDialog.fillList(list(map(lambda x: x.name, self._analyseFiles)))
-            saveDialog.listWidget.setCurrentRow(0)
-            result = saveDialog.exec()
-            if result:
-                self._indexOfFile = saveDialog.listWidget.currentRow()
-                path = self._showFileDialog(mode)
-                return path
-        elif mode == QtWidgets.QFileDialog.AcceptMode.AcceptOpen:
-            path = self._showFileDialog(mode)
-            return path
+    def _getSaveFileName(self) -> str:
+        saveDialog = SaveDialog(self)
+        saveDialog.fillList(list(map(lambda x: x.name, self._analyseFiles)))
+        saveDialog.listWidget.setCurrentRow(0)
+        result = saveDialog.exec()
+        if result:
+            self._indexOfFile = saveDialog.listWidget.currentRow()
+            fileName, filters = QtWidgets.QFileDialog.getSaveFileName(
+                self,
+                "Open File",
+                "./",
+                "Antique'X Spectrum (*.atx);;Text Spectrum (*.txt)"
+            )
+            return fileName
 
-    def _showFileDialog(self, mode: QtWidgets.QFileDialog.AcceptMode) -> Optional[str]:
-        fileDialog = QtWidgets.QFileDialog(self)
-        fileDialog.setFileMode(QtWidgets.QFileDialog.FileMode.AnyFile)
-        fileDialog.setNameFilters(
-            ["Antique'X Spectrum (*.atx)", "Text Spectrum (*.txt)"]
-        )
-        fileDialog.setAcceptMode(mode)
-        result = fileDialog.exec()
-        if result == 1:
-            return fileDialog.selectedFiles()[0] if fileDialog.selectedFiles() else None
-        return None
-
-    def _addAnalyseFile(self, filename: str) -> None:
+    def _addAnalyseFromFileName(self, filename: str) -> None:
         analyse = self._constructAnalyseFromFilename(filename)
         if analyse is not None and analyse.data:
             self.addAnalyse(analyse)
@@ -460,8 +463,6 @@ class PlotWindow(QtWidgets.QMainWindow):
             self._treeWidget.setItemWidget(child, 1, colorButton)
         mapper = {"txt": 0, "atx": 1}
         self._treeWidget.topLevelItem(mapper[analyse.extension]).addChild(item)
-        self._treeWidget.expandItem(self._treeWidget.topLevelItem(mapper[analyse.extension]))
-        self._treeWidget.expandItem(item)
 
     def resetWindow(self):
         messageBox = QtWidgets.QMessageBox(self)
