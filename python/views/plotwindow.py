@@ -252,10 +252,13 @@ class PlotWindow(QtWidgets.QMainWindow):
             mousePoint = self._plotWidget.getPlotItem().vb.mapSceneToView(pos)
             self._setCoordinate(mousePoint.x(), mousePoint.y())
 
-    def _setCoordinate(self, x: int, y: int) -> None:
-        self._coordinateLabel.setText(
-            "<span style='font-size: 2rem'>x=%0.1f,y=%0.1f</span>" % (x, y)
-        )
+    def _setCoordinate(self, x: float, y: float) -> None:
+        self._coordinateLabel.setText(f"""
+            <span style="font-size: 12px; 
+                        color: rgb(128, 128, 128);
+                        padding: 5px;
+                        letter-spacing: 2px">x= {round(x, 2)} y= {round(y, 2)}</span>
+        """)
 
     def _createTreeWidget(self) -> None:
         self._treeWidget = QtWidgets.QTreeWidget()
