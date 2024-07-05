@@ -259,59 +259,93 @@ class PlotWindow(QtWidgets.QMainWindow):
 
     def _createTreeWidget(self) -> None:
         self._treeWidget = QtWidgets.QTreeWidget()
-        self._treeWidget.setColumnCount(3)
-        self._treeWidget.setHeaderLabels(["File", "Condition", "Color"])
+        self._treeWidget.setStyleSheet("""
+            QTreeView {
+                show-decoration-selected: 1;
+            }
+
+            QHeaderView::section {
+                background-color: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #616161, stop: 0.5 #505050, stop: 0.6 #434343, stop:1 #656565);
+                color: white;
+                border: 1px solid #6c6c6c;
+            }
+
+            QTreeView::item {
+                border: 1px solid #d9d9d9;
+                border-top-color: transparent;
+                border-bottom-color: transparent;
+            }
+
+            QTreeView::item:hover {
+                background: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1, stop: 0 #e7effd, stop: 1 #cbdaf1);
+                border: 1px solid #bfcde4;
+            }
+
+            QTreeView::item:selected {
+                border: 1px solid #567dbc;
+            }
+
+            QTreeView::item:selected:active{
+                background: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1, stop: 0 #6ea1f1, stop: 1 #567dbc);
+            }
+
+            QTreeView::item:selected:!active {
+                background: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1, stop: 0 #6b9be8, stop: 1 #577fbf);
+            }
+
+            # QTreeView::branch:has-siblings:!adjoins-item {
+            #     border-image: url(icons/vline.png) 0;
+            # }
+
+            QTreeView::branch:has-siblings:adjoins-item {
+                border-image: url(icons/branch-more.png) 0;
+            }
+
+            QTreeView::branch:!has-children:!has-siblings:adjoins-item {
+                border-image: url(icons/branch-end.png) 0;
+            }
+
+            QTreeView::branch:has-children:!has-siblings:closed,
+            QTreeView::branch:closed:has-children:has-siblings {
+                border-image: none;
+                image: url(icons/branch-closed.png);
+            }
+
+            QTreeView::branch:open:has-children:!has-siblings,
+            QTreeView::branch:open:has-children:has-siblings  {
+                border-image: none;
+                image: url(icons/branch-open.png);
+            }
+        """)
+        self._treeWidget.setColumnCount(2)
+        self._treeWidget.setHeaderLabels(["File", "Color"])
+        header = self._treeWidget.header()
+        headerFont = QtGui.QFont('Segoe UI', 13, QtGui.QFont.Weight.Bold)
+        header.setFont(headerFont)
+        header.setDefaultAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
         self._treeWidget.setFrameShape(QtWidgets.QFrame.Shape.Box)
         self._treeWidget.setFrameShadow(QtWidgets.QFrame.Shadow.Plain)
-        self._treeWidget.header().setHighlightSections(True)
         self._treeWidget.setAnimated(True)
         self._treeWidget.setExpandsOnDoubleClick(False)
-        header = self._treeWidget.header()
-        header.setSectionResizeMode(QtWidgets.QHeaderView.ResizeMode.Stretch)
-        header.setHighlightSections(True)
         self._treeWidget.setEditTriggers(
             QtWidgets.QTreeWidget.EditTrigger.NoEditTriggers
         )
         self._treeWidget.setTabKeyNavigation(True)
-        self._treeWidget.setAlternatingRowColors(True)
-        self._treeWidget.setMaximumWidth(int(self.size().width() / 3))
-        self._treeWidget.setMinimumWidth(int(self.size().width() / 5))
+        self._treeWidget.setFixedWidth(int(self.size().width() / 3))
+        # self._treeWidget.setMinimumWidth(int(self.size().width() / 5))
+        self._treeWidget.setColumnWidth(0, int(self._treeWidget.size().width() * 0.7))
         self._fillTreeWidget()
-        self._treeWidget.itemChanged.connect(self._checkStateChanged)
+        self._treeWidget.itemChanged.connect(self._drawCanvas)
         self._treeWidget.itemClicked.connect(self._togglePeakSearchAction)
 
     def _fillTreeWidget(self) -> None:
+        font = QtGui.QFont('Segoe UI', 12)
         items = ["Text Files", "Antique'X Files", "Packet Files"]
         for label in items:
             item = QtWidgets.QTreeWidgetItem(self._treeWidget)
             item.setText(0, label)
+            item.setFont(0, font)
             self._treeWidget.addTopLevelItem(item)
-
-    @QtCore.pyqtSlot(QtWidgets.QTreeWidgetItem, int)
-    def _checkStateChanged(self, item: QtWidgets.QTreeWidgetItem) -> None:
-        self._treeWidget.blockSignals(True)
-        if self._treeWidget.indexOfTopLevelItem(item.parent()) != -1:
-            if item.checkState(0) == QtCore.Qt.CheckState.Unchecked:
-                for dataIndex in range(item.childCount()):
-                    item.child(dataIndex).setCheckState(
-                        1, QtCore.Qt.CheckState.Unchecked
-                    )
-            elif item.checkState(0) == QtCore.Qt.CheckState.Checked:
-                for dataIndex in range(item.childCount()):
-                    item.child(dataIndex).setCheckState(1, QtCore.Qt.CheckState.Checked)
-        else:
-            analyseItem = item.parent()
-            states = [
-                analyseItem.child(childIndex).checkState(1)
-                for childIndex in range(analyseItem.childCount())
-            ]
-            mapper = map(lambda state: state == QtCore.Qt.CheckState.Checked, states)
-            if all(mapper):
-                analyseItem.setCheckState(0, QtCore.Qt.CheckState.Checked)
-            else:
-                analyseItem.setCheckState(0, QtCore.Qt.CheckState.Unchecked)
-        self._treeWidget.blockSignals(False)
-        self._drawCanvas()
 
     @QtCore.pyqtSlot(QtWidgets.QTreeWidgetItem)
     def _togglePeakSearchAction(self, item: QtWidgets.QTreeWidgetItem):
@@ -404,20 +438,27 @@ class PlotWindow(QtWidgets.QMainWindow):
             self._actionsMap["new"].setDisabled(False)
 
     def _addAnalyseToTree(self, analyse: datatypes.Analyse) -> None:
+        font = QtGui.QFont('Segoe UI', 11)
+        font.setItalic(True)
         item = QtWidgets.QTreeWidgetItem()
         item.setCheckState(0, QtCore.Qt.CheckState.Unchecked)
         item.setText(0, analyse.name)
+        item.setFont(0, font)
+        item.setFlags(item.flags() | QtCore.Qt.ItemFlag.ItemIsAutoTristate | QtCore.Qt.ItemFlag.ItemIsUserCheckable)
         for index, data in enumerate(analyse.data):
             child = QtWidgets.QTreeWidgetItem()
-            child.setText(1, f"Condition {data.condition}")
-            child.setCheckState(1, QtCore.Qt.CheckState.Unchecked)
+            child.setText(0, f"Condition {data.condition}")
+            child.setFlags(child.flags() | QtCore.Qt.ItemFlag.ItemIsUserCheckable)
+            child.setCheckState(0, QtCore.Qt.CheckState.Unchecked)
             item.addChild(child)
             colorButton = pg.ColorButton()
             colorButton.setColor(COLORS[index])
             colorButton.sigColorChanged.connect(self._drawCanvas)
-            self._treeWidget.setItemWidget(child, 2, colorButton)
+            self._treeWidget.setItemWidget(child, 1, colorButton)
         mapper = {"txt": 0, "atx": 1}
         self._treeWidget.topLevelItem(mapper[analyse.extension]).addChild(item)
+        self._treeWidget.expandItem(self._treeWidget.topLevelItem(mapper[analyse.extension]))
+        self._treeWidget.expandItem(item)
 
     def resetWindow(self):
         messageBox = QtWidgets.QMessageBox(self)
@@ -445,8 +486,8 @@ class PlotWindow(QtWidgets.QMainWindow):
                 analyseItem = extensionItem.child(analyseIndex)
                 for dataIndex in range(analyseItem.childCount()):
                     analyseDataItem = analyseItem.child(dataIndex)
-                    if analyseDataItem.checkState(1) == QtCore.Qt.CheckState.Checked:
-                        color = self._treeWidget.itemWidget(analyseDataItem, 2).color()
+                    if analyseDataItem.checkState(0) == QtCore.Qt.CheckState.Checked:
+                        color = self._treeWidget.itemWidget(analyseDataItem, 1).color()
                         activePlotAttrs.append(
                             (extensionIndex, analyseIndex, dataIndex, color)
                         )
