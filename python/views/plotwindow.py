@@ -164,17 +164,29 @@ class PlotWindow(QtWidgets.QMainWindow):
     @QtCore.pyqtSlot()
     def _actionTriggered(self, key: str):
         if key == "open":
-            path = self._getFileNameFromDialog(
-                QtWidgets.QFileDialog.AcceptMode.AcceptOpen
+            fileNames, filters = QtWidgets.QFileDialog.getOpenFileNames(
+                self,
+                "Open File",
+                "./",
+                "Antique'X Spectrum (*.atx);;Text Spectrum (*.txt)"
             )
-            if path is not None:
-                self._addAnalyseFile(path)
+            if fileNames:
+                for fileName in fileNames:
+                    self._addAnalyseFromFileName(fileName)
+                mapper = {"Text Spectrum (*.txt)": 0, "Antique'X Spectrum (*.atx)": 1}
+                topLevelItem = self._treeWidget.topLevelItem(mapper[filters])
+                if not topLevelItem.isExpanded():
+                    self._treeWidget.expandItem(topLevelItem)
         elif key == "save-as":
-            path = self._getFileNameFromDialog(
-                QtWidgets.QFileDialog.AcceptMode.AcceptSave
-            )
-            if path is not None:
-                self.saveFile(path)
+            # TODO
+            # selectedPaths = self._getFileNameFromDialog(
+            #     QtWidgets.QFileDialog.AcceptMode.AcceptOpen
+            # )
+            # if selectedPaths is not None:
+            #     for path in selectedPaths:
+            #         self.saveFile(path)
+            fileName = self._getSaveFileName()
+            self.saveFile(fileName)
         elif key == "new":
             self.resetWindow()
         elif key == "close":
@@ -185,13 +197,17 @@ class PlotWindow(QtWidgets.QMainWindow):
         elif key == "peak-search":
             self._showPeakSearchWindow()
         elif key == "add-calibration":
-            path = self._getFileNameFromDialog(
-                QtWidgets.QFileDialog.AcceptMode.AcceptOpen
+            fileNames, filters = QtWidgets.QFileDialog.getOpenFileNames(
+                self,
+                "Open File",
+                "./",
+                "Antique'X Spectrum (*.atx);;Text Spectrum (*.txt)"
             )
-            if path is not None:
-                analyse = self._constructAnalyseFromFilename(path)
-                if analyse.concentrations:
-                    self.addCalibration(analyse)
+            if fileNames:
+                for fileName in fileNames:
+                    analyse = self._constructAnalyseFromFilename(fileName)
+                    if analyse.classification == "CAL":
+                        self.addCalibration(analyse)
 
     def _createMenus(self) -> None:
         self._menusMap = {}
@@ -252,70 +268,104 @@ class PlotWindow(QtWidgets.QMainWindow):
             mousePoint = self._plotWidget.getPlotItem().vb.mapSceneToView(pos)
             self._setCoordinate(mousePoint.x(), mousePoint.y())
 
-    def _setCoordinate(self, x: int, y: int) -> None:
-        self._coordinateLabel.setText(
-            "<span style='font-size: 2rem'>x=%0.1f,y=%0.1f</span>" % (x, y)
-        )
+    def _setCoordinate(self, x: float, y: float) -> None:
+        self._coordinateLabel.setText(f"""
+            <span style="font-size: 12px; 
+                        color: rgb(128, 128, 128);
+                        padding: 5px;
+                        letter-spacing: 2px">x= {round(x, 2)} y= {round(y, 2)}</span>
+        """)
 
     def _createTreeWidget(self) -> None:
         self._treeWidget = QtWidgets.QTreeWidget()
-        self._treeWidget.setColumnCount(3)
-        self._treeWidget.setHeaderLabels(["File", "Condition", "Color"])
+        self._treeWidget.setStyleSheet("""
+            QTreeView {
+                show-decoration-selected: 1;
+            }
+
+            QHeaderView::section {
+                background-color: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #616161, stop: 0.5 #505050, stop: 0.6 #434343, stop:1 #656565);
+                color: white;
+                border: None;
+            }
+
+            QTreeView::item {
+                border: None;
+            }
+
+            QTreeView::item:hover {
+                background: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1, stop: 0 #e7effd, stop: 1 #cbdaf1);
+                border: None;
+            }
+
+            QTreeView::item:selected {
+                border: None;
+            }
+
+            QTreeView::item:selected:active{
+                background: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1, stop: 0 #6ea1f1, stop: 1 #567dbc);
+            }
+
+            QTreeView::item:selected:!active {
+                background: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1, stop: 0 #6b9be8, stop: 1 #577fbf);
+            }
+
+            QTreeView::branch:has-siblings:!adjoins-item {
+                border-image: url(icons/vline.png) 0;
+            }
+
+            QTreeView::branch:has-siblings:adjoins-item {
+                border-image: url(icons/branch-more.png) 0;
+            }
+
+            QTreeView::branch:!has-children:!has-siblings:adjoins-item {
+                border-image: url(icons/branch-end.png) 0;
+            }
+
+            QTreeView::branch:has-children:!has-siblings:closed,
+            QTreeView::branch:closed:has-children:has-siblings {
+                border-image: none;
+                image: url(icons/branch-closed.png);
+            }
+
+            QTreeView::branch:open:has-children:!has-siblings,
+            QTreeView::branch:open:has-children:has-siblings  {
+                border-image: none;
+                image: url(icons/branch-open.png);
+            }
+        """)
+        self._treeWidget.setColumnCount(2)
+        self._treeWidget.setHeaderLabels(["File", "Color"])
+        header = self._treeWidget.header()
+        headerFont = QtGui.QFont('Segoe UI', 13, QtGui.QFont.Weight.Bold)
+        header.setFont(headerFont)
+        header.setDefaultAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
         self._treeWidget.setFrameShape(QtWidgets.QFrame.Shape.Box)
         self._treeWidget.setFrameShadow(QtWidgets.QFrame.Shadow.Plain)
-        self._treeWidget.header().setHighlightSections(True)
         self._treeWidget.setAnimated(True)
         self._treeWidget.setExpandsOnDoubleClick(False)
-        header = self._treeWidget.header()
-        header.setSectionResizeMode(QtWidgets.QHeaderView.ResizeMode.Stretch)
-        header.setHighlightSections(True)
         self._treeWidget.setEditTriggers(
             QtWidgets.QTreeWidget.EditTrigger.NoEditTriggers
         )
         self._treeWidget.setTabKeyNavigation(True)
-        self._treeWidget.setAlternatingRowColors(True)
-        self._treeWidget.setMaximumWidth(int(self.size().width() / 3))
-        self._treeWidget.setMinimumWidth(int(self.size().width() / 5))
+        self._treeWidget.setFixedWidth(int(self.size().width() / 3))
+        self._treeWidget.setColumnWidth(0, int(self._treeWidget.size().width() * 0.7))
         self._fillTreeWidget()
-        self._treeWidget.itemChanged.connect(self._checkStateChanged)
+        self._treeWidget.itemChanged.connect(self._drawCanvas)
         self._treeWidget.itemClicked.connect(self._togglePeakSearchAction)
 
     def _fillTreeWidget(self) -> None:
+        font = QtGui.QFont('Segoe UI', 12)
         items = ["Text Files", "Antique'X Files", "Packet Files"]
         for label in items:
             item = QtWidgets.QTreeWidgetItem(self._treeWidget)
             item.setText(0, label)
+            item.setFont(0, font)
             self._treeWidget.addTopLevelItem(item)
-
-    @QtCore.pyqtSlot(QtWidgets.QTreeWidgetItem, int)
-    def _checkStateChanged(self, item: QtWidgets.QTreeWidgetItem) -> None:
-        self._treeWidget.blockSignals(True)
-        if self._treeWidget.indexOfTopLevelItem(item.parent()) != -1:
-            if item.checkState(0) == QtCore.Qt.CheckState.Unchecked:
-                for dataIndex in range(item.childCount()):
-                    item.child(dataIndex).setCheckState(
-                        1, QtCore.Qt.CheckState.Unchecked
-                    )
-            elif item.checkState(0) == QtCore.Qt.CheckState.Checked:
-                for dataIndex in range(item.childCount()):
-                    item.child(dataIndex).setCheckState(1, QtCore.Qt.CheckState.Checked)
-        else:
-            analyseItem = item.parent()
-            states = [
-                analyseItem.child(childIndex).checkState(1)
-                for childIndex in range(analyseItem.childCount())
-            ]
-            mapper = map(lambda state: state == QtCore.Qt.CheckState.Checked, states)
-            if all(mapper):
-                analyseItem.setCheckState(0, QtCore.Qt.CheckState.Checked)
-            else:
-                analyseItem.setCheckState(0, QtCore.Qt.CheckState.Unchecked)
-        self._treeWidget.blockSignals(False)
-        self._drawCanvas()
 
     @QtCore.pyqtSlot(QtWidgets.QTreeWidgetItem)
     def _togglePeakSearchAction(self, item: QtWidgets.QTreeWidgetItem):
-        if "condition" in item.text(1).lower():
+        if "condition" in item.text(0).lower():
             self._actionsMap["peak-search"].setDisabled(False)
         else:
             self._actionsMap["peak-search"].setDisabled(True)
@@ -345,35 +395,22 @@ class PlotWindow(QtWidgets.QMainWindow):
         mainWidget.setLayout(vlayout)
         self.setCentralWidget(mainWidget)
 
-    def _getFileNameFromDialog(
-            self, mode: QtWidgets.QFileDialog.AcceptMode
-    ) -> Optional[str]:
-        if mode == QtWidgets.QFileDialog.AcceptMode.AcceptSave:
-            saveDialog = SaveDialog(self)
-            saveDialog.fillList(list(map(lambda x: x.name, self._analyseFiles)))
-            saveDialog.listWidget.setCurrentRow(0)
-            result = saveDialog.exec()
-            if result:
-                self._indexOfFile = saveDialog.listWidget.currentRow()
-                path = self._showFileDialog(mode)
-                return path
-        elif mode == QtWidgets.QFileDialog.AcceptMode.AcceptOpen:
-            path = self._showFileDialog(mode)
-            return path
+    def _getSaveFileName(self) -> str:
+        saveDialog = SaveDialog(self)
+        saveDialog.fillList(list(map(lambda x: x.name, self._analyseFiles)))
+        saveDialog.listWidget.setCurrentRow(0)
+        result = saveDialog.exec()
+        if result:
+            self._indexOfFile = saveDialog.listWidget.currentRow()
+            fileName, filters = QtWidgets.QFileDialog.getSaveFileName(
+                self,
+                "Open File",
+                "./",
+                "Antique'X Spectrum (*.atx);;Text Spectrum (*.txt)"
+            )
+            return fileName
 
-    def _showFileDialog(self, mode: QtWidgets.QFileDialog.AcceptMode) -> Optional[str]:
-        fileDialog = QtWidgets.QFileDialog(self)
-        fileDialog.setFileMode(QtWidgets.QFileDialog.FileMode.AnyFile)
-        fileDialog.setNameFilters(
-            ["Antique'X Spectrum (*.atx)", "Text Spectrum (*.txt)"]
-        )
-        fileDialog.setAcceptMode(mode)
-        result = fileDialog.exec()
-        if result == 1:
-            return fileDialog.selectedFiles()[0] if fileDialog.selectedFiles() else None
-        return None
-
-    def _addAnalyseFile(self, filename: str) -> None:
+    def _addAnalyseFromFileName(self, filename: str) -> None:
         analyse = self._constructAnalyseFromFilename(filename)
         if analyse is not None and analyse.data:
             self.addAnalyse(analyse)
@@ -404,18 +441,23 @@ class PlotWindow(QtWidgets.QMainWindow):
             self._actionsMap["new"].setDisabled(False)
 
     def _addAnalyseToTree(self, analyse: datatypes.Analyse) -> None:
+        font = QtGui.QFont('Segoe UI', 11)
+        font.setItalic(True)
         item = QtWidgets.QTreeWidgetItem()
         item.setCheckState(0, QtCore.Qt.CheckState.Unchecked)
         item.setText(0, analyse.name)
+        item.setFont(0, font)
+        item.setFlags(item.flags() | QtCore.Qt.ItemFlag.ItemIsAutoTristate | QtCore.Qt.ItemFlag.ItemIsUserCheckable)
         for index, data in enumerate(analyse.data):
             child = QtWidgets.QTreeWidgetItem()
-            child.setText(1, f"Condition {data.condition}")
-            child.setCheckState(1, QtCore.Qt.CheckState.Unchecked)
+            child.setText(0, f"Condition {data.condition}")
+            child.setFlags(child.flags() | QtCore.Qt.ItemFlag.ItemIsUserCheckable)
+            child.setCheckState(0, QtCore.Qt.CheckState.Unchecked)
             item.addChild(child)
             colorButton = pg.ColorButton()
             colorButton.setColor(COLORS[index])
             colorButton.sigColorChanged.connect(self._drawCanvas)
-            self._treeWidget.setItemWidget(child, 2, colorButton)
+            self._treeWidget.setItemWidget(child, 1, colorButton)
         mapper = {"txt": 0, "atx": 1}
         self._treeWidget.topLevelItem(mapper[analyse.extension]).addChild(item)
 
@@ -445,8 +487,8 @@ class PlotWindow(QtWidgets.QMainWindow):
                 analyseItem = extensionItem.child(analyseIndex)
                 for dataIndex in range(analyseItem.childCount()):
                     analyseDataItem = analyseItem.child(dataIndex)
-                    if analyseDataItem.checkState(1) == QtCore.Qt.CheckState.Checked:
-                        color = self._treeWidget.itemWidget(analyseDataItem, 2).color()
+                    if analyseDataItem.checkState(0) == QtCore.Qt.CheckState.Checked:
+                        color = self._treeWidget.itemWidget(analyseDataItem, 1).color()
                         activePlotAttrs.append(
                             (extensionIndex, analyseIndex, dataIndex, color)
                         )
