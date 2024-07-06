@@ -286,22 +286,20 @@ class PlotWindow(QtWidgets.QMainWindow):
             QHeaderView::section {
                 background-color: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #616161, stop: 0.5 #505050, stop: 0.6 #434343, stop:1 #656565);
                 color: white;
-                border: 1px solid #6c6c6c;
+                border: None;
             }
 
             QTreeView::item {
-                border: 1px solid #d9d9d9;
-                border-top-color: transparent;
-                border-bottom-color: transparent;
+                border: None;
             }
 
             QTreeView::item:hover {
                 background: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1, stop: 0 #e7effd, stop: 1 #cbdaf1);
-                border: 1px solid #bfcde4;
+                border: None;
             }
 
             QTreeView::item:selected {
-                border: 1px solid #567dbc;
+                border: None;
             }
 
             QTreeView::item:selected:active{
@@ -351,7 +349,6 @@ class PlotWindow(QtWidgets.QMainWindow):
         )
         self._treeWidget.setTabKeyNavigation(True)
         self._treeWidget.setFixedWidth(int(self.size().width() / 3))
-        # self._treeWidget.setMinimumWidth(int(self.size().width() / 5))
         self._treeWidget.setColumnWidth(0, int(self._treeWidget.size().width() * 0.7))
         self._fillTreeWidget()
         self._treeWidget.itemChanged.connect(self._drawCanvas)
