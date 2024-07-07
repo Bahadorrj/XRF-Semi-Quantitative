@@ -7,6 +7,7 @@ from typing import Union
 import numpy as np
 import pandas as pd
 import pyqtgraph as pg
+from PyQt6.QtCore import Qt
 
 from python.utils import calculation
 from python.utils import encryption
@@ -50,13 +51,17 @@ class Analyse:
     extension: str = field(default=None)
     generalData: dict[str] = field(default_factory=dict)
     data: list[AnalyseData] = field(default_factory=list)
+    classification: str = field(default=None)
     concentrations: dict[str, float] = field(default_factory=dict)
 
     def __init__(self, **kwargs) -> None:
         if "data" not in kwargs:
             raise ValueError("Data is required for initialization in class Analyse")
         if "concentrations" not in kwargs:
+            self.classification = "DEF"
             self.concentrations = {}
+        else:
+            self.classification = "CAL"
         if "generalData" not in kwargs:
             self.generalData = {}
         for key, value in kwargs.items():
@@ -82,7 +87,7 @@ class Analyse:
 
     @classmethod
     def fromTextFile(cls, filename: str) -> 'Analyse':
-        # TODO this has to change in future
+        # TODO change in future
         analyseDict = {}
         data = []
         with open(filename, 'r') as f:
@@ -139,6 +144,7 @@ class PlotData:
         self.spectrumLine.setPen(pg.mkPen(color=(0, 255, 0, 150), width=2))
 
     def deactivate(self):
+        # TODO set color based on radiation type
         self.active = False
         self.peakLine.setPen(pg.mkPen(color=(255, 0, 0, 150), width=2))
         self.spectrumLine.setPen(pg.mkPen(color=(255, 0, 0, 150), width=2))
@@ -146,15 +152,13 @@ class PlotData:
     @classmethod
     def fromSeries(cls, rowId: int, series: pd.Series) -> 'PlotData':
         active = bool(series['active'])
-        value = calculation.evToPx(float(series['kiloelectron_volt']))
-        labels = [str(series['symbol']), str(series['radiation_type'])]
-        spectrumLine = cls._generateLine(value, active=active)
-        peakLine = cls._generateLine(value, labels=labels, active=active)
+        spectrumLine = cls._generateLine(series)
+        peakLine = cls._generateLine(series, lineType="peak")
         rng = (
             calculation.evToPx(float(series['low_kiloelectron_volt'])),
             calculation.evToPx(float(series['high_kiloelectron_volt']))
         )
-        region = cls._generateRegion(rng)
+        region = cls._generateRegion(rng, not bool(series['active']))
         try:
             conditionId = int(series['condition_id'])
         except ValueError:
@@ -162,30 +166,51 @@ class PlotData:
         return PlotData(rowId, spectrumLine, peakLine, region, False, active, conditionId)
 
     @staticmethod
-    def _generateLine(value: float, **kwargs) -> pg.InfiniteLine:
+    def _generateLine(series: pd.Series, lineType: str = "spectrum") -> pg.InfiniteLine:
+        # TODO if kwargs['active'] constant line else dash dot line
+        value = calculation.evToPx(float(series['kiloelectron_volt']))
         line = pg.InfiniteLine()
         line.setAngle(90)
         line.setMovable(False)
         line.setValue(value)
-        pos = 1
-        for key, val in kwargs.items():
-            if key == 'active':
-                if val is True:
-                    line.setPen(pg.mkPen(color=(0, 255, 0, 150), width=2))
-                else:
-                    line.setPen(pg.mkPen(color=(255, 0, 0, 150), width=2))
-            if key == 'labels':
-                for label in val:
-                    pos -= 0.1
-                    pg.InfLineLabel(
-                        line, text=label, movable=False, position=pos
-                    )
+        active = bool(series['active'])
+        pen = pg.mkPen()
+        if active:
+            pen.setStyle(Qt.PenStyle.SolidLine)
+        else:
+            pen.setStyle(Qt.PenStyle.DashLine)
+        radiation = series['radiation_type']
+        match radiation:
+            case "Ka":
+                pen.setColor(pg.mkColor("#00FFFF"))
+            case "Kb":
+                pen.setColor(pg.mkColor("#FF00FF"))
+            case "La":
+                pen.setColor(pg.mkColor("#FFFF00"))
+            case "Lb":
+                pen.setColor(pg.mkColor("#00FF00"))
+            case "Ly":
+                pen.setColor(pg.mkColor("#FFA500"))
+            case "Ma":
+                pen.setColor(pg.mkColor("#ADD8E6"))
+        if lineType == "peak":
+            pen.setWidth(2)
+            pos = 1
+            for label in [radiation, series['symbol']]:
+                pos -= 0.1
+                pg.InfLineLabel(
+                    line, text=label, movable=False, position=pos
+                )
+        else:
+            pen.setWidth(1)
+        line.setPen(pen)
         return line
 
     @staticmethod
-    def _generateRegion(rng: Union[list[float, float], tuple[float, float]]):
+    def _generateRegion(rng: Union[list[float, float], tuple[float, float]], movable: bool = True):
         region = pg.LinearRegionItem(swapMode='push')
         region.setZValue(10)
         region.setRegion(rng)
         region.setBounds((0, 2048))
+        region.setMovable(movable)
         return region

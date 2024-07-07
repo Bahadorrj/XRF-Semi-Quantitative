@@ -257,6 +257,7 @@ class ElementsTableWidget(QtWidgets.QTableWidget):
         for column, value in mapper.items():
             item = TableItem(value)
             item.setTextAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
+            item.setFlags(item.flags() & ~QtCore.Qt.ItemFlag.ItemIsEditable)
             if column == 8:
                 if value == "Activated":
                     item.setForeground(QtGui.QColor(0, 255, 0))
@@ -306,6 +307,7 @@ class PeakSearchWindow(QtWidgets.QMainWindow):
         self._undoStack = deque()
         self._redoStack = deque()
         self._flag = False
+        self._regionActive = False
         self.resize(1200, 800)
         self._mainLayout = QtWidgets.QVBoxLayout()
         self._createToolBar()
@@ -328,14 +330,18 @@ class PeakSearchWindow(QtWidgets.QMainWindow):
             icon=QtGui.QIcon(resourcePath("icons/undo.png"))
         )
         # self._redoAction = QtGui.QAction(icon=QtGui.QIcon(resource_path("icons/redo.png")))
+        self._regionAction = QtGui.QAction(icon=QtGui.QIcon(resourcePath("icons/brackets.png")))
+        self._regionAction.setCheckable(True)
         self._undoAction.setDisabled(True)
         # self._redoAction.setDisabled(True)
         self._undoAction.setShortcut(QtGui.QKeySequence("Ctrl+z"))
         # self._redoAction.setShortcut(QtGui.QKeySequence("Ctrl+r"))
         toolBar.addAction(self._undoAction)
         # toolBar.addAction(self._redoAction)
+        toolBar.addAction(self._regionAction)
         self._undoAction.triggered.connect(self._undo)
         # self._redoAction.triggered.connect(self._redo)
+        self._regionAction.triggered.connect(self._toggleRegions)
 
     def _undo(self) -> None:
         if self._undoStack:
@@ -357,6 +363,15 @@ class PeakSearchWindow(QtWidgets.QMainWindow):
     #             self._redoAction.setDisabled(True)
     #         self._undoAction.setDisabled(False)
     #         self._rowChanged(rowId, action)
+
+    def _toggleRegions(self, checked: bool) -> None:
+        self._regionActive = checked
+        for data in self._plotDataList:
+            if data.visible:
+                if checked:
+                    self._peakPlot.addItem(data.region)
+                else:
+                    self._peakPlot.removeItem(data.region)
 
     def _createSearchBar(self) -> None:
         self._searchedElement = QtWidgets.QLineEdit()
@@ -469,7 +484,7 @@ class PeakSearchWindow(QtWidgets.QMainWindow):
         self._tableWidget.setFrameShape(QtWidgets.QFrame.Shape.Box)
         self._tableWidget.setFrameShadow(QtWidgets.QFrame.Shadow.Plain)
         self._tableWidget.rowChanged.connect(self._rowChangedSlotHandler)
-        self._tableWidget.itemClicked.connect(self._itemClicked)
+        self._tableWidget.cellClicked.connect(self._cellClicked)
 
     def _createPlotViewBox(self) -> None:
         self._createCoordinateLabel()
@@ -785,7 +800,7 @@ class PeakSearchWindow(QtWidgets.QMainWindow):
             self._peakPlot.addItem(data.peakLine)
         if data.spectrumLine not in self._spectrumPlot.items:
             self._spectrumPlot.addItem(data.spectrumLine)
-        if data.region not in self._peakPlot.items and data.active is False:
+        if self._regionActive and data.region not in self._peakPlot.items:
             self._peakPlot.addItem(data.region)
 
     def _erasePlotData(self, data: datatypes.PlotData) -> None:
@@ -793,12 +808,12 @@ class PeakSearchWindow(QtWidgets.QMainWindow):
             self._peakPlot.removeItem(data.peakLine)
         if data.spectrumLine in self._spectrumPlot.items:
             self._spectrumPlot.removeItem(data.spectrumLine)
-        if data.region in self._peakPlot.items:
+        if self._regionActive and data.region in self._peakPlot.items:
             self._peakPlot.removeItem(data.region)
 
-    @QtCore.pyqtSlot(QtWidgets.QTableWidgetItem)
-    def _itemClicked(self, item: QtWidgets.QTableWidgetItem) -> None:
-        rowId = self._tableWidget.rowIds[item.row()]
+    @QtCore.pyqtSlot(int, int)
+    def _cellClicked(self, row: int, column: int) -> None:
+        rowId = self._tableWidget.rowIds[row]
         data = self._plotDataList[rowId]
         if data.visible:
             self._hoverOverData(data)
@@ -873,8 +888,11 @@ class PeakSearchWindow(QtWidgets.QMainWindow):
 
     def addAnalyse(self, analyse: Analyse) -> None:
         self._analyse = analyse
+        if analyse.classification == "DEF":
+            self._regionAction.setDisabled(True)
 
     def displayAnalyseData(self, analyseDataIndex: int) -> None:
+        # TODO if analyse.classification == "DEF" remove region privileges
         analyseData = self._analyse.data[analyseDataIndex]
         self._peakPlot.clear()
         self._spectrumPlot.clear()
