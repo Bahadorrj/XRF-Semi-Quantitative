@@ -9,7 +9,7 @@ if __name__ == "__main__":
     elementTwoIds = [i for i in range(1, 400)]
     shuffle(elementOneIds)
     shuffle(elementTwoIds)
-    db = getDatabase(resourcePath('../views/fundamentals.db'))
+    db = getDatabase(resourcePath("../views/fundamentals.db"))
     for i, j in zip(elementOneIds, elementTwoIds):
         query = f"""
         INSERT INTO Interferences (element1_id, element2_id, coefficient) 

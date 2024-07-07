@@ -32,7 +32,7 @@ class GuiHandler(QtCore.QObject):
         self.window.hide()
 
     def exitApplication(self):
-        getDatabase(resourcePath('fundamentals.db')).closeConnection()
+        getDatabase(resourcePath("fundamentals.db")).closeConnection()
         if not self.window.isHidden():
             self.window.close()
         logging.info("Application exit")
@@ -45,7 +45,9 @@ class ClientHandler(QtCore.QObject):
     dataLock = threading.Lock()
     commandLock = threading.Lock()
 
-    def __init__(self, conn: socket.socket, guiHandler: GuiHandler, app: QtWidgets.QApplication):
+    def __init__(
+        self, conn: socket.socket, guiHandler: GuiHandler, app: QtWidgets.QApplication
+    ):
         super().__init__()
         self.conn = conn
         self.guiHandler = guiHandler
@@ -75,8 +77,10 @@ class ClientHandler(QtCore.QObject):
                     self.app.exit()
                     break
                 else:
-                    logging.warning(f"There is not any action related to {command}. "
-                                    f"make sure you are sending the correct command.")
+                    logging.warning(
+                        f"There is not any action related to {command}. "
+                        f"make sure you are sending the correct command."
+                    )
         except Exception as e:
             logging.error(f"Error handling client: {e}", exc_info=True)
         finally:

@@ -27,7 +27,7 @@ def main() -> None:
     logging.basicConfig(level=logging.INFO)
     arg = sys.argv
     app = QtWidgets.QApplication(arg)
-    app.setWindowIcon(QtGui.QIcon(paths.resourcePath('CSAN.ico')))
+    app.setWindowIcon(QtGui.QIcon(paths.resourcePath("CSAN.ico")))
     window = PlotWindow()
     # connectServerAndGUI('127.0.0.1', 16000, window, app)
     window.show()

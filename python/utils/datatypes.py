@@ -20,20 +20,16 @@ class AnalyseData:
     y: np.ndarray
 
     def toDict(self) -> dict:
-        return {
-            'condition': self.condition,
-            'x': self.x.tolist(),
-            'y': self.y.tolist()
-        }
+        return {"condition": self.condition, "x": self.x.tolist(), "y": self.y.tolist()}
 
     @classmethod
-    def fromDict(cls, data: dict) -> 'AnalyseData':
-        return cls(data['condition'], np.array(data['x']), np.array(data['y']))
+    def fromDict(cls, data: dict) -> "AnalyseData":
+        return cls(data["condition"], np.array(data["x"]), np.array(data["y"]))
 
     @classmethod
-    def fromList(cls, data: list) -> 'AnalyseData':
+    def fromList(cls, data: list) -> "AnalyseData":
         temp = list()
-        condition = 0
+        condition = None
         for d in data:
             if d.isdigit():
                 temp.append(int(d))
@@ -41,7 +37,7 @@ class AnalyseData:
                 condition = int(d.split()[-1])
         y = np.array(temp)
         x = np.arange(0, y.size, 1)
-        return cls(condition, x, y)
+        return cls(condition, x, y) if condition is not None else None
 
 
 @dataclass
@@ -67,7 +63,7 @@ class Analyse:
         for key, value in kwargs.items():
             setattr(self, key, value)
             if key == "filename":
-                setattr(self, 'name', Path(value).stem)
+                setattr(self, "name", Path(value).stem)
                 setattr(self, "extension", value.split(".")[-1])
 
     def toDict(self) -> dict:
@@ -77,59 +73,70 @@ class Analyse:
             "extension": getattr(self, "extension"),
             "generalData": getattr(self, "generalData"),
             "data": [d.toDict() for d in getattr(self, "data")],
-            "concentrations": getattr(self, "concentrations")
+            "concentrations": getattr(self, "concentrations"),
         }
 
     @classmethod
-    def fromDict(cls, analyseDict: dict) -> 'Analyse':
-        analyseDict['data'] = [AnalyseData.fromDict(dataDict) for dataDict in analyseDict['data']]
+    def fromDict(cls, analyseDict: dict) -> "Analyse":
+        analyseDict["data"] = [
+            AnalyseData.fromDict(dataDict) for dataDict in analyseDict["data"]
+        ]
         return cls(**analyseDict)
 
     @classmethod
-    def fromTextFile(cls, filename: str) -> 'Analyse':
+    def fromTextFile(cls, filename: str) -> "Analyse":
         # TODO change in future
         analyseDict = {}
         data = []
-        with open(filename, 'r') as f:
+        with open(filename, "r") as f:
             lines = list(map(lambda s: s.strip(), f.readlines()))
             start = 0
             stop = 0
             for line in lines:
                 if "<<EndData>>" in line:
                     analyseData = AnalyseData.fromList(lines[start:stop])
-                    start = stop
-                    if analyseData.y.size != 0:
-                        data.append(analyseData)
+                    if analyseData is not None:
+                        start = stop
+                        if analyseData.y.size != 0:
+                            data.append(analyseData)
                 else:
                     stop += 1
         data.sort(key=lambda x: x.condition)
-        analyseDict['data'] = data
-        analyseDict['filename'] = filename
+        analyseDict["data"] = data
+        analyseDict["filename"] = filename
         return cls(**analyseDict)
 
     @classmethod
-    def fromATXFile(cls, filename: str) -> 'Analyse':
+    def fromATXFile(cls, filename: str) -> "Analyse":
         key = encryption.loadKey()
-        with open(filename, 'r') as f:
+        with open(filename, "r") as f:
             encryptedText = f.readline()
             decryptedText = encryption.decryptText(encryptedText, key)
             analyseDict = loads(decryptedText)
         return cls.fromDict(analyseDict)
 
     @classmethod
-    def fromSocket(cls, connection: socket.socket) -> 'Analyse':
+    def fromSocket(cls, connection: socket.socket) -> "Analyse":
         received = ""
         while True:
-            received += connection.recv(10).decode('utf-8')
-            if received[-4:] == 'stp':
+            received += connection.recv(10).decode("utf-8")
+            if received[-4:] == "stp":
                 break
         analyseDict = loads(received)
         return cls.fromDict(analyseDict)
 
 
 class PlotData:
-    def __init__(self, rowId: int, spectrumLine: pg.InfiniteLine, peakLine: pg.InfiniteLine,
-                 region: pg.LinearRegionItem, visible: bool, active: bool, condition: int):
+    def __init__(
+        self,
+        rowId: int,
+        spectrumLine: pg.InfiniteLine,
+        peakLine: pg.InfiniteLine,
+        region: pg.LinearRegionItem,
+        visible: bool,
+        active: bool,
+        condition: int,
+    ):
         self.rowId = rowId
         self.spectrumLine = spectrumLine
         self.peakLine = peakLine
@@ -140,46 +147,46 @@ class PlotData:
 
     def activate(self):
         self.active = True
-        self.peakLine.setPen(pg.mkPen(color=(0, 255, 0, 150), width=2))
-        self.spectrumLine.setPen(pg.mkPen(color=(0, 255, 0, 150), width=2))
+        self.peakLine.pen.setStyle(Qt.PenStyle.SolidLine)
+        self.spectrumLine.pen.setStyle(Qt.PenStyle.SolidLine)
 
     def deactivate(self):
-        # TODO set color based on radiation type
         self.active = False
-        self.peakLine.setPen(pg.mkPen(color=(255, 0, 0, 150), width=2))
-        self.spectrumLine.setPen(pg.mkPen(color=(255, 0, 0, 150), width=2))
+        self.peakLine.pen.setStyle(Qt.PenStyle.DashLine)
+        self.spectrumLine.pen.setStyle(Qt.PenStyle.DashLine)
 
     @classmethod
-    def fromSeries(cls, rowId: int, series: pd.Series) -> 'PlotData':
-        active = bool(series['active'])
+    def fromSeries(cls, rowId: int, series: pd.Series) -> "PlotData":
+        active = bool(series["active"])
         spectrumLine = cls._generateLine(series)
         peakLine = cls._generateLine(series, lineType="peak")
         rng = (
-            calculation.evToPx(float(series['low_kiloelectron_volt'])),
-            calculation.evToPx(float(series['high_kiloelectron_volt']))
+            calculation.evToPx(float(series["low_kiloelectron_volt"])),
+            calculation.evToPx(float(series["high_kiloelectron_volt"])),
         )
-        region = cls._generateRegion(rng, not bool(series['active']))
+        region = cls._generateRegion(rng, not bool(series["active"]))
         try:
-            conditionId = int(series['condition_id'])
+            conditionId = int(series["condition_id"])
         except ValueError:
             conditionId = None
-        return PlotData(rowId, spectrumLine, peakLine, region, False, active, conditionId)
+        return PlotData(
+            rowId, spectrumLine, peakLine, region, False, active, conditionId
+        )
 
     @staticmethod
     def _generateLine(series: pd.Series, lineType: str = "spectrum") -> pg.InfiniteLine:
-        # TODO if kwargs['active'] constant line else dash dot line
-        value = calculation.evToPx(float(series['kiloelectron_volt']))
+        value = calculation.evToPx(float(series["kiloelectron_volt"]))
         line = pg.InfiniteLine()
         line.setAngle(90)
         line.setMovable(False)
         line.setValue(value)
-        active = bool(series['active'])
+        active = bool(series["active"])
         pen = pg.mkPen()
         if active:
             pen.setStyle(Qt.PenStyle.SolidLine)
         else:
             pen.setStyle(Qt.PenStyle.DashLine)
-        radiation = series['radiation_type']
+        radiation = series["radiation_type"]
         match radiation:
             case "Ka":
                 pen.setColor(pg.mkColor("#00FFFF"))
@@ -196,19 +203,19 @@ class PlotData:
         if lineType == "peak":
             pen.setWidth(2)
             pos = 1
-            for label in [radiation, series['symbol']]:
+            for label in [radiation, series["symbol"]]:
                 pos -= 0.1
-                pg.InfLineLabel(
-                    line, text=label, movable=False, position=pos
-                )
+                pg.InfLineLabel(line, text=label, movable=False, position=pos)
         else:
             pen.setWidth(1)
         line.setPen(pen)
         return line
 
     @staticmethod
-    def _generateRegion(rng: Union[list[float, float], tuple[float, float]], movable: bool = True):
-        region = pg.LinearRegionItem(swapMode='push')
+    def _generateRegion(
+        rng: Union[list[float, float], tuple[float, float]], movable: bool = True
+    ):
+        region = pg.LinearRegionItem(swapMode="push")
         region.setZValue(10)
         region.setRegion(rng)
         region.setBounds((0, 2048))

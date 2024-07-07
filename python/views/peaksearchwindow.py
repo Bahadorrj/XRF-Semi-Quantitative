@@ -330,7 +330,9 @@ class PeakSearchWindow(QtWidgets.QMainWindow):
             icon=QtGui.QIcon(resourcePath("icons/undo.png"))
         )
         # self._redoAction = QtGui.QAction(icon=QtGui.QIcon(resource_path("icons/redo.png")))
-        self._regionAction = QtGui.QAction(icon=QtGui.QIcon(resourcePath("icons/brackets.png")))
+        self._regionAction = QtGui.QAction(
+            icon=QtGui.QIcon(resourcePath("icons/brackets.png"))
+        )
         self._regionAction.setCheckable(True)
         self._undoAction.setDisabled(True)
         # self._redoAction.setDisabled(True)
@@ -565,7 +567,7 @@ class PeakSearchWindow(QtWidgets.QMainWindow):
                         self._analyse.data,
                     )
                 )[0].y
-                intensity = y[round(minX):round(maxX)].sum()
+                intensity = y[round(minX) : round(maxX)].sum()
             except IndexError:
                 intensity = "NA"
         self._tableWidget.addRow(data, series["symbol":"active"], intensity)
@@ -596,8 +598,10 @@ class PeakSearchWindow(QtWidgets.QMainWindow):
 
         try:
             conditionId = data.condition
-            y = list(filter(lambda d: d.condition == conditionId, self._analyse.data))[0].y
-            intensity = y[round(minX):round(maxX)].sum()
+            y = list(filter(lambda d: d.condition == conditionId, self._analyse.data))[
+                0
+            ].y
+            intensity = y[round(minX) : round(maxX)].sum()
         except IndexError:
             intensity = "NA"
         row.get(6).setText(str(intensity))
@@ -714,7 +718,7 @@ class PeakSearchWindow(QtWidgets.QMainWindow):
                 y = list(
                     filter(lambda d: d.condition == conditionId, self._analyse.data)
                 )[0].y
-                intensity = y[round(minX): round(maxX)].sum()
+                intensity = y[round(minX) : round(maxX)].sum()
             except IndexError:
                 intensity = "NA"
         else:
@@ -864,7 +868,7 @@ class PeakSearchWindow(QtWidgets.QMainWindow):
             for radiationLabel in self._df["radiation_type"].unique():
                 filteredData = self._elementsInRange[
                     self._elementsInRange["radiation_type"] == radiationLabel
-                    ]
+                ]
                 if not filteredData.empty:
                     menu = self._peakPlot.vb.menu.addMenu(radiationLabel)
                     menu.triggered.connect(self._actionClicked)
@@ -892,7 +896,6 @@ class PeakSearchWindow(QtWidgets.QMainWindow):
             self._regionAction.setDisabled(True)
 
     def displayAnalyseData(self, analyseDataIndex: int) -> None:
-        # TODO if analyse.classification == "DEF" remove region privileges
         analyseData = self._analyse.data[analyseDataIndex]
         self._peakPlot.clear()
         self._spectrumPlot.clear()
@@ -918,8 +921,8 @@ class PeakSearchWindow(QtWidgets.QMainWindow):
 
     def mousePressEvent(self, a0):
         if (
-                not self._searchedElement.geometry().contains(a0.pos())
-                and self._searchedElement.hasFocus()
+            not self._searchedElement.geometry().contains(a0.pos())
+            and self._searchedElement.hasFocus()
         ):
             self._searchedElement.clearFocus()
         return super().mousePressEvent(a0)

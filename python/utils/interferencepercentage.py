@@ -6,14 +6,16 @@ from python.utils.paths import resourcePath
 
 def fill_interferences(database, lines: pd.DataFrame):
     for lineIndex, line in lines.iterrows():
-        interference = ((lines['kiloelectron_volt'] - line['kiloelectron_volt']).abs()).sort_values()
+        interference = (
+            (lines["kiloelectron_volt"] - line["kiloelectron_volt"]).abs()
+        ).sort_values()
         importantInterferences = interference[interference < 0.5]
         for index in importantInterferences.index:
             if index != lineIndex:
                 percentage = round(100 - importantInterferences[index] / 0.5 * 100, 2)
                 if percentage == 0:
                     break
-                query = (f"""
+                query = f"""
                     INSERT INTO Interferences(
                             line1_id,
                             line1_symbol, 
@@ -32,13 +34,13 @@ def fill_interferences(database, lines: pd.DataFrame):
                             '{lines.at[index, 'radiation_type']}', 
                             {percentage}
                         );
-                """)
+                """
                 database.executeQuery(query)
 
 
-if __name__ == '__main__':
-    db = getDatabase(resourcePath('../../fundamentals.db'))
-    df = db.dataframe('SELECT * FROM Lines')
+if __name__ == "__main__":
+    db = getDatabase(resourcePath("../../fundamentals.db"))
+    df = db.dataframe("SELECT * FROM Lines")
     for row in df.itertuples():
         query = f"""
         UPDATE Lines 
