@@ -570,9 +570,47 @@ class PlotWindow(QtWidgets.QMainWindow):
     #         event.accept()
 
     def addCalibration(self, calibration: datatypes.Analyse) -> None:
+        self._addCalibrationToInterferenceTable(calibration)
+
+    def _addCalibrationToCalibrationTable(self, calibration: datatypes.Analyse) -> None:
+        # TODO complete method
         pass
 
-    @cache
+    def _addCalibrationToInterferenceTable(self, calibration: datatypes.Analyse) -> None:
+        # TODO complete method
+        optimalIntensities = self._calculateOptimalIntensities(calibration)
+        query = f"""
+            SELECT line_id, low_kiloelectron_volt, high_kiloelectron_volt, condition_id 
+            FROM Lines 
+            WHERE symbol = '{calibration.name}';
+        """
+        rows = self._db.executeQuery(query).fetchall()
+        for row in rows:
+            calibrationLineId, calibrationLowKev, calibrationHighKev, calibrationConditionId = row
+            if calibrationConditionId is not None:
+                calibrationIntensity = (
+                    optimalIntensities[calibrationConditionId - 1]
+                    [int(calculation.evToPx(calibrationLowKev)):int(calculation.evToPx(calibrationHighKev))]
+                    .sum()
+                )
+                query = """
+                    SELECT line_id, low_kiloelectron_volt, high_kiloelectron_volt
+                    FROM Lines;
+                """
+                columns = self._db.executeQuery(query).fetchall()
+                for column in columns:
+                    interfererLineId, lowKev, highKev = column
+                    intensity = (
+                        optimalIntensities[calibrationConditionId - 1]
+                        [int(calculation.evToPx(lowKev)):int(calculation.evToPx(highKev))]
+                        .sum()
+                    )
+                    query = f"""
+                        INSERT INTO NewInterferences (line1_id, line2_id, coefficient)
+                        VALUES ({calibrationLineId}, {interfererLineId}, {intensity / calibrationIntensity});
+                    """
+                    self._db.executeQuery(query)
+
     def _calculateOptimalIntensities(self, analyse: datatypes.Analyse) -> list:
         optimalIntensities = []
         for data, blank in zip(analyse.data, self._blank.data):
@@ -591,68 +629,3 @@ class PlotWindow(QtWidgets.QMainWindow):
         # Interpolate y values for the smoother plot
         Y = cs(X)
         return X, Y
-
-    def _addCalibrationToCalibrationTable(self, calibration: datatypes.Analyse) -> None:
-        # TODO complete method
-        optimalIntensities = self._calculateOptimalIntensities(calibration)
-        for calibrationSymbol, concentration in calibration.concentrations.items():
-            query = f"""
-                SELECT condition_id, low_kiloelectron_volt, high_kiloelectron_volt
-                FROM Lines
-                WHERE symbol = '{calibrationSymbol}';
-            """
-            rows: list[tuple] = self._db.executeQuery(query).fetchall()
-            for row in rows:
-                conditionId, lowKev, highKev = row
-                if tmp := list(filter(lambda d: d.condition == conditionId, calibration.data)):
-                    data = tmp[0]
-                    intensity = data.y[int(calculation.evToPx(lowKev)):int(calculation.evToPx(highKev))].sum()
-                    query = f"""
-                        INSERT INTO Calibrations (element_id, intensity, concentration, coefficient)
-                        VALUES (
-                            (SELECT element_id FROM Elements WHERE symbol = '{calibrationSymbol}'),
-                            {intensity},
-                            {concentration},
-                            {concentration / intensity}
-                        );
-                    """
-                    self._db.executeQuery(query)
-
-    def _addCalibrationToInterferenceTable(self, calibration: datatypes.Analyse) -> None:
-        # TODO complete method
-        calibrationSymbol = calibration.name
-        query = f"""
-            SELECT line_id, low_kiloelectron_volt, high_kiloelectron_volt, condition_id 
-            FROM Lines 
-            WHERE symbol = '{calibrationSymbol}' AND active = 1;
-        """
-        calibrationLineId, calibrationLowKev, calibrationHighKev, calibrationConditionId = self._db.executeQuery(
-            query
-        ).fetchone()
-        if tmp := list(filter(lambda d: d.condition == calibrationConditionId, calibration.data)):
-            data = tmp[0]
-            calibrationIntensity = (
-                data
-                .y[int(calculation.evToPx(calibrationLowKev)):int(calculation.evToPx(calibrationHighKev))]
-                .sum() - self._blank.data[calibrationConditionId]
-            )
-            for symbol, concentration in calibration.concentrations.items():
-                if symbol != calibrationSymbol:
-                    query = f"""
-                        SELECT line_id, low_kiloelectron_volt, high_kiloelectron_volt 
-                        FROM Lines 
-                        WHERE symbol = '{symbol}';
-                    """
-                    rows = self._db.executeQuery(query).fetchall()
-                    for row in rows:
-                        interfererLineId, lowKev, highKev = row
-                        intensity = (
-                            data
-                            .y[int(calculation.evToPx(lowKev)):int(calculation.evToPx(highKev))]
-                            .sum()
-                        )
-                        query = f"""
-                            INSERT INTO Interferences (line1_id, line2_id, coefficient)
-                            VALUES ({calibrationLineId}, {interfererLineId}, {calibrationIntensity / intensity});
-                        """
-                        self._db.executeQuery(query)
