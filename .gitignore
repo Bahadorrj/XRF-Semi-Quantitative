@@ -360,3 +360,4 @@ fabric.properties
 /VB
 /UML
 *.ui
+*.sql
