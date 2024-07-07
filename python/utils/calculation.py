@@ -7,7 +7,7 @@ A1 = 0.01491
 
 
 def truncate(f, n):
-    return math.floor(f * 10 ** n) / 10 ** n
+    return math.floor(f * 10**n) / 10**n
 
 
 def evToPx(ev: float) -> float:

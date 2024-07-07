@@ -137,7 +137,9 @@ class PlotWindow(QtWidgets.QMainWindow):
         self._analyseFiles = list()
         self._elementsWindow: Optional[ElementsWindow] = None
         self._peakSearchWindow: Optional[PeakSearchWindow] = None
-        self._blank = datatypes.Analyse.fromTextFile("Additional/Pure samples/8 mehr/Blank.txt")
+        self._blank = datatypes.Analyse.fromTextFile(
+            "Additional/Pure samples/8 mehr/Blank.txt"
+        )
         # TODO instantiate interference window
 
     def _createActions(self) -> None:
@@ -167,7 +169,7 @@ class PlotWindow(QtWidgets.QMainWindow):
                 self,
                 "Open File",
                 "./",
-                "Antique'X Spectrum (*.atx);;Text Spectrum (*.txt)"
+                "Antique'X Spectrum (*.atx);;Text Spectrum (*.txt)",
             )
             if fileNames:
                 for fileName in fileNames:
@@ -195,7 +197,7 @@ class PlotWindow(QtWidgets.QMainWindow):
                 self,
                 "Open File",
                 "./",
-                "Antique'X Spectrum (*.atx);;Text Spectrum (*.txt)"
+                "Antique'X Spectrum (*.atx);;Text Spectrum (*.txt)",
             )
             if fileName:
                 analyse = self._constructAnalyseFromFilename(fileName)
@@ -262,16 +264,19 @@ class PlotWindow(QtWidgets.QMainWindow):
             self._setCoordinate(mousePoint.x(), mousePoint.y())
 
     def _setCoordinate(self, x: float, y: float) -> None:
-        self._coordinateLabel.setText(f"""
+        self._coordinateLabel.setText(
+            f"""
             <span style="font-size: 12px; 
                         color: rgb(128, 128, 128);
                         padding: 5px;
                         letter-spacing: 2px">x= {round(x, 2)} y= {round(y, 2)}</span>
-        """)
+        """
+        )
 
     def _createTreeWidget(self) -> None:
         self._treeWidget = QtWidgets.QTreeWidget()
-        self._treeWidget.setStyleSheet("""
+        self._treeWidget.setStyleSheet(
+            """
             QTreeView {
                 show-decoration-selected: 1;
             }
@@ -326,11 +331,12 @@ class PlotWindow(QtWidgets.QMainWindow):
                 border-image: none;
                 image: url(icons/branch-open.png);
             }
-        """)
+        """
+        )
         self._treeWidget.setColumnCount(2)
         self._treeWidget.setHeaderLabels(["File", "Color"])
         header = self._treeWidget.header()
-        headerFont = QtGui.QFont('Segoe UI', 13, QtGui.QFont.Weight.Bold)
+        headerFont = QtGui.QFont("Segoe UI", 13, QtGui.QFont.Weight.Bold)
         header.setFont(headerFont)
         header.setDefaultAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
         self._treeWidget.setFrameShape(QtWidgets.QFrame.Shape.Box)
@@ -348,7 +354,7 @@ class PlotWindow(QtWidgets.QMainWindow):
         self._treeWidget.itemClicked.connect(self._togglePeakSearchAction)
 
     def _fillTreeWidget(self) -> None:
-        font = QtGui.QFont('Segoe UI', 12)
+        font = QtGui.QFont("Segoe UI", 12)
         items = ["Text Files", "Antique'X Files", "Packet Files"]
         for label in items:
             item = QtWidgets.QTreeWidgetItem(self._treeWidget)
@@ -399,7 +405,7 @@ class PlotWindow(QtWidgets.QMainWindow):
                 self,
                 "Open File",
                 "./",
-                "Antique'X Spectrum (*.atx);;Text Spectrum (*.txt)"
+                "Antique'X Spectrum (*.atx);;Text Spectrum (*.txt)",
             )
             return fileName
         return ""
@@ -418,7 +424,7 @@ class PlotWindow(QtWidgets.QMainWindow):
             messageBox.setStandardButtons(QtWidgets.QMessageBox.StandardButton.Ok)
             messageBox.show()
 
-    def _constructAnalyseFromFilename(self, filename: str) -> datatypes.Analyse:
+    def _constructAnalyseFromFilename(self, filename: str) -> datatypes.Analyse | None:
         extension = filename[-4:]
         analyse: Optional[datatypes.Analyse] = None
         if extension == ".txt":
@@ -435,13 +441,17 @@ class PlotWindow(QtWidgets.QMainWindow):
             self._actionsMap["new"].setDisabled(False)
 
     def _addAnalyseToTree(self, analyse: datatypes.Analyse) -> None:
-        font = QtGui.QFont('Segoe UI', 11)
+        font = QtGui.QFont("Segoe UI", 11)
         font.setItalic(True)
         item = QtWidgets.QTreeWidgetItem()
         item.setCheckState(0, QtCore.Qt.CheckState.Unchecked)
         item.setText(0, analyse.name)
         item.setFont(0, font)
-        item.setFlags(item.flags() | QtCore.Qt.ItemFlag.ItemIsAutoTristate | QtCore.Qt.ItemFlag.ItemIsUserCheckable)
+        item.setFlags(
+            item.flags()
+            | QtCore.Qt.ItemFlag.ItemIsAutoTristate
+            | QtCore.Qt.ItemFlag.ItemIsUserCheckable
+        )
         for index, data in enumerate(analyse.data):
             child = QtWidgets.QTreeWidgetItem()
             child.setText(0, f"Condition {data.condition}")
@@ -504,13 +514,13 @@ class PlotWindow(QtWidgets.QMainWindow):
 
     @cache
     def _getDataFromIndex(
-            self, extensionIndex: int, analyseIndex: int, dataIndex: int
+        self, extensionIndex: int, analyseIndex: int, dataIndex: int
     ) -> datatypes.AnalyseData:
         return self._getAnalyseFromIndex(extensionIndex, analyseIndex).data[dataIndex]
 
     @cache
     def _getAnalyseFromIndex(
-            self, extensionIndex: int, analyseIndex: int
+        self, extensionIndex: int, analyseIndex: int
     ) -> datatypes.Analyse:
         mapper = {0: "txt", 1: "atx"}
         analyse = list(
@@ -576,7 +586,9 @@ class PlotWindow(QtWidgets.QMainWindow):
         # TODO complete method
         pass
 
-    def _addCalibrationToInterferenceTable(self, calibration: datatypes.Analyse) -> None:
+    def _addCalibrationToInterferenceTable(
+        self, calibration: datatypes.Analyse
+    ) -> None:
         # TODO complete method
         optimalIntensities = self._calculateOptimalIntensities(calibration)
         query = f"""
@@ -586,13 +598,18 @@ class PlotWindow(QtWidgets.QMainWindow):
         """
         rows = self._db.executeQuery(query).fetchall()
         for row in rows:
-            calibrationLineId, calibrationLowKev, calibrationHighKev, calibrationConditionId = row
+            (
+                calibrationLineId,
+                calibrationLowKev,
+                calibrationHighKev,
+                calibrationConditionId,
+            ) = row
             if calibrationConditionId is not None:
-                calibrationIntensity = (
-                    optimalIntensities[calibrationConditionId - 1]
-                    [int(calculation.evToPx(calibrationLowKev)):int(calculation.evToPx(calibrationHighKev))]
-                    .sum()
-                )
+                calibrationIntensity = optimalIntensities[calibrationConditionId - 1][
+                    int(calculation.evToPx(calibrationLowKev)) : int(
+                        calculation.evToPx(calibrationHighKev)
+                    )
+                ].sum()
                 query = """
                     SELECT line_id, low_kiloelectron_volt, high_kiloelectron_volt
                     FROM Lines;
@@ -600,11 +617,11 @@ class PlotWindow(QtWidgets.QMainWindow):
                 columns = self._db.executeQuery(query).fetchall()
                 for column in columns:
                     interfererLineId, lowKev, highKev = column
-                    intensity = (
-                        optimalIntensities[calibrationConditionId - 1]
-                        [int(calculation.evToPx(lowKev)):int(calculation.evToPx(highKev))]
-                        .sum()
-                    )
+                    intensity = optimalIntensities[calibrationConditionId - 1][
+                        int(calculation.evToPx(lowKev)) : int(
+                            calculation.evToPx(highKev)
+                        )
+                    ].sum()
                     query = f"""
                         INSERT INTO NewInterferences (line1_id, line2_id, coefficient)
                         VALUES ({calibrationLineId}, {interfererLineId}, {intensity / calibrationIntensity});
@@ -622,7 +639,9 @@ class PlotWindow(QtWidgets.QMainWindow):
         return optimalIntensities
 
     @staticmethod
-    def _smooth(x: np.ndarray, y: np.ndarray, level: float) -> tuple[np.ndarray, np.ndarray]:
+    def _smooth(
+        x: np.ndarray, y: np.ndarray, level: float
+    ) -> tuple[np.ndarray, np.ndarray]:
         cs = CubicSpline(x, y)
         # Generate finer x values for smoother plot
         X = np.linspace(0, x.size, int(x.size / level))

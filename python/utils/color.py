@@ -5,7 +5,7 @@ def interpolateColor(color1, color2, factor: float) -> tuple:
 
 def rgbToHex(rgb: tuple) -> str:
     """Convert an RGB color to a hex string."""
-    return '#{:02x}{:02x}{:02x}'.format(*rgb)
+    return "#{:02x}{:02x}{:02x}".format(*rgb)
 
 
 def generateGradiant(size: int) -> list:

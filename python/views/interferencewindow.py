@@ -13,7 +13,8 @@ from python.utils.paths import resourcePath
 class RadiationComboBox(QtWidgets.QComboBox):
     def __init__(self, parent=None):
         super(RadiationComboBox, self).__init__(parent)
-        self.setStyleSheet("""
+        self.setStyleSheet(
+            """
             QComboBox {
                 border: 1px solid gray;
                 border-radius: 3px;
@@ -41,7 +42,8 @@ class RadiationComboBox(QtWidgets.QComboBox):
                 selection-background-color: lightgray;
                 background-color: lightblue; /* Custom background color for the drop-down menu */
             }
-        """)
+        """
+        )
 
 
 class InterferenceTableWidget(QtWidgets.QTableWidget):
@@ -58,17 +60,18 @@ class InterferenceTableWidget(QtWidgets.QTableWidget):
             QHeaderView::section {
                 padding: 3px;  /* Adjust padding value as needed */
             }
-            """)
+            """
+        )
 
 
 class InterferenceWindow(QtWidgets.QMainWindow):
     def __init__(self, parent=None) -> None:
         super(InterferenceWindow, self).__init__(parent)
-        self._db = getDatabase(resourcePath('fundamentals.db'))
-        self._interferenceDf = self._db.dataframe('SELECT * FROM Interferences')
+        self._db = getDatabase(resourcePath("fundamentals.db"))
+        self._interferenceDf = self._db.dataframe("SELECT * FROM Interferences")
         self._initialInterferenceDf = self._interferenceDf.copy()
-        self._linesDf = self._db.dataframe('SELECT * FROM Lines')
-        self._symbols = self._linesDf['symbol'].unique().tolist()
+        self._linesDf = self._db.dataframe("SELECT * FROM Lines")
+        self._symbols = self._linesDf["symbol"].unique().tolist()
         self.resize(1200, 800)
         self._mainLayout = QtWidgets.QGridLayout()
         # self._createIndexFinderLayout()
@@ -87,8 +90,12 @@ class InterferenceWindow(QtWidgets.QMainWindow):
         self._tableWidget.setRowCount(len(vHeader))
         self._tableWidget.setVerticalHeaderLabels(vHeader)
         self._fillTable()
-        self._tableWidget.horizontalHeader().setSectionResizeMode(QtWidgets.QHeaderView.ResizeMode.ResizeToContents)
-        self._tableWidget.verticalHeader().setSectionResizeMode(QtWidgets.QHeaderView.ResizeMode.ResizeToContents)
+        self._tableWidget.horizontalHeader().setSectionResizeMode(
+            QtWidgets.QHeaderView.ResizeMode.ResizeToContents
+        )
+        self._tableWidget.verticalHeader().setSectionResizeMode(
+            QtWidgets.QHeaderView.ResizeMode.ResizeToContents
+        )
         self._tableWidget.setCurrentCell(0, 0)
         self._mainLayout.addWidget(self._tableWidget, 0, 1, 5, 1)
         self._tableWidget.cellChanged.connect(self._cellChanged)
@@ -175,7 +182,9 @@ class InterferenceWindow(QtWidgets.QMainWindow):
         label.setText("Element:")
         horizontalLayout.addWidget(label)
         self._elementSymbol = QtWidgets.QLineEdit()
-        self._elementSymbol.setSizePolicy(QtWidgets.QSizePolicy.Policy.Fixed, QtWidgets.QSizePolicy.Policy.Fixed)
+        self._elementSymbol.setSizePolicy(
+            QtWidgets.QSizePolicy.Policy.Fixed, QtWidgets.QSizePolicy.Policy.Fixed
+        )
         horizontalLayout.addWidget(self._elementSymbol)
         self._elementRadiation = QtWidgets.QComboBox()
         horizontalLayout.addWidget(self._elementRadiation)
@@ -189,7 +198,9 @@ class InterferenceWindow(QtWidgets.QMainWindow):
         if elementSymbol in self._symbols:
             index = self._symbols.index(elementSymbol)
             if self._tableWidget.currentColumn() != 0:
-                self._tableWidget.setCurrentCell(index, self._tableWidget.currentColumn())
+                self._tableWidget.setCurrentCell(
+                    index, self._tableWidget.currentColumn()
+                )
             else:
                 self._tableWidget.selectRow(index)
             self._elementRadiation.blockSignals(True)
@@ -207,7 +218,9 @@ class InterferenceWindow(QtWidgets.QMainWindow):
         elementSymbol = self._elementSymbol.text()
         self._vComboBoxMap[elementSymbol].setCurrentText(radiation)
         if self._tableWidget.currentColumn() != 0:
-            self._tableWidget.setCurrentCell(self._tableWidget.currentRow(), self._tableWidget.currentColumn())
+            self._tableWidget.setCurrentCell(
+                self._tableWidget.currentRow(), self._tableWidget.currentColumn()
+            )
         else:
             self._tableWidget.selectRow(self._tableWidget.currentRow())
         self._changeElementInterferenceTable()
@@ -240,13 +253,17 @@ class InterferenceWindow(QtWidgets.QMainWindow):
         label.setText("Interferer:")
         horizontalLayout.addWidget(label)
         self._interfererSymbol = QtWidgets.QLineEdit()
-        self._interfererSymbol.setSizePolicy(QtWidgets.QSizePolicy.Policy.Fixed, QtWidgets.QSizePolicy.Policy.Fixed)
+        self._interfererSymbol.setSizePolicy(
+            QtWidgets.QSizePolicy.Policy.Fixed, QtWidgets.QSizePolicy.Policy.Fixed
+        )
         horizontalLayout.addWidget(self._interfererSymbol)
         self._interfererRadiation = QtWidgets.QComboBox()
         horizontalLayout.addWidget(self._interfererRadiation)
         self._mainLayout.addLayout(horizontalLayout, 3, 0, 1, 1)
         self._interfererSymbol.editingFinished.connect(self._interfererSelected)
-        self._interfererRadiation.currentTextChanged.connect(self._interfererRadiationChanged)
+        self._interfererRadiation.currentTextChanged.connect(
+            self._interfererRadiationChanged
+        )
 
     @QtCore.pyqtSlot()
     def _interfererSelected(self):
@@ -272,14 +289,18 @@ class InterferenceWindow(QtWidgets.QMainWindow):
         interfererSymbol = self._interfererSymbol.text()
         self._hComboBoxMap[interfererSymbol].setCurrentText(radiation)
         if self._tableWidget.currentRow() != 0:
-            self._tableWidget.setCurrentCell(self._tableWidget.currentRow(), self._tableWidget.currentColumn())
+            self._tableWidget.setCurrentCell(
+                self._tableWidget.currentRow(), self._tableWidget.currentColumn()
+            )
         else:
             self._tableWidget.selectColumn(self._tableWidget.currentColumn())
         self._changeInterfererInterferenceTable()
 
     def _changeInterfererInterferenceTable(self):
-        df = self._interferenceDf.query(f"line1_symbol == '{self._interfererSymbol.text()}' "
-                                        f"and line1_radiation_type == '{self._interfererRadiation.currentText()}'")
+        df = self._interferenceDf.query(
+            f"line1_symbol == '{self._interfererSymbol.text()}' "
+            f"and line1_radiation_type == '{self._interfererRadiation.currentText()}'"
+        )
         colors = generateGradiant(df.shape[0])
         self._interfererInterferenceTable.setRowCount(0)
         for rowIndex, row in enumerate(df.itertuples()):
@@ -304,7 +325,9 @@ class InterferenceWindow(QtWidgets.QMainWindow):
         self._elementInterferenceTable.horizontalHeader().setSectionResizeMode(
             QtWidgets.QHeaderView.ResizeMode.Stretch
         )
-        self._elementInterferenceTable.setEditTriggers(QtWidgets.QAbstractItemView.EditTrigger.NoEditTriggers)
+        self._elementInterferenceTable.setEditTriggers(
+            QtWidgets.QAbstractItemView.EditTrigger.NoEditTriggers
+        )
         self._elementInterferenceTable.setFrameShape(QtWidgets.QFrame.Shape.Box)
         self._elementInterferenceTable.setFrameShadow(QtWidgets.QFrame.Shadow.Plain)
         self._mainLayout.addWidget(self._elementInterferenceTable, 2, 0, 1, 1)
@@ -326,7 +349,9 @@ class InterferenceWindow(QtWidgets.QMainWindow):
         self._interfererInterferenceTable.horizontalHeader().setSectionResizeMode(
             QtWidgets.QHeaderView.ResizeMode.Stretch
         )
-        self._interfererInterferenceTable.setEditTriggers(QtWidgets.QAbstractItemView.EditTrigger.NoEditTriggers)
+        self._interfererInterferenceTable.setEditTriggers(
+            QtWidgets.QAbstractItemView.EditTrigger.NoEditTriggers
+        )
         self._interfererInterferenceTable.setFrameShape(QtWidgets.QFrame.Shape.Box)
         self._interfererInterferenceTable.setFrameShadow(QtWidgets.QFrame.Shadow.Plain)
         self._mainLayout.addWidget(self._interfererInterferenceTable, 4, 0, 1, 1)
@@ -344,10 +369,10 @@ class InterferenceWindow(QtWidgets.QMainWindow):
         try:
             coefficient = float(self._tableWidget.item(row, column).text())
         except ValueError:
-            self._tableWidget.item(row, column).setText('')
+            self._tableWidget.item(row, column).setText("")
             return
         if coefficient > 1:
-            self._tableWidget.item(row, column).setText('')
+            self._tableWidget.item(row, column).setText("")
             return
         self._plotCoefficient(coefficient)
         elementSymbol = self._symbols[row]
@@ -356,46 +381,55 @@ class InterferenceWindow(QtWidgets.QMainWindow):
         interfererRadiation = self._tableWidget.cellWidget(0, column).currentText()
         elementId = self._linesDf.query(
             f"symbol == '{elementSymbol}' and radiation_type == '{elementRadiation}'"
-        )['line_id'].values[0]
+        )["line_id"].values[0]
         interfererId = self._linesDf.query(
             f"symbol == '{interfererSymbol}' and radiation_type == '{interfererRadiation}'"
-        )['line_id'].values[0]
+        )["line_id"].values[0]
         df = self._interferenceDf.query(
             f"(line1_id == {elementId} and line2_id == {interfererId}) \
             or (line1_id == {interfererId} and line2_id == {elementId})"
         )
         if df.empty:
             interferenceId = self._interferenceDf.iloc[-1, 0] + 1
-            df2 = pd.DataFrame({
-                'interference_id': [interferenceId],
-                'line1_id': [elementId],
-                'line1_symbol': [elementSymbol],
-                'line1_radiation_type': [elementRadiation],
-                'line2_id': [interferenceId],
-                'line2_symbol': [interfererSymbol],
-                'line2_radiation_type': [interfererRadiation],
-                'percentage': [0.0],
-                'coefficient': [coefficient],
-                'active': [0]
-            })
-            df1 = pd.DataFrame({
-                'interference_id': [interferenceId],
-                'line1_id': [interferenceId],
-                'line1_symbol': [interfererSymbol],
-                'line1_radiation_type': [interfererRadiation],
-                'line2_id': [elementId],
-                'line2_symbol': [elementSymbol],
-                'line2_radiation_type': [elementRadiation],
-                'percentage': [0.0],
-                'coefficient': [coefficient],
-                'active': [0]
-            })
-            self._interferenceDf = pd.concat([self._interferenceDf, df1, df2], ignore_index=True)
+            df2 = pd.DataFrame(
+                {
+                    "interference_id": [interferenceId],
+                    "line1_id": [elementId],
+                    "line1_symbol": [elementSymbol],
+                    "line1_radiation_type": [elementRadiation],
+                    "line2_id": [interferenceId],
+                    "line2_symbol": [interfererSymbol],
+                    "line2_radiation_type": [interfererRadiation],
+                    "percentage": [0.0],
+                    "coefficient": [coefficient],
+                    "active": [0],
+                }
+            )
+            df1 = pd.DataFrame(
+                {
+                    "interference_id": [interferenceId],
+                    "line1_id": [interferenceId],
+                    "line1_symbol": [interfererSymbol],
+                    "line1_radiation_type": [interfererRadiation],
+                    "line2_id": [elementId],
+                    "line2_symbol": [elementSymbol],
+                    "line2_radiation_type": [elementRadiation],
+                    "percentage": [0.0],
+                    "coefficient": [coefficient],
+                    "active": [0],
+                }
+            )
+            self._interferenceDf = pd.concat(
+                [self._interferenceDf, df1, df2], ignore_index=True
+            )
         else:
             for index in df.index:
-                self._interferenceDf.at[index, 'coefficient'] = coefficient
-        if self._hComboBoxMap[elementSymbol].currentText() == elementRadiation and \
-                self._vComboBoxMap[interfererSymbol].currentText() == interfererRadiation:
+                self._interferenceDf.at[index, "coefficient"] = coefficient
+        if (
+            self._hComboBoxMap[elementSymbol].currentText() == elementRadiation
+            and self._vComboBoxMap[interfererSymbol].currentText()
+            == interfererRadiation
+        ):
             rowIndex = self._symbols.index(interfererSymbol)
             columnIndex = self._symbols.index(elementSymbol)
             item = self._tableWidget.item(rowIndex, columnIndex)
@@ -409,25 +443,31 @@ class InterferenceWindow(QtWidgets.QMainWindow):
             self._plotWidget.clear()
         self._elementSymbol.setText(self._symbols[row])
         self._elementSelected()
-        self._elementRadiation.setCurrentIndex(self._tableWidget.cellWidget(row, 0).currentIndex())
+        self._elementRadiation.setCurrentIndex(
+            self._tableWidget.cellWidget(row, 0).currentIndex()
+        )
         self._interfererSymbol.setText(self._symbols[column])
         self._interfererSelected()
-        self._interfererRadiation.setCurrentIndex(self._tableWidget.cellWidget(0, column).currentIndex())
+        self._interfererRadiation.setCurrentIndex(
+            self._tableWidget.cellWidget(0, column).currentIndex()
+        )
 
     def _plotCoefficient(self, coefficient: float) -> None:
         self._plotWidget.clear()
         y = np.linspace(0, 1, 100)
         x = np.linspace(0, 100 / coefficient, 100)
-        self._plotWidget.plot(x, y, pen=pg.mkPen(width=1, color='b'))
+        self._plotWidget.plot(x, y, pen=pg.mkPen(width=1, color="b"))
 
     def closeEvent(self, a0):
         a0.accept()
         self._saveToDatabase()
 
     def _saveToDatabase(self) -> None:
-        df = self._interferenceDf[self._interferenceDf['coefficient'].notna()]
+        df = self._interferenceDf[self._interferenceDf["coefficient"].notna()]
         for row in df.itertuples():
-            availableDf = self._initialInterferenceDf.query(f"interference_id == {row.interference_id}")
+            availableDf = self._initialInterferenceDf.query(
+                f"interference_id == {row.interference_id}"
+            )
             if availableDf.empty:
                 query = f"""
                     INSERT INTO Interferences (

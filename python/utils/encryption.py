@@ -10,12 +10,12 @@ def generateKeyToFile() -> None:
     # Save the key to a file
     # write to file and truncate it
     # binary mode
-    with open('secret.key', 'wb') as f:
+    with open("secret.key", "wb") as f:
         f.write(key)
 
 
 def loadKey() -> bytes:
-    with open(paths.resourcePath('secret.key'), 'rb') as f:
+    with open(paths.resourcePath("secret.key"), "rb") as f:
         return f.read()
 
 
