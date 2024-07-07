@@ -33,7 +33,7 @@ class AnalyseData:
     @classmethod
     def fromList(cls, data: list) -> 'AnalyseData':
         temp = list()
-        condition = 0
+        condition = None
         for d in data:
             if d.isdigit():
                 temp.append(int(d))
@@ -41,7 +41,7 @@ class AnalyseData:
                 condition = int(d.split()[-1])
         y = np.array(temp)
         x = np.arange(0, y.size, 1)
-        return cls(condition, x, y)
+        return cls(condition, x, y) if condition is not None else None
 
 
 @dataclass
@@ -97,9 +97,10 @@ class Analyse:
             for line in lines:
                 if "<<EndData>>" in line:
                     analyseData = AnalyseData.fromList(lines[start:stop])
-                    start = stop
-                    if analyseData.y.size != 0:
-                        data.append(analyseData)
+                    if analyseData is not None:
+                        start = stop
+                        if analyseData.y.size != 0:
+                            data.append(analyseData)
                 else:
                     stop += 1
         data.sort(key=lambda x: x.condition)
@@ -140,14 +141,13 @@ class PlotData:
 
     def activate(self):
         self.active = True
-        self.peakLine.setPen(pg.mkPen(color=(0, 255, 0, 150), width=2))
-        self.spectrumLine.setPen(pg.mkPen(color=(0, 255, 0, 150), width=2))
+        self.peakLine.pen.setStyle(Qt.PenStyle.SolidLine)
+        self.spectrumLine.pen.setStyle(Qt.PenStyle.SolidLine)
 
     def deactivate(self):
-        # TODO set color based on radiation type
         self.active = False
-        self.peakLine.setPen(pg.mkPen(color=(255, 0, 0, 150), width=2))
-        self.spectrumLine.setPen(pg.mkPen(color=(255, 0, 0, 150), width=2))
+        self.peakLine.pen.setStyle(Qt.PenStyle.DashLine)
+        self.spectrumLine.pen.setStyle(Qt.PenStyle.DashLine)
 
     @classmethod
     def fromSeries(cls, rowId: int, series: pd.Series) -> 'PlotData':
@@ -167,7 +167,6 @@ class PlotData:
 
     @staticmethod
     def _generateLine(series: pd.Series, lineType: str = "spectrum") -> pg.InfiniteLine:
-        # TODO if kwargs['active'] constant line else dash dot line
         value = calculation.evToPx(float(series['kiloelectron_volt']))
         line = pg.InfiniteLine()
         line.setAngle(90)

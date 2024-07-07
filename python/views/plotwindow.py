@@ -1,10 +1,12 @@
-from functools import partial
+from functools import partial, cache
 from json import dumps
 from typing import Optional
 
 import numpy as np
 import pyqtgraph as pg
 from PyQt6 import QtCore, QtGui, QtWidgets
+from scipy.interpolate import CubicSpline
+from scipy.signal import find_peaks
 
 from python.utils import calculation, datatypes
 from python.utils import encryption
@@ -135,11 +137,8 @@ class PlotWindow(QtWidgets.QMainWindow):
         self._analyseFiles = list()
         self._elementsWindow: Optional[ElementsWindow] = None
         self._peakSearchWindow: Optional[PeakSearchWindow] = None
+        self._blank = datatypes.Analyse.fromTextFile("Additional/Pure samples/8 mehr/Blank.txt")
         # TODO instantiate interference window
-
-        # self.addAnalyse(
-        #     datatypes.Analyse.fromTextFile(r"F:\CSAN\XRF-Semi-Quantitative\Additional\Pure samples\8 Mehr\Au.txt")
-        # )
 
     def _createActions(self) -> None:
         self._actionsMap = {}
@@ -162,7 +161,7 @@ class PlotWindow(QtWidgets.QMainWindow):
             action.triggered.connect(partial(self._actionTriggered, key))
 
     @QtCore.pyqtSlot()
-    def _actionTriggered(self, key: str):
+    def _actionTriggered(self, key: str) -> None:
         if key == "open":
             fileNames, filters = QtWidgets.QFileDialog.getOpenFileNames(
                 self,
@@ -179,14 +178,9 @@ class PlotWindow(QtWidgets.QMainWindow):
                     self._treeWidget.expandItem(topLevelItem)
         elif key == "save-as":
             # TODO
-            # selectedPaths = self._getFileNameFromDialog(
-            #     QtWidgets.QFileDialog.AcceptMode.AcceptOpen
-            # )
-            # if selectedPaths is not None:
-            #     for path in selectedPaths:
-            #         self.saveFile(path)
             fileName = self._getSaveFileName()
-            self.saveFile(fileName)
+            if fileName:
+                self.saveFile(fileName)
         elif key == "new":
             self.resetWindow()
         elif key == "close":
@@ -197,17 +191,16 @@ class PlotWindow(QtWidgets.QMainWindow):
         elif key == "peak-search":
             self._showPeakSearchWindow()
         elif key == "add-calibration":
-            fileNames, filters = QtWidgets.QFileDialog.getOpenFileNames(
+            fileName, filters = QtWidgets.QFileDialog.getOpenFileName(
                 self,
                 "Open File",
                 "./",
                 "Antique'X Spectrum (*.atx);;Text Spectrum (*.txt)"
             )
-            if fileNames:
-                for fileName in fileNames:
-                    analyse = self._constructAnalyseFromFilename(fileName)
-                    if analyse.classification == "CAL":
-                        self.addCalibration(analyse)
+            if fileName:
+                analyse = self._constructAnalyseFromFilename(fileName)
+                analyse.classification = "CAL"
+                self.addCalibration(analyse)
 
     def _createMenus(self) -> None:
         self._menusMap = {}
@@ -364,13 +357,13 @@ class PlotWindow(QtWidgets.QMainWindow):
             self._treeWidget.addTopLevelItem(item)
 
     @QtCore.pyqtSlot(QtWidgets.QTreeWidgetItem)
-    def _togglePeakSearchAction(self, item: QtWidgets.QTreeWidgetItem):
+    def _togglePeakSearchAction(self, item: QtWidgets.QTreeWidgetItem) -> None:
         if "condition" in item.text(0).lower():
             self._actionsMap["peak-search"].setDisabled(False)
         else:
             self._actionsMap["peak-search"].setDisabled(True)
 
-    def _createListWidget(self):
+    def _createListWidget(self) -> None:
         self._formWidget = ConditionForm(self)
 
     def _createCoordinateLabel(self) -> None:
@@ -409,6 +402,7 @@ class PlotWindow(QtWidgets.QMainWindow):
                 "Antique'X Spectrum (*.atx);;Text Spectrum (*.txt)"
             )
             return fileName
+        return ""
 
     def _addAnalyseFromFileName(self, filename: str) -> None:
         analyse = self._constructAnalyseFromFilename(filename)
@@ -461,7 +455,7 @@ class PlotWindow(QtWidgets.QMainWindow):
         mapper = {"txt": 0, "atx": 1}
         self._treeWidget.topLevelItem(mapper[analyse.extension]).addChild(item)
 
-    def resetWindow(self):
+    def resetWindow(self) -> None:
         messageBox = QtWidgets.QMessageBox(self)
         messageBox.setWindowTitle("Reset window")
         messageBox.setText("This will clear all added files.\nDo you want to continue?")
@@ -508,11 +502,13 @@ class PlotWindow(QtWidgets.QMainWindow):
                 self._setPlotLimits(maxIntensity)
             self._plot(x, y, pg.mkPen(color=color, width=2))
 
+    @cache
     def _getDataFromIndex(
             self, extensionIndex: int, analyseIndex: int, dataIndex: int
     ) -> datatypes.AnalyseData:
         return self._getAnalyseFromIndex(extensionIndex, analyseIndex).data[dataIndex]
 
+    @cache
     def _getAnalyseFromIndex(
             self, extensionIndex: int, analyseIndex: int
     ) -> datatypes.Analyse:
@@ -533,7 +529,7 @@ class PlotWindow(QtWidgets.QMainWindow):
         self._plotWidget.plot(x, y, pen=pen)
 
     def saveFile(self, filename: str) -> None:
-        analyse = self._constructAnalyseFromFilename(filename)
+        analyse = self._analyseFiles[self._indexOfFile]
         if filename.endswith(".atx"):
             key = encryption.loadKey()
             with open(filename, "wb") as f:
@@ -541,7 +537,6 @@ class PlotWindow(QtWidgets.QMainWindow):
                 encryptedText = encryption.encryptText(jsonText, key)
                 f.write(encryptedText + b"\n")
         elif filename.endswith(".txt"):
-            analyse.extension = "txt"
             with open(filename, "w") as f:
                 for data in analyse.data:
                     f.write("<<Data>>\n")
@@ -550,7 +545,7 @@ class PlotWindow(QtWidgets.QMainWindow):
                     for i in data.y:
                         f.write(str(i) + "\n")
 
-    def _showPeakSearchWindow(self):
+    def _showPeakSearchWindow(self) -> None:
         self._peakSearchWindow = PeakSearchWindow()
         dataItem = self._treeWidget.currentItem()
         analyseItem = dataItem.parent()
@@ -575,14 +570,31 @@ class PlotWindow(QtWidgets.QMainWindow):
     #         event.accept()
 
     def addCalibration(self, calibration: datatypes.Analyse) -> None:
-        # TODO fill Calibrations and Interferences tables
-        # TODO auto save?
-        # self._addCalibrationToCalibrationTable(calibration)
-        # self._addCalibrationToInterferenceTable(calibration)
         pass
+
+    @cache
+    def _calculateOptimalIntensities(self, analyse: datatypes.Analyse) -> list:
+        optimalIntensities = []
+        for data, blank in zip(analyse.data, self._blank.data):
+            xSmooth, ySmooth = self._smooth(data.x, data.y, 2.5)
+            peaks, _ = find_peaks(-ySmooth)
+            regressionCurve = np.interp(data.x, xSmooth[peaks], ySmooth[peaks])
+            y = (data.y - blank.y - regressionCurve).clip(min=0)
+            optimalIntensities.append(y)
+        return optimalIntensities
+
+    @staticmethod
+    def _smooth(x: np.ndarray, y: np.ndarray, level: float) -> tuple[np.ndarray, np.ndarray]:
+        cs = CubicSpline(x, y)
+        # Generate finer x values for smoother plot
+        X = np.linspace(0, x.size, int(x.size / level))
+        # Interpolate y values for the smoother plot
+        Y = cs(X)
+        return X, Y
 
     def _addCalibrationToCalibrationTable(self, calibration: datatypes.Analyse) -> None:
         # TODO complete method
+        optimalIntensities = self._calculateOptimalIntensities(calibration)
         for calibrationSymbol, concentration in calibration.concentrations.items():
             query = f"""
                 SELECT condition_id, low_kiloelectron_volt, high_kiloelectron_volt
@@ -594,17 +606,14 @@ class PlotWindow(QtWidgets.QMainWindow):
                 conditionId, lowKev, highKev = row
                 if tmp := list(filter(lambda d: d.condition == conditionId, calibration.data)):
                     data = tmp[0]
-                    intensity = (
-                        data
-                        .y[int(calculation.evToPx(lowKev)):int(calculation.evToPx(highKev))]
-                        .sum()
-                    )
+                    intensity = data.y[int(calculation.evToPx(lowKev)):int(calculation.evToPx(highKev))].sum()
                     query = f"""
-                        INSERT INTO Calibrations (element_id, intensity, concentration)
+                        INSERT INTO Calibrations (element_id, intensity, concentration, coefficient)
                         VALUES (
                             (SELECT element_id FROM Elements WHERE symbol = '{calibrationSymbol}'),
                             {intensity},
-                            {concentration}
+                            {concentration},
+                            {concentration / intensity}
                         );
                     """
                     self._db.executeQuery(query)
@@ -625,7 +634,7 @@ class PlotWindow(QtWidgets.QMainWindow):
             calibrationIntensity = (
                 data
                 .y[int(calculation.evToPx(calibrationLowKev)):int(calculation.evToPx(calibrationHighKev))]
-                .sum()
+                .sum() - self._blank.data[calibrationConditionId]
             )
             for symbol, concentration in calibration.concentrations.items():
                 if symbol != calibrationSymbol:
