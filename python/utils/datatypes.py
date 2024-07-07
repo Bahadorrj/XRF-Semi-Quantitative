@@ -158,7 +158,7 @@ class PlotData:
             calculation.evToPx(float(series['low_kiloelectron_volt'])),
             calculation.evToPx(float(series['high_kiloelectron_volt']))
         )
-        region = cls._generateRegion(rng)
+        region = cls._generateRegion(rng, not bool(series['active']))
         try:
             conditionId = int(series['condition_id'])
         except ValueError:
@@ -207,9 +207,10 @@ class PlotData:
         return line
 
     @staticmethod
-    def _generateRegion(rng: Union[list[float, float], tuple[float, float]]):
+    def _generateRegion(rng: Union[list[float, float], tuple[float, float]], movable: bool = True):
         region = pg.LinearRegionItem(swapMode='push')
         region.setZValue(10)
         region.setRegion(rng)
         region.setBounds((0, 2048))
+        region.setMovable(movable)
         return region
