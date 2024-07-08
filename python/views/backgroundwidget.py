@@ -1,10 +1,9 @@
 from typing import Optional
 
-import matplotlib
 import numpy as np
+import pandas as pd
+import pyqtgraph as pg
 from PyQt6 import QtCore, QtGui, QtWidgets
-from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg, NavigationToolbar2QT as NavigationToolbar
-from matplotlib.figure import Figure
 from scipy.interpolate import CubicSpline
 from scipy.signal import find_peaks
 
@@ -12,14 +11,7 @@ from python.utils import datatypes
 from python.utils.database import getDatabase
 from python.utils.paths import resourcePath
 
-matplotlib.use('QtAgg')
-
-
-class MplCanvas(FigureCanvasQTAgg):
-    def __init__(self, parent=None, width=5, height=4, dpi=100):
-        fig = Figure(figsize=(width, height), dpi=dpi)
-        self.axes = fig.add_subplot(111)
-        super(MplCanvas, self).__init__(fig)
+pg.setConfigOptions(antialias=True)
 
 
 class ComboBox(QtWidgets.QComboBox):
@@ -64,7 +56,8 @@ class CalibrationBackgroundWidget(QtWidgets.QWidget):
         self._data = analyseData
         self._blank = blank
         self._db = getDatabase(resourcePath("fundamentals.db"))
-        self._plotWidget: Optional[MplCanvas] = None
+        self._profiles: pd.DataFrame = self._db.dataframe("SELECT * FROM BackgroundProfiles")
+        self._plotWidget: Optional[pg.PlotWidget] = None
         self.resize(800, 600)
         self._createPlotWidget()
         self._setUpView()
@@ -74,9 +67,7 @@ class CalibrationBackgroundWidget(QtWidgets.QWidget):
         label = QtWidgets.QLabel("Select profile: ")
         label.setSizePolicy(QtWidgets.QSizePolicy.Policy.Fixed, QtWidgets.QSizePolicy.Policy.Fixed)
         self._profileComboBox = ComboBox(self)
-        query = "SELECT name FROM BackgroundProfiles"
-        profiles = [t[0] for t in self._db.executeQuery(query).fetchall()]
-        self._profileComboBox.addItems(profiles)
+        self._profileComboBox.addItems(self._profiles['name'])
         addProfileButton = QtWidgets.QPushButton(icon=QtGui.QIcon(resourcePath("icons/plus.png")))
         addProfileButton.setStyleSheet("""
             QPushButton {
@@ -98,6 +89,9 @@ class CalibrationBackgroundWidget(QtWidgets.QWidget):
         label.linkActivated.connect(self._openInterferencesWindow)
         return backgroundProfileLayout
 
+    def backgroundProfile(self) -> str:
+        return self._profileComboBox.currentText()
+
     @QtCore.pyqtSlot(str)
     def _profileChanged(self, text: str) -> None:
         pass
@@ -111,43 +105,44 @@ class CalibrationBackgroundWidget(QtWidgets.QWidget):
         pass
 
     def _createPlotWidget(self) -> None:
-        self._canvas = MplCanvas(self)
-        self._plt = self._canvas.axes
-        self._plotToolBar = NavigationToolbar(self._canvas, self)
+        self._plt = pg.PlotWidget()
+        self._plt.setBackground("#fff")
+        self._plt.setFrameShape(QtWidgets.QFrame.Shape.Box)
+        self._plt.setFrameShadow(QtWidgets.QFrame.Shadow.Plain)
+        self._plt.setStyleSheet("border: 1px solid gray;")
+        plotItem = self._plt.getPlotItem()
+        plotItem.setContentsMargins(10, 10, 10, 10)
+        self._legend = plotItem.addLegend(
+            offset=(-25, 25),
+            pen=pg.mkPen(color="#E0E0E0", width=1),
+            brush=pg.mkBrush(color="#f2f2f2")
+        )
 
     def plot(self, x: np.ndarray, y: np.ndarray, *args, **kwargs) -> None:
         self._plt.plot(x, y, *args, **kwargs)
 
     def clearPlot(self) -> None:
-        self._plt.cla()
-        self._canvas.figure.tight_layout()
-        self._canvas.draw()
+        self._plt.clear()
 
     def _setUpView(self):
         mainLayout = QtWidgets.QVBoxLayout()
         hLayout = self._createProfileSelectionLayout()
         mainLayout.addLayout(hLayout)
-        mainLayout.addWidget(self._plotToolBar)
-        mainLayout.addWidget(self._canvas)
+        mainLayout.addWidget(self._plt)
+        mainLayout.setContentsMargins(0, 0, 0, 0)
         self.setLayout(mainLayout)
 
     def _plotAnalyseData(self) -> None:
         if self._data is None:
             return
-        self.clearPlot()
+
         x = self._data.x
         y = self._data.y
-        self.plot(x, y, label="Original")
-        if self._blank is not None:
-            y -= self._blank.y
-        xSmooth, ySmooth = self._smooth(x, y, 2.5)
-        peaks, _ = find_peaks(-ySmooth)
-        regressionCurve = np.interp(x, xSmooth[peaks], ySmooth[peaks])
-        y = (y - regressionCurve).clip(0)
-        self.plot(x, y, label="Optimal")
-        self._plt.legend()
-        self._canvas.figure.tight_layout()
-        self._canvas.draw()
+        background = self._calculateBackground(x, y)
+
+        self.clearPlot()
+        self.plot(x, y, name="Original", pen=pg.mkPen(color='#ff7f0eff', width=2))
+        self.plot(x, background, name="Optimal", pen=pg.mkPen(color='#1f77b4ff', width=2))
 
     @staticmethod
     def _smooth(x: np.ndarray, y: np.ndarray, level: float) -> tuple[np.ndarray, np.ndarray]:
@@ -157,6 +152,16 @@ class CalibrationBackgroundWidget(QtWidgets.QWidget):
         # Interpolate y values for the smoother plot
         Y = cs(X)
         return X, Y
+
+    def _calculateBackground(self, x: np.ndarray, y: np.ndarray) -> np.ndarray:
+        optimalY = y.copy()
+        if self._blank is not None:
+            optimalY = y - self._blank.y
+        xSmooth, ySmooth = self._smooth(x, optimalY, 2.5)
+        peaks, _ = find_peaks(-ySmooth)
+        regressionCurve = np.interp(x, xSmooth[peaks], ySmooth[peaks])
+        optimalY = (optimalY - regressionCurve).clip(0)
+        return optimalY
 
     @property
     def blank(self):

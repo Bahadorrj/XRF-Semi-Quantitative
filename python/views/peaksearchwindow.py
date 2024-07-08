@@ -55,13 +55,11 @@ class HideButton(QtWidgets.QPushButton):
         super().setIcon(icon)
         self.currentIcon = icon
         self.previousIcon = self.currentIcon
-        self.setStyleSheet(
-            """
-                    QPushButton {
-                        background-color: transparent;
-                    }
-                """
-        )
+        self.setStyleSheet("""
+            QPushButton {
+                background-color: transparent;
+            }
+        """)
 
     def setIcon(self, icon):
         self.previousIcon = self.currentIcon

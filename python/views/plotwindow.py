@@ -144,7 +144,7 @@ class PlotWindow(QtWidgets.QMainWindow):
 
     def _createActions(self) -> None:
         self._actionsMap = {}
-        actions = [
+        actions = (
             "New",
             "Open",
             "Save as",
@@ -152,7 +152,7 @@ class PlotWindow(QtWidgets.QMainWindow):
             "Peak Search",
             "Elements",
             "Add Calibration",
-        ]
+        )
         for label in actions:
             action = QtGui.QAction(label)
             key = "-".join(label.lower().split(" "))
