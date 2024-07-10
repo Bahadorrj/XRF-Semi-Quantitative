@@ -13,10 +13,13 @@ class Database:
         except sqlite3.Error as e:
             print(e)
 
-    def executeQuery(self, query: str):
+    def executeQuery(self, query: str, values: list = None):
         try:
             cursor = self.conn.cursor()
-            cursor.execute(query)
+            if values is None:
+                cursor.execute(query)
+            else:
+                cursor.execute(query, values)
             self.conn.commit()
             return cursor
         except sqlite3.Error as e:
