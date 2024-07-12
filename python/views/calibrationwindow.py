@@ -17,20 +17,47 @@ pg.setConfigOptions(antialias=True)
 
 class AddProfileButton(QtWidgets.QPushButton):
     def __init__(self, parent=None):
-        super(AddProfileButton, self).__init__(parent)
-        self.setIcon(QtGui.QIcon(resourcePath("icons/plus.png")))
+        super().__init__(parent)
         self.setSizePolicy(
             QtWidgets.QSizePolicy.Policy.Fixed, QtWidgets.QSizePolicy.Policy.Fixed
         )
         self.setStyleSheet(
             """
             QPushButton {
+                background-color: white;
+                color: black;
                 border: 1px solid gray;
-                background-color: #FFFFFF;
+                border-radius: 5px;
                 font-size: 12px;
                 height: 1.65em;
                 width: 1.65em;
+            } 
+        """
+        )
+
+
+class GroupBoxButton(QtWidgets.QPushButton):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setStyleSheet(
+            """
+                QPushButton {
+                background-color: black;
+                color: white;
+                border: 1px solid black;
                 border-radius: 5px;
+                padding: 10px;
+                margin: 10px 5px;
+            }
+
+            QPushButton:hover {
+                background-color: white;
+                color: black;
+            }    
+
+            QPushButton:pressed {
+                background-color: whitesmoke;
+                color: black;
             }
         """
         )
@@ -90,82 +117,58 @@ class GroupBox(QtWidgets.QGroupBox):
                 subcontrol-origin: margin;
                 subcontrol-position: top center; /* position at the top center */
                 padding: 0 3px;
-                background-color: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1, stop: 0 #FFOECE, stop: 1 #FFFFFF);
+                border: 2px solid gray;
+                border-radius: 5px;
+                background-color: white;
             }
         """
         )
-
-
-class AddProfileDialog(QtWidgets.QDialog):
-    profileAdded = QtCore.pyqtSignal(str)
-
-    def __init__(self, parent=None):
-        super(AddProfileDialog, self).__init__(parent)
-        self._db = getDatabase(resourcePath("fundamentals.db"))
-        self._profiles: pd.DataFrame = self._db.dataframe(
-            "SELECT * FROM BackgroundProfiles"
+        layout = QtWidgets.QFormLayout()
+        layout.setFieldGrowthPolicy(
+            QtWidgets.QFormLayout.FieldGrowthPolicy.ExpandingFieldsGrow
         )
-        self._profile = {key: None for key in self._profiles.columns[1:]}
-        self._setUpView()
+        self.setLayout(layout)
 
-    def _setUpView(self) -> None:
-        mainLayout = QtWidgets.QVBoxLayout()
-        formLayout = QtWidgets.QFormLayout()
-        for name in self._profiles.columns[1:]:
-            lineEdit = QtWidgets.QLineEdit(self)
-            formLayout.addRow(name, lineEdit)
-            lineEdit.editingFinished.connect(
-                partial(self._editingFinished, name, lineEdit)
-            )
+    def clear(self) -> None:
+        while self.layout().rowCount() > 0:
+            self.layout().removeRow(0)
 
-        mainLayout.addLayout(formLayout)
-        spacerItem = QtWidgets.QSpacerItem(
-            0,
-            30,
-            QtWidgets.QSizePolicy.Policy.Fixed,
-            QtWidgets.QSizePolicy.Policy.Expanding,
+
+class Label(QtWidgets.QLabel):
+    def __init__(self, parent=None) -> None:
+        super(Label, self).__init__(parent)
+        self.setStyleSheet(
+            """
+                QLabel {
+                background-color: transparent;
+                margin-top: 10px;
+                padding: 5px 2px;
+            }
+        """
         )
-        mainLayout.addItem(spacerItem)
-        addButton = QtWidgets.QPushButton("Add")
-        cancelButton = QtWidgets.QPushButton("Cancel")
-        hLayout = QtWidgets.QHBoxLayout()
-        hLayout.addWidget(addButton)
-        hLayout.addWidget(cancelButton)
-        mainLayout.addLayout(hLayout)
-        self.setLayout(mainLayout)
-        cancelButton.clicked.connect(self.reject)
-        addButton.clicked.connect(self.accept)
-        addButton.clicked.connect(self._addProfile)
+        font = QtGui.QFont()
+        font.setPointSize(11)
+        font.setItalic(True)
+        self.setFont(font)
 
-    @QtCore.pyqtSlot(str, QtWidgets.QLineEdit)
-    def _editingFinished(self, name: str, lineEdit: QtWidgets.QLineEdit) -> None:
-        if name == "name":
-            self._profile["name"] = lineEdit.text()
-            return
-        if name in ["smoothness", "rel_height", "distance"]:
-            pattern = re.compile(r"^\d+(\.\d+)?$")
-        elif name == "wlen":
-            pattern = re.compile(r"^\d+$")
-        else:
-            pattern = re.compile(
-                r"^("
-                r"\d+(\.\d+)?"  # A single number
-                r"|\(\d+(\.\d+)?,\s*\d+(\.\d+)?\)"  # A tuple of two numbers
-                r")$"
-            )
-        if not re.match(pattern, lineEdit.text()):
-            lineEdit.setText("Invalid!")
-        else:
-            self._profile[name] = lineEdit.text()
 
-    @QtCore.pyqtSlot()
-    def _addProfile(self) -> None:
-        columns = ", ".join(self._profile.keys())
-        placeholders = ", ".join(["?" for _ in self._profile])
-        values = [None if v is None else v for v in self._profile.values()]
-        query = f"INSERT INTO BackgroundProfiles ({columns}) VALUES ({placeholders})"
-        self._db.executeQuery(query, values)
-        self.profileAdded.emit(values[0])
+class LineEdit(QtWidgets.QLineEdit):
+    def __init__(self, parent=None) -> None:
+        super(LineEdit, self).__init__(parent)
+        self.setStyleSheet(
+            """
+            QLineEdit {
+                border-radius: 5px;
+                border: 1px solid gray;
+                padding: 5px 2px;
+                margin-top: 10px;
+            }
+            
+            QLineEdit:focus {
+                border: 1px solid black;
+            }
+        """
+        )
 
 
 class CalibrationWindow(QtWidgets.QMainWindow):
@@ -185,16 +188,19 @@ class CalibrationWindow(QtWidgets.QMainWindow):
         self._profiles: pd.DataFrame = self._db.dataframe(
             "SELECT * FROM BackgroundProfiles"
         )
+        self._profile = self._profiles.iloc[0]
+        self._tempProfile = None
+        self._optimalY = None
         self.setStyleSheet("background-color: #FFFFFF")
         self.resize(1200, 800)
         self._createActions()
         self._createToolBar()
         self._createProfileBox()
         self._createGeneralDataBox()
-        self._createProfileLayout()
+        self._createProfileSelectionLayout()
         self._createPlotWidget()
         self._setUpView()
-        self.drawAnalyseData(self._analyseData, self._blankData, self._profiles.iloc[0])
+        self._displayCurrentProfile()
 
     def _createActions(self) -> None:
         self._actionsMap = {}
@@ -204,16 +210,16 @@ class CalibrationWindow(QtWidgets.QMainWindow):
             key = "-".join(label.lower().split(" "))
             action.setIcon(QtGui.QIcon(resourcePath(f"icons/{key}.png")))
             self._actionsMap[key] = action
+            # signals
             action.triggered.connect(partial(self._actionTriggered, key))
 
     @QtCore.pyqtSlot()
     def _actionTriggered(self, key: str) -> None:
-        return
         if key == "run":
             query = f"""
                 SELECT line_id, low_kiloelectron_volt, high_kiloelectron_volt
                 FROM Lines
-                WHERE symbol = '{self._calibration.name}' AND active = 1;
+                WHERE symbol = '{self._analyse.name}' AND active = 1;
             """
             rows = self._db.fetchData(query)
             for row in rows:
@@ -226,17 +232,15 @@ class CalibrationWindow(QtWidgets.QMainWindow):
                 query = f"""
                     SELECT line_id, low_kiloelectron_volt, high_kiloelectron_volt, condition_id
                     FROM Lines
-                    WHERE symbol != '{self._calibration.name}' AND active = 1;
+                    WHERE symbol != '{self._analyse.name}' AND active = 1;
                 """
                 columns = self._db.fetchData(query)
                 for column in columns:
                     interfererLineId, lowKev, highKev, conditionId = column
-                    analyseData = self._calibration.getDataByConditionId(conditionId)
+                    analyseData = self._analyse.getDataByConditionId(conditionId)
                     blankData = self._blank.getDataByConditionId(conditionId)
-                    # TODO what profile?
                     optimalY = self._removeBackgroundFromData(
-                        analyseData,
-                        blankData,
+                        analyseData, blankData, self._profile
                     )
                     intensity = optimalY[
                         round(calculation.evToPx(lowKev)) : round(
@@ -260,61 +264,139 @@ class CalibrationWindow(QtWidgets.QMainWindow):
     def _fillToolBarWithActions(self, toolBar: QtWidgets.QToolBar) -> None:
         toolBar.addAction(self._actionsMap["run"])
 
-    def _createProfileLayout(self) -> None:
-        self._profileLayout = QtWidgets.QHBoxLayout()
+    def _createProfileSelectionLayout(self) -> None:
+        self._profileSelectionLayout = QtWidgets.QHBoxLayout()
         label = QtWidgets.QLabel("Select profile: ")
         label.setSizePolicy(
             QtWidgets.QSizePolicy.Policy.Fixed, QtWidgets.QSizePolicy.Policy.Fixed
         )
         self._profileComboBox = ProfileComboBox(self)
-        self._profileComboBox.addItems(self._profiles["name"])
-        self._displayProfileInForm(self._profiles.iloc[0])
+        if not self._profiles.empty:
+            self._profileComboBox.addItems(self._profiles["name"])
         addProfileButton = AddProfileButton()
-        self._profileLayout.addWidget(label)
-        self._profileLayout.addWidget(self._profileComboBox)
-        self._profileLayout.addWidget(addProfileButton)
+        addProfileButton.setIcon(QtGui.QIcon(resourcePath("icons/plus.png")))
+        editProfileButton = AddProfileButton()
+        editProfileButton.setIcon(QtGui.QIcon(resourcePath("icons/pencil.png")))
+        self._profileSelectionLayout.addWidget(label)
+        self._profileSelectionLayout.addWidget(self._profileComboBox)
+        self._profileSelectionLayout.addWidget(editProfileButton)
+        self._profileSelectionLayout.addWidget(addProfileButton)
+        # signals
         self._profileComboBox.currentTextChanged.connect(self._profileChanged)
-        addProfileButton.clicked.connect(self._openAddProfileDialog)
+        addProfileButton.clicked.connect(self._inputProfileBox)
+        editProfileButton.clicked.connect(partial(self._inputProfileBox, "edit"))
 
     @QtCore.pyqtSlot(str)
     def _profileChanged(self, text: str) -> None:
-        profile = self._profiles.query(f"name == '{text}'").iloc[0]
-        self.drawAnalyseData(self._analyseData, self._blankData, profile)
-        self._displayProfileInForm(profile)
+        self._profile = self._profiles.query(f"name == '{text}'").iloc[0]
+        self._displayCurrentProfile()
 
-    def _displayProfileInForm(self, profile: pd.Series) -> None:
-        if self._profileBoxLayout.count() != 0:
-            for row in range(1, self._profileBoxLayout.count(), 2):
-                self._profileBoxLayout.itemAt(row).widget().setText(
-                    f"{profile[self._profileBoxLayout.itemAt(row - 1).widget().text()]}"
-                )
-        else:
-            for name in self._profiles.columns[1:]:
-                nameLabel = QtWidgets.QLabel(name)
-                nameLabel.setStyleSheet("background-color: transparent;")
-                nameLabel.setFixedWidth(150)
-                font = QtGui.QFont()
-                font.setPointSize(11)
-                font.setItalic(True)
-                nameLabel.setFont(font)
-                valueLabel = QtWidgets.QLabel(f"{profile[name]}")
-                valueLabel.setStyleSheet("background-color: transparent;")
-                font = QtGui.QFont()
-                font.setPointSize(11)
-                font.setItalic(True)
-                valueLabel.setFont(font)
-                self._profileBox.layout().addRow(nameLabel, valueLabel)
+    def _displayCurrentProfile(self) -> None:
+        self.drawAnalyseData(self._analyseData, self._blankData, self._profile)
+        self._profileBox.clear()
+        for name, value in self._profile[1:].items():
+            nameLabel = Label(self)
+            nameLabel.setText(name)
+            valueLabel = Label(self)
+            valueLabel.setText(value)
+            spacerItem = QtWidgets.QSpacerItem(
+                0, 0, QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Fixed
+            )
+            layout = QtWidgets.QHBoxLayout()
+            layout.addWidget(nameLabel)
+            layout.addItem(spacerItem)
+            layout.addWidget(valueLabel)
+            self._profileBox.layout().addRow(layout)
 
     @QtCore.pyqtSlot()
-    def _openAddProfileDialog(self) -> None:
-        addProfileDialog = AddProfileDialog(self)
-        addProfileDialog.show()
-        addProfileDialog.profileAdded.connect(self._addProfile)
+    def _inputProfileBox(self, mode: str = "new") -> None:
+        self._profileBox.clear()
+        self._tempProfile = self._profile.copy()
+        for name in self._profiles.columns[1:]:
+            nameLabel = QtWidgets.QLabel(name)
+            self._resetLabel(nameLabel)
+            lineEdit = LineEdit(self)
+            if mode == "edit":
+                lineEdit.setText(self._profile[name])
+            self._profileBox.layout().addRow(nameLabel, lineEdit)
+            # signals
+            lineEdit.editingFinished.connect(
+                partial(self._editingFinished, name, lineEdit)
+            )
+        addButton = GroupBoxButton(self)
+        if mode == "edit":
+            addButton.setText("Apply")
+            addButton.clicked.connect(self._editProfile)
+        else:
+            for name, value in self._tempProfile.items():
+                self._tempProfile[name] = None
+            addButton.setText("Add")
+            addButton.clicked.connect(self._addProfile)
+        cancelButton = GroupBoxButton(self)
+        cancelButton.setText("Cancel")
+        cancelButton.clicked.connect(self._displayCurrentProfile)
+        layout = QtWidgets.QHBoxLayout()
+        layout.addWidget(addButton)
+        layout.addWidget(cancelButton)
+        self._profileBox.layout().addRow(layout)
 
-    @QtCore.pyqtSlot(str)
-    def _addProfile(self, text: str) -> None:
-        self._profileComboBox.addItem(text)
+    @QtCore.pyqtSlot(str, QtWidgets.QLineEdit)
+    def _editingFinished(self, name: str, lineEdit: QtWidgets.QLineEdit) -> None:
+        if name == "name":
+            self._tempProfile["name"] = lineEdit.text()
+            return
+        if name in ["smoothness", "rel_height", "distance"]:
+            pattern = re.compile(r"^\d+(\.\d+)?$|^$")
+        elif name == "wlen":
+            pattern = re.compile(r"^\d+$|^$")
+        else:
+            pattern = re.compile(
+                r"^-?\d+(\.\d+)?$|^\(-?\d+(\.\d+)?, *-?\d+(\.\d+)?\)$|^$"
+            )
+        if not re.match(pattern, lineEdit.text()):
+            lineEdit.setText("Invalid!")
+        else:
+            if name == "smoothness":
+                if 1 <= eval(lineEdit.text()) <= 25:
+                    self._tempProfile[name] = lineEdit.text()
+                else:
+                    lineEdit.setText(self._profile[name])
+            else:
+                self._tempProfile[name] = (
+                    None if not lineEdit.text() else lineEdit.text()
+                )
+        self.drawAnalyseData(self._analyseData, self._blankData, self._tempProfile)
+
+    @QtCore.pyqtSlot()
+    def _addProfile(self) -> None:
+        self._profile = self._tempProfile.copy()
+        columns = ", ".join(self._profile.index[1:])
+        placeholders = ", ".join(["?" for _ in self._profile[1:]])
+        values = [None if v is np.nan else v for v in self._profile.values[1:]]
+        query = (
+            f"INSERT INTO BackgroundProfiles ({columns}) VALUES ({placeholders})"
+        )
+        self._db.executeQuery(query, values)
         self._profiles = self._db.dataframe("SELECT * FROM BackgroundProfiles")
+        self._profileComboBox.addItem(values[0])
+        self._profileComboBox.setCurrentText(values[0])
+
+    def _editProfile(self) -> None:
+        self._profile = self._tempProfile.copy()
+        for name, value in self._profile[1:].items():
+            if value is not None:
+                query = f"UPDATE BackgroundProfiles SET {name} = '{value}' WHERE profile_id = {self._profile['profile_id']}"
+                self._db.executeQuery(query)
+            else:
+                query = f"UPDATE BackgroundProfiles SET {name} = NULL WHERE profile_id = {self._profile['profile_id']}"
+                self._db.executeQuery(query)
+        self._profiles = self._db.dataframe("SELECT * FROM BackgroundProfiles")
+        currentIndex = self._profileComboBox.currentIndex()
+        self._profileComboBox.blockSignals(True)
+        self._profileComboBox.removeItem(currentIndex)
+        self._profileComboBox.insertItem(currentIndex, self._profile.values[1])
+        self._profileComboBox.blockSignals(False)
+        self._displayCurrentProfile()
 
     def _createPlotWidget(self) -> None:
         self._plotWidget = pg.PlotWidget(self)
@@ -345,11 +427,6 @@ class CalibrationWindow(QtWidgets.QMainWindow):
 
     def _createProfileBox(self):
         self._profileBox = GroupBox(self)
-        self._profileBoxLayout = QtWidgets.QFormLayout()
-        self._profileBoxLayout.setFieldGrowthPolicy(
-            QtWidgets.QFormLayout.FieldGrowthPolicy.ExpandingFieldsGrow
-        )
-        self._profileBox.setLayout(self._profileBoxLayout)
         self._profileBox.setTitle("Profile")
 
     def _createGeneralDataBox(self) -> None:
@@ -357,25 +434,24 @@ class CalibrationWindow(QtWidgets.QMainWindow):
         self._generalBox.setTitle("General Data")
 
     def _setUpView(self) -> None:
-        mainLayout = QtWidgets.QGridLayout()
-        mainLayout.addLayout(self._profileLayout, 0, 0, 1, 3)
-        mainLayout.addWidget(self._plotWidget, 1, 0, 5, 3)
-        mainLayout.addWidget(self._profileBox, 0, 3, 3, 1)
-        mainLayout.addWidget(self._generalBox, 3, 3, 3, 1)
+        self._mainLayout = QtWidgets.QGridLayout()
+        self._mainLayout.addLayout(self._profileSelectionLayout, 0, 0, 1, 3)
+        self._mainLayout.addWidget(self._plotWidget, 1, 0, 5, 3)
+        self._mainLayout.addWidget(self._profileBox, 0, 3, 3, 1)
+        self._mainLayout.addWidget(self._generalBox, 3, 3, 3, 1)
         mainWidget = QtWidgets.QWidget(self)
-        mainWidget.setLayout(mainLayout)
+        mainWidget.setLayout(self._mainLayout)
         self.setCentralWidget(mainWidget)
 
     def drawAnalyseData(
         self,
         analyseData: datatypes.AnalyseData,
         blankData: datatypes.AnalyseData,
-        profile: pd.Series,
+        profile: pd.Series | dict,
     ) -> None:
         x = analyseData.x
         y = analyseData.y
         self._optimalY = self._removeBackgroundFromData(analyseData, blankData, profile)
-
         self.clearPlot()
         self.plot(x, y, name="Original", pen=pg.mkPen(color="#FF7F0EFF", width=2))
         self.plot(
@@ -387,13 +463,16 @@ class CalibrationWindow(QtWidgets.QMainWindow):
         self,
         analyseData: datatypes.AnalyseData,
         blankData: datatypes.AnalyseData,
-        profile: pd.Series,
+        profile: pd.Series | dict,
     ) -> np.ndarray:
-        kwargs = {}
-        for name, value in profile.items():
-            if name not in ["profile_id", "name"] and value is not None:
-                kwargs[name] = eval(str(value))
         optimalY = analyseData.y - blankData.y
+        if isinstance(profile, pd.Series):
+            kwargs = {}
+            for name, value in profile.items():
+                if name not in ["profile_id", "name"] and value is not None:
+                    kwargs[name] = eval(str(value))
+        else:
+            kwargs = profile
         xSmooth, ySmooth = self.smooth(analyseData.x, optimalY, kwargs["smoothness"])
         kwargs.pop("smoothness")
         if kwargs:
