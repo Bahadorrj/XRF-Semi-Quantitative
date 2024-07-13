@@ -171,7 +171,7 @@ class LineEdit(QtWidgets.QLineEdit):
         )
 
 
-class CalibrationWindow(QtWidgets.QMainWindow):
+class CalibrationDialog(QtWidgets.QDialog):
     def __init__(
         self,
         parent=None,
@@ -179,7 +179,7 @@ class CalibrationWindow(QtWidgets.QMainWindow):
         blank: datatypes.Analyse = None,
         condition: int = None,
     ):
-        super(CalibrationWindow, self).__init__(parent)
+        super(CalibrationDialog, self).__init__(parent)
         self._analyse = analyse
         self._blank = blank
         self._analyseData = analyse.getDataByConditionId(condition)
@@ -192,7 +192,7 @@ class CalibrationWindow(QtWidgets.QMainWindow):
         self._tempProfile = None
         self._optimalY = None
         self.setStyleSheet("background-color: #FFFFFF")
-        self.resize(1200, 800)
+        self.resize(900, 600)
         self._createActions()
         self._createToolBar()
         self._createProfileBox()
@@ -200,6 +200,7 @@ class CalibrationWindow(QtWidgets.QMainWindow):
         self._createProfileSelectionLayout()
         self._createPlotWidget()
         self._setUpView()
+        self.setModal(True)
         self._displayCurrentProfile()
 
     def _createActions(self) -> None:
@@ -224,6 +225,8 @@ class CalibrationWindow(QtWidgets.QMainWindow):
             rows = self._db.fetchData(query)
             for row in rows:
                 calibrationLineId, calibrationLowKev, calibrationHighKev = row
+                query = f"DELETE FROM NewInterferences WHERE line1_id = {calibrationLineId}"
+                self._db.executeQuery(query)
                 calibrationIntensity = self._optimalY[
                     round(calculation.evToPx(calibrationLowKev)) : round(
                         calculation.evToPx(calibrationHighKev)
@@ -252,17 +255,17 @@ class CalibrationWindow(QtWidgets.QMainWindow):
                         VALUES ({calibrationLineId}, {interfererLineId}, {intensity / calibrationIntensity});
                     """
                     self._db.executeQuery(query)
+            self.accept()
 
     def _createToolBar(self) -> None:
-        toolBar = QtWidgets.QToolBar(self)
-        toolBar.setIconSize(QtCore.QSize(16, 16))
-        toolBar.setToolButtonStyle(QtCore.Qt.ToolButtonStyle.ToolButtonTextUnderIcon)
-        toolBar.setMovable(False)
-        self._fillToolBarWithActions(toolBar)
-        self.addToolBar(toolBar)
+        self._toolBar = QtWidgets.QToolBar(self)
+        self._toolBar.setIconSize(QtCore.QSize(16, 16))
+        self._toolBar.setToolButtonStyle(QtCore.Qt.ToolButtonStyle.ToolButtonTextUnderIcon)
+        self._toolBar.setMovable(False)
+        self._fillToolBarWithActions()
 
-    def _fillToolBarWithActions(self, toolBar: QtWidgets.QToolBar) -> None:
-        toolBar.addAction(self._actionsMap["run"])
+    def _fillToolBarWithActions(self) -> None:
+        self._toolBar.addAction(self._actionsMap["run"])
 
     def _createProfileSelectionLayout(self) -> None:
         self._profileSelectionLayout = QtWidgets.QHBoxLayout()
@@ -313,8 +316,8 @@ class CalibrationWindow(QtWidgets.QMainWindow):
         self._profileBox.clear()
         self._tempProfile = self._profile.copy()
         for name in self._profiles.columns[1:]:
-            nameLabel = QtWidgets.QLabel(name)
-            self._resetLabel(nameLabel)
+            nameLabel = Label(self)
+            nameLabel.setText(name)
             lineEdit = LineEdit(self)
             if mode == "edit":
                 lineEdit.setText(self._profile[name])
@@ -435,13 +438,12 @@ class CalibrationWindow(QtWidgets.QMainWindow):
 
     def _setUpView(self) -> None:
         self._mainLayout = QtWidgets.QGridLayout()
-        self._mainLayout.addLayout(self._profileSelectionLayout, 0, 0, 1, 3)
-        self._mainLayout.addWidget(self._plotWidget, 1, 0, 5, 3)
-        self._mainLayout.addWidget(self._profileBox, 0, 3, 3, 1)
-        self._mainLayout.addWidget(self._generalBox, 3, 3, 3, 1)
-        mainWidget = QtWidgets.QWidget(self)
-        mainWidget.setLayout(self._mainLayout)
-        self.setCentralWidget(mainWidget)
+        self._mainLayout.addWidget(self._toolBar, 0, 0, 1, 4)
+        self._mainLayout.addLayout(self._profileSelectionLayout, 1, 0, 1, 3)
+        self._mainLayout.addWidget(self._plotWidget, 2, 0, 5, 3)
+        self._mainLayout.addWidget(self._profileBox, 1, 3, 3, 1)
+        self._mainLayout.addWidget(self._generalBox, 4, 3, 3, 1)
+        self.setLayout(self._mainLayout)
 
     def drawAnalyseData(
         self,
