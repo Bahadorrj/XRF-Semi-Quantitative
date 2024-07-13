@@ -6,9 +6,8 @@ from PyQt6 import QtWidgets, QtGui
 from PyQt6.QtWidgets import QApplication
 
 from python.controllers import GuiHandler, ClientHandler
-from python.utils import paths, datatypes
+from python.utils import paths
 from python.utils.paths import sys
-from python.views.calibrationwindow import CalibrationWindow
 from python.views.plotwindow import PlotWindow
 
 
@@ -29,11 +28,7 @@ def main() -> None:
     arg = sys.argv
     app = QtWidgets.QApplication(arg)
     app.setWindowIcon(QtGui.QIcon(paths.resourcePath("CSAN.ico")))
-    data = datatypes.Analyse.fromATXFile("Additional/atx/Au.atx").data[6]
-    blank = datatypes.Analyse.fromTextFile("Additional/Pure samples/8 Mehr/Blank.txt").data[6]
-    window = CalibrationWindow()
-    window.addBlank(blank)
-    window.addAnalyseData(data)
+    window = PlotWindow()
     # connectServerAndGUI('127.0.0.1', 16000, window, app)
     window.show()
     sys.exit(app.exec())

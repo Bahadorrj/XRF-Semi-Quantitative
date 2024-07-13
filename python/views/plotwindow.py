@@ -5,13 +5,12 @@ from typing import Optional
 import numpy as np
 import pyqtgraph as pg
 from PyQt6 import QtCore, QtGui, QtWidgets
-from scipy.interpolate import CubicSpline
-from scipy.signal import find_peaks
 
-from python.utils import calculation, datatypes
+from python.utils import datatypes
 from python.utils import encryption
 from python.utils.database import getDatabase
 from python.utils.paths import resourcePath
+from python.views.calibrationdialog import CalibrationDialog
 from python.views.elementswindow import ElementsWindow
 from python.views.peaksearchwindow import PeakSearchWindow
 
@@ -580,71 +579,7 @@ class PlotWindow(QtWidgets.QMainWindow):
     #         event.accept()
 
     def addCalibration(self, calibration: datatypes.Analyse) -> None:
-        self._addCalibrationToInterferenceTable(calibration)
-
-    def _addCalibrationToCalibrationTable(self, calibration: datatypes.Analyse) -> None:
-        # TODO complete method
-        pass
-
-    def _addCalibrationToInterferenceTable(
-        self, calibration: datatypes.Analyse
-    ) -> None:
-        # TODO complete method
-        optimalIntensities = self._calculateOptimalIntensities(calibration)
-        query = f"""
-            SELECT line_id, low_kiloelectron_volt, high_kiloelectron_volt, condition_id 
-            FROM Lines 
-            WHERE symbol = '{calibration.name}';
-        """
-        rows = self._db.executeQuery(query).fetchall()
-        for row in rows:
-            (
-                calibrationLineId,
-                calibrationLowKev,
-                calibrationHighKev,
-                calibrationConditionId,
-            ) = row
-            if calibrationConditionId is not None:
-                calibrationIntensity = optimalIntensities[calibrationConditionId - 1][
-                    int(calculation.evToPx(calibrationLowKev)) : int(
-                        calculation.evToPx(calibrationHighKev)
-                    )
-                ].sum()
-                query = """
-                    SELECT line_id, low_kiloelectron_volt, high_kiloelectron_volt
-                    FROM Lines;
-                """
-                columns = self._db.executeQuery(query).fetchall()
-                for column in columns:
-                    interfererLineId, lowKev, highKev = column
-                    intensity = optimalIntensities[calibrationConditionId - 1][
-                        int(calculation.evToPx(lowKev)) : int(
-                            calculation.evToPx(highKev)
-                        )
-                    ].sum()
-                    query = f"""
-                        INSERT INTO NewInterferences (line1_id, line2_id, coefficient)
-                        VALUES ({calibrationLineId}, {interfererLineId}, {intensity / calibrationIntensity});
-                    """
-                    self._db.executeQuery(query)
-
-    def _calculateOptimalIntensities(self, analyse: datatypes.Analyse) -> list:
-        optimalIntensities = []
-        for data, blank in zip(analyse.data, self._blank.data):
-            xSmooth, ySmooth = self._smooth(data.x, data.y, 2.5)
-            peaks, _ = find_peaks(-ySmooth)
-            regressionCurve = np.interp(data.x, xSmooth[peaks], ySmooth[peaks])
-            y = (data.y - blank.y - regressionCurve).clip(min=0)
-            optimalIntensities.append(y)
-        return optimalIntensities
-
-    @staticmethod
-    def _smooth(
-        x: np.ndarray, y: np.ndarray, level: float
-    ) -> tuple[np.ndarray, np.ndarray]:
-        cs = CubicSpline(x, y)
-        # Generate finer x values for smoother plot
-        X = np.linspace(0, x.size, int(x.size / level))
-        # Interpolate y values for the smoother plot
-        Y = cs(X)
-        return X, Y
+        query = f"SELECT condition_id FROM Lines WHERE symbol = '{calibration.name}' AND active = 1"
+        condition = self._db.fetchData(query)[0][0]
+        calibrationDialog = CalibrationDialog(self, calibration, self._blank, condition)
+        calibrationDialog.exec()
