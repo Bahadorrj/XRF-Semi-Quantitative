@@ -57,10 +57,10 @@ class HideButton(QtWidgets.QPushButton):
         self.previousIcon = self.currentIcon
         self.setStyleSheet(
             """
-                    QPushButton {
-                        background-color: transparent;
-                    }
-                """
+            QPushButton {
+                background-color: transparent;
+            }
+        """
         )
 
     def setIcon(self, icon):
@@ -205,9 +205,9 @@ class ElementsTableWidget(QtWidgets.QTableWidget):
 
     def _createHideWidget(self, data: datatypes.PlotData) -> HideButton:
         if data.visible:
-            widget = HideButton(icon=QtGui.QIcon(resourcePath(f"icons/show.png")))
+            widget = HideButton(icon=QtGui.QIcon(resourcePath("icons/show.png")))
         else:
-            widget = HideButton(icon=QtGui.QIcon(resourcePath(f"icons/hide.png")))
+            widget = HideButton(icon=QtGui.QIcon(resourcePath("icons/hide.png")))
         widget.clicked.connect(partial(self._emitRowChanged, data.rowId, "hide"))
         return widget
 
@@ -312,9 +312,9 @@ class PeakSearchWindow(QtWidgets.QMainWindow):
         self._mainLayout = QtWidgets.QVBoxLayout()
         self._createToolBar()
         self._createSearchBar()
+        self._createStatusLabel()
         self._createTableWidget()
         self._createPlotViewBox()
-        # self._createMenuBar()
         self._setupView()
 
     def _createToolBar(self) -> None:
@@ -472,6 +472,16 @@ class PeakSearchWindow(QtWidgets.QMainWindow):
                 data = self._plotDataList[rowId]
                 self._addPlotData(data)
 
+    def _createStatusLabel(self) -> None:
+        self._statusLabel = QtWidgets.QLabel()
+        self._statusLabel.setStyleSheet(
+            """
+            font-size: 14px; 
+            color: rgb(128, 128, 128);
+            padding: 5px;
+        """
+        )
+
     def _createTableWidget(self) -> None:
         self._tableWidget = ElementsTableWidget(self, df=self._df)
         self._tableWidget.setSelectionMode(
@@ -489,21 +499,24 @@ class PeakSearchWindow(QtWidgets.QMainWindow):
         self._tableWidget.cellClicked.connect(self._cellClicked)
 
     def _createPlotViewBox(self) -> None:
-        self._createCoordinateLabel()
+        self._createStatusLayout()
         self._graphicsLayoutWidget = pg.GraphicsLayoutWidget()
         self._createPeakPlot()
         self._createSpectrumPlot()
         self._mainLayout.addWidget(self._graphicsLayoutWidget)
 
-    def _createCoordinateLabel(self) -> None:
+    def _createStatusLayout(self) -> None:
         self._coordinateLabel = QtWidgets.QLabel()
         self._coordinateLabel.setSizePolicy(
             QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Fixed
         )
         self._coordinateLabel.setAlignment(QtCore.Qt.AlignmentFlag.AlignRight)
-        self._mainLayout.addWidget(self._coordinateLabel)
+        layout = QtWidgets.QHBoxLayout()
+        layout.addWidget(self._statusLabel)
+        layout.addWidget(self._coordinateLabel)
+        self._mainLayout.addLayout(layout)
 
-    def _createPeakPlot(self):
+    def _createPeakPlot(self) -> None:
         self._peakPlot = self._graphicsLayoutWidget.addPlot(row=0, col=0)
         self._peakPlot.showGrid(x=True, y=True)
         self._vLine = pg.InfiniteLine(angle=90, movable=False)
@@ -549,9 +562,11 @@ class PeakSearchWindow(QtWidgets.QMainWindow):
         self.setCentralWidget(centralWidget)
 
     def _fillTable(self) -> None:
+        self._statusLabel.setText("Adding lines...")
         self._tableWidget.resetTable()
         for data in self._plotDataList:
             self._addPlotData(data)
+        self._statusLabel.setText(None)
 
     def _addPlotData(self, data: datatypes.PlotData) -> None:
         series: pd.Series = self._df.iloc[data.rowId]

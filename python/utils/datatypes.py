@@ -66,6 +66,9 @@ class Analyse:
                 setattr(self, "name", Path(value).stem)
                 setattr(self, "extension", value.split(".")[-1])
 
+    def getDataByConditionId(self, condition: int) -> AnalyseData:
+        return self.data[condition - 1]
+
     def toDict(self) -> dict:
         return {
             "filename": getattr(self, "filename"),
