@@ -1,0 +1,106 @@
+* {
+    font-family: Open Sans Regular;
+    font-size: 12px;
+}
+
+QTreeView {
+    /*Ensures that the entire row is highlighted when a tree item is selected, not just the item's text.*/
+    show-decoration-selected: 1;
+    border: 1px solid black;
+}
+
+QTreeView::item {
+    border: None;
+}
+
+QTreeView::item:hover {
+    background: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1, stop: 0 #e7effd, stop: 1 #cbdaf1);
+}
+
+QTreeView::item:selected:active{
+    background: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1, stop: 0 #6ea1f1, stop: 1 #567dbc);
+}
+
+QTreeView::item:selected:!active {
+    background: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1, stop: 0 #6b9be8, stop: 1 #577fbf);
+}
+
+QTreeView::branch:has-siblings:!adjoins-item {
+    border-image: url(icons/vline.png) 0;
+}
+
+QTreeView::branch:has-siblings:adjoins-item {
+    border-image: url(icons/branch-more.png) 0;
+}
+
+QTreeView::branch:!has-children:!has-siblings:adjoins-item {
+    border-image: url(icons/branch-end.png) 0;
+}
+
+QTreeView::branch:has-children:!has-siblings:closed,
+QTreeView::branch:closed:has-children:has-siblings {
+    border-image: none;
+    image: url(icons/branch-closed.png);
+}
+
+QTreeView::branch:open:has-children:!has-siblings,
+QTreeView::branch:open:has-children:has-siblings  {
+    border-image: none;
+    image: url(icons/branch-open.png);
+}
+
+QComboBox {
+    border: 1px solid black;
+    border-radius: 3px;
+}
+
+QComboBox:hover {
+    border: 1px solid blue;
+}
+
+QComboBox::drop-down {
+    subcontrol-origin: padding;
+    subcontrol-position: top right;
+    width: 15px;
+    border-left-width: 1px;
+    border-left-color: darkgray;
+    border-left-style: solid;
+    border-top-right-radius: 3px;
+    border-bottom-right-radius: 3px;
+}
+QComboBox::down-arrow {
+    image: url(icons/branch-open.png)
+}
+
+QComboBox QAbstractItemView {
+    border-radius: 3px;
+    border: 1px solid gray;
+    selection-background-color: lightgray;
+    background-color: rgba(135, 206, 250, 128); /* Custom background color for the drop-down menu */
+}
+
+/* Plot Window */
+#file-tree > QHeaderView::section {
+    font-size: 14px;
+    font-weight: bold;
+    letter-spacing: 2px;
+    background-color: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #616161, stop: 0.5 #505050, stop: 0.6 #434343, stop:1 #656565);
+    color: white;
+    border: None;
+}
+
+#condition-form {
+    border: 1px solid black;
+}
+
+#condition-form > QComboBox {
+    padding: 5px;
+}
+
+#condition-form > QTableWidget {
+    border: 1px solid black;
+}
+
+#plot-widget {
+    border: 1px solid black;
+}

@@ -18,6 +18,7 @@ class StatusButton(QtWidgets.QPushButton):
         super().__init__(parent)
         self.currentText = self.text()
         self.previousText = self.currentText
+        self.setObjectName("status-button")
         self.setStyleSheet(
             """
                     QPushButton {

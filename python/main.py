@@ -1,14 +1,16 @@
 import logging
 import socket
 import threading
+import os
 
 from PyQt6 import QtWidgets, QtGui
 from PyQt6.QtWidgets import QApplication
 
 from python.controllers import GuiHandler, ClientHandler
 from python.utils import paths
-from python.utils.paths import sys
+from python.utils.paths import sys, resourcePath
 from python.views.plotwindow import PlotWindow
+from python.views.methodexplorer import MethodExplorer
 
 
 def connectServerAndGUI(host, port, plotWindow: PlotWindow, app: QApplication):
@@ -30,5 +32,12 @@ def main() -> None:
     app.setWindowIcon(QtGui.QIcon(paths.resourcePath("CSAN.ico")))
     window = PlotWindow()
     # connectServerAndGUI('127.0.0.1', 16000, window, app)
+    for root, _, files in os.walk(resourcePath("fonts")):
+        for file in files:
+            path = os.path.join(root, file)
+            QtGui.QFontDatabase.addApplicationFont(path)
+    with open(resourcePath("style.qss")) as f:
+        _style = f.read()
+        app.setStyleSheet(_style)
     window.show()
     sys.exit(app.exec())

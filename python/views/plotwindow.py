@@ -40,8 +40,7 @@ class SaveDialog(QtWidgets.QDialog):
         label.setText("Select the file you like to save:")
         verticalLayout.addWidget(label)
         self.listWidget = QtWidgets.QListWidget(self)
-        self.listWidget.setFrameShape(QtWidgets.QFrame.Shape.Box)
-        self.listWidget.setFrameShadow(QtWidgets.QFrame.Shadow.Plain)
+        self.listWidget.setFrameShape(QtWidgets.QFrame.Shape.NoFrame)
         self.listWidget.setEditTriggers(
             QtWidgets.QAbstractItemView.EditTrigger.NoEditTriggers
         )
@@ -66,8 +65,8 @@ class SaveDialog(QtWidgets.QDialog):
 class ConditionForm(QtWidgets.QListView):
     def __init__(self, parent=None):
         super(ConditionForm, self).__init__(parent)
-        self.setFrameShape(QtWidgets.QFrame.Shape.Box)
-        self.setFrameShadow(QtWidgets.QFrame.Shadow.Plain)
+        self.setObjectName("condition-form")
+        self.setFrameShape(QtWidgets.QFrame.Shape.NoFrame)
         db = getDatabase(resourcePath("fundamentals.db"))
         self._df = db.dataframe("SELECT * FROM Conditions")
         self._createComboBox()
@@ -242,6 +241,7 @@ class PlotWindow(QtWidgets.QMainWindow):
 
     def _createPlotWidget(self) -> None:
         self._plotWidget = pg.PlotWidget()
+        self._plotWidget.setObjectName("plot-widget")
         self._plotWidget.setBackground("#fff")
         self._plotWidget.setLabel(
             "bottom", """<span style=\"font-size:1.5rem\">px</span>"""
@@ -251,8 +251,7 @@ class PlotWindow(QtWidgets.QMainWindow):
             """<span style=\"font-size:1.5rem\">Intensity</span>""",
         )
         self._plotWidget.showGrid(x=True, y=True)
-        self._plotWidget.setFrameShape(QtWidgets.QFrame.Shape.Box)
-        self._plotWidget.setFrameShadow(QtWidgets.QFrame.Shadow.Plain)
+        self._plotWidget.setFrameShape(QtWidgets.QFrame.Shape.NoFrame)
         self._plotWidget.setMinimumWidth(500)
         self._plotWidget.setMinimumHeight(500)
         self._plotWidget.scene().sigMouseMoved.connect(self._mouseMoved)
@@ -274,72 +273,12 @@ class PlotWindow(QtWidgets.QMainWindow):
 
     def _createTreeWidget(self) -> None:
         self._treeWidget = QtWidgets.QTreeWidget()
-        self._treeWidget.setStyleSheet(
-            """
-            QTreeView {
-                show-decoration-selected: 1;
-            }
-
-            QHeaderView::section {
-                background-color: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #616161, stop: 0.5 #505050, stop: 0.6 #434343, stop:1 #656565);
-                color: white;
-                border: None;
-            }
-
-            QTreeView::item {
-                border: None;
-            }
-
-            QTreeView::item:hover {
-                background: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1, stop: 0 #e7effd, stop: 1 #cbdaf1);
-                border: None;
-            }
-
-            QTreeView::item:selected {
-                border: None;
-            }
-
-            QTreeView::item:selected:active{
-                background: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1, stop: 0 #6ea1f1, stop: 1 #567dbc);
-            }
-
-            QTreeView::item:selected:!active {
-                background: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1, stop: 0 #6b9be8, stop: 1 #577fbf);
-            }
-
-            QTreeView::branch:has-siblings:!adjoins-item {
-                border-image: url(icons/vline.png) 0;
-            }
-
-            QTreeView::branch:has-siblings:adjoins-item {
-                border-image: url(icons/branch-more.png) 0;
-            }
-
-            QTreeView::branch:!has-children:!has-siblings:adjoins-item {
-                border-image: url(icons/branch-end.png) 0;
-            }
-
-            QTreeView::branch:has-children:!has-siblings:closed,
-            QTreeView::branch:closed:has-children:has-siblings {
-                border-image: none;
-                image: url(icons/branch-closed.png);
-            }
-
-            QTreeView::branch:open:has-children:!has-siblings,
-            QTreeView::branch:open:has-children:has-siblings  {
-                border-image: none;
-                image: url(icons/branch-open.png);
-            }
-        """
-        )
+        self._treeWidget.setObjectName("file-tree")
         self._treeWidget.setColumnCount(2)
         self._treeWidget.setHeaderLabels(["File", "Color"])
         header = self._treeWidget.header()
-        headerFont = QtGui.QFont("Segoe UI", 13, QtGui.QFont.Weight.Bold)
-        header.setFont(headerFont)
         header.setDefaultAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
-        self._treeWidget.setFrameShape(QtWidgets.QFrame.Shape.Box)
-        self._treeWidget.setFrameShadow(QtWidgets.QFrame.Shadow.Plain)
+        self._treeWidget.setFrameShape(QtWidgets.QFrame.Shape.NoFrame)
         self._treeWidget.setAnimated(True)
         self._treeWidget.setExpandsOnDoubleClick(False)
         self._treeWidget.setEditTriggers(
@@ -353,7 +292,7 @@ class PlotWindow(QtWidgets.QMainWindow):
         self._treeWidget.itemClicked.connect(self._togglePeakSearchAction)
 
     def _fillTreeWidget(self) -> None:
-        font = QtGui.QFont("Segoe UI", 12)
+        font = QtGui.QFont("Open Sans Regular", 12)
         items = ["Text Files", "Antique'X Files", "Packet Files"]
         for label in items:
             item = QtWidgets.QTreeWidgetItem(self._treeWidget)
@@ -440,7 +379,7 @@ class PlotWindow(QtWidgets.QMainWindow):
             self._actionsMap["new"].setDisabled(False)
 
     def _addAnalyseToTree(self, analyse: datatypes.Analyse) -> None:
-        font = QtGui.QFont("Segoe UI", 11)
+        font = QtGui.QFont("Open Sans", 12)
         font.setItalic(True)
         item = QtWidgets.QTreeWidgetItem()
         item.setCheckState(0, QtCore.Qt.CheckState.Unchecked)
