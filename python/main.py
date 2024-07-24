@@ -30,5 +30,5 @@ def main() -> None:
     app.setWindowIcon(QtGui.QIcon(paths.resourcePath("CSAN.ico")))
     window = PlotWindow()
     # connectServerAndGUI('127.0.0.1', 16000, window, app)
-    window.show()
+    window.showMaximized()
     sys.exit(app.exec())

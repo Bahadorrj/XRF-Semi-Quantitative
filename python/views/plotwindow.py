@@ -335,8 +335,6 @@ class PlotWindow(QtWidgets.QMainWindow):
         self._treeWidget.setColumnCount(2)
         self._treeWidget.setHeaderLabels(["File", "Color"])
         header = self._treeWidget.header()
-        headerFont = QtGui.QFont("Segoe UI", 13, QtGui.QFont.Weight.Bold)
-        header.setFont(headerFont)
         header.setDefaultAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
         self._treeWidget.setFrameShape(QtWidgets.QFrame.Shape.Box)
         self._treeWidget.setFrameShadow(QtWidgets.QFrame.Shadow.Plain)
@@ -353,7 +351,7 @@ class PlotWindow(QtWidgets.QMainWindow):
         self._treeWidget.itemClicked.connect(self._togglePeakSearchAction)
 
     def _fillTreeWidget(self) -> None:
-        font = QtGui.QFont("Segoe UI", 12)
+        font = QtGui.QFont("Segoe UI", 10)
         items = ["Text Files", "Antique'X Files", "Packet Files"]
         for label in items:
             item = QtWidgets.QTreeWidgetItem(self._treeWidget)
@@ -440,7 +438,7 @@ class PlotWindow(QtWidgets.QMainWindow):
             self._actionsMap["new"].setDisabled(False)
 
     def _addAnalyseToTree(self, analyse: datatypes.Analyse) -> None:
-        font = QtGui.QFont("Segoe UI", 11)
+        font = QtGui.QFont("Segoe UI", 10)
         font.setItalic(True)
         item = QtWidgets.QTreeWidgetItem()
         item.setCheckState(0, QtCore.Qt.CheckState.Unchecked)

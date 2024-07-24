@@ -192,7 +192,7 @@ class CalibrationDialog(QtWidgets.QDialog):
         self._tempProfile = None
         self._optimalY = None
         self.setStyleSheet("background-color: #FFFFFF")
-        self.resize(900, 600)
+        self.resize(1200, 800)
         self._createActions()
         self._createToolBar()
         self._createProfileBox()
