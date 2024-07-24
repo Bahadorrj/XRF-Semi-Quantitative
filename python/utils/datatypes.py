@@ -129,6 +129,7 @@ class Analyse:
         return cls.fromDict(analyseDict)
 
 
+@dataclass
 class PlotData:
     def __init__(
         self,

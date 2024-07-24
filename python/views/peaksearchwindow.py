@@ -348,14 +348,20 @@ class PeakSearchWindow(QtWidgets.QMainWindow):
 
     def _undo(self) -> None:
         if self._undoStack:
-            rowId, values, action = self._undoStack.pop()
-            # self._addRowToRedoStack(rowId, action)
-            self._tableWidget.updateRow(rowId, values)
+            temp = self._undoStack.pop()
+            if isinstance(temp, list):
+                for package in temp:
+                    rowId, values, action = package
+                    self._tableWidget.updateRow(rowId, values)
+                    self._rowChanged(rowId, action)
+            else:
+                rowId, values, action = temp
+                self._tableWidget.updateRow(rowId, values)
+                if not self._undoStack:
+                    self._undoAction.setDisabled(True)
+                self._rowChanged(rowId, action)
             if not self._undoStack:
                 self._undoAction.setDisabled(True)
-                # self._flag = True
-            # self._redoAction.setDisabled(False)
-            self._rowChanged(rowId, action)
 
     # def _redo(self) -> None:
     #     if self._redoStack:
@@ -583,7 +589,7 @@ class PeakSearchWindow(QtWidgets.QMainWindow):
                         self._analyse.data,
                     )
                 )[0].y
-                intensity = y[round(minX) : round(maxX)].sum()
+                intensity = y[round(minX): round(maxX)].sum()
             except IndexError:
                 intensity = "NA"
         self._tableWidget.addRow(data, series["symbol":"active"], intensity)
@@ -617,7 +623,7 @@ class PeakSearchWindow(QtWidgets.QMainWindow):
             y = list(filter(lambda d: d.condition == conditionId, self._analyse.data))[
                 0
             ].y
-            intensity = y[round(minX) : round(maxX)].sum()
+            intensity = y[round(minX): round(maxX)].sum()
         except IndexError:
             intensity = "NA"
         row.get(6).setText(str(intensity))
@@ -655,8 +661,8 @@ class PeakSearchWindow(QtWidgets.QMainWindow):
     def _addRowToUndoStack(self, rowId: int, action: str) -> None:
         if not self._undoStack:
             self._undoAction.setDisabled(False)
-        if len(self._undoStack) > 30:
-            self._undoStack.popleft()
+        # if len(self._undoStack) > 30:
+        #     self._undoStack.popleft()
         # if self._flag:
         #     self._redoStack.clear()
         #     self._redoAction.setDisabled(True)
@@ -734,7 +740,7 @@ class PeakSearchWindow(QtWidgets.QMainWindow):
                 y = list(
                     filter(lambda d: d.condition == conditionId, self._analyse.data)
                 )[0].y
-                intensity = y[round(minX) : round(maxX)].sum()
+                intensity = y[round(minX): round(maxX)].sum()
             except IndexError:
                 intensity = "NA"
         else:
@@ -872,23 +878,19 @@ class PeakSearchWindow(QtWidgets.QMainWindow):
         self._peakPlot.setXRange(minX, maxX, padding=0)
 
     def _openPopUp(self, event):
-        pos = event.pos()
         if event.button() == QtCore.Qt.MouseButton.RightButton:
-            mousePoint = self._peakPlot.vb.mapSceneToView(pos)
-            kev = calculation.pxToEv(mousePoint.x())
+            minX, maxX = self._zoomRegion.getRegion()
+            minKev = calculation.pxToEv(minX)
+            maxKev = calculation.pxToEv(maxX)
             self._peakPlot.vb.menu.clear()
-            greater = self._df["low_kiloelectron_volt"] <= kev
-            smaller = kev <= self._df["high_kiloelectron_volt"]
-            mask = np.logical_and(greater, smaller)
-            self._elementsInRange = self._df[mask]
-            for radiationLabel in self._df["radiation_type"].unique():
-                filteredData = self._elementsInRange[
-                    self._elementsInRange["radiation_type"] == radiationLabel
-                ]
-                if not filteredData.empty:
-                    menu = self._peakPlot.vb.menu.addMenu(radiationLabel)
+            self._elementsInRange = self._df.query(
+                f"kiloelectron_volt <= {maxKev} and high_kiloelectron_volt >= {minKev}"
+            )
+            if not self._elementsInRange.empty:
+                for radiationType in self._elementsInRange["radiation_type"].unique():
+                    menu = self._peakPlot.vb.menu.addMenu(radiationType)
                     menu.triggered.connect(self._actionClicked)
-                    for symbol in filteredData["symbol"]:
+                    for symbol in self._elementsInRange.query(f"radiation_type == '{radiationType}'")["symbol"]:
                         menu.addAction(symbol)
             showAllAction = self._peakPlot.vb.menu.addAction("Show All")
             showAllAction.triggered.connect(self._showAll)
@@ -903,8 +905,15 @@ class PeakSearchWindow(QtWidgets.QMainWindow):
         self._tableWidget.rowChanged.emit(rowId, "hide")
 
     def _showAll(self) -> None:
+        temp = self._undoStack.copy()
         for rowId in self._elementsInRange.index:
-            self._tableWidget.rowChanged.emit(rowId, "hide")
+            if self._plotDataList[rowId].visible is False:
+                self._tableWidget.rowChanged.emit(rowId, "hide")
+        stack = []
+        for i in range(len(temp), len(self._undoStack)):
+            stack.append(self._undoStack[i])
+        temp.append(stack)
+        self._undoStack = temp.copy()
 
     def addAnalyse(self, analyse: Analyse) -> None:
         self._analyse = analyse
