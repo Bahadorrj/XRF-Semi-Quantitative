@@ -49,6 +49,7 @@ class Analyse:
     data: list[AnalyseData] = field(default_factory=list)
     classification: str = field(default=None)
     concentrations: dict[str, float] = field(default_factory=dict)
+    status: str = field(default="Not Certified")
 
     def __init__(self, **kwargs) -> None:
         if "data" not in kwargs:
