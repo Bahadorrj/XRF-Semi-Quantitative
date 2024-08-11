@@ -6,10 +6,11 @@ from functools import partial
 
 
 class AnalytesAndConditionsWidget(QtWidgets.QWidget):
-    def __init__(self, parent=None, method=None):
+    def __init__(self, parent=None, method: dict = None):
+        assert method is not None, "method must be provided"
         super(AnalytesAndConditionsWidget, self).__init__(parent)
-        self.conditionsDataFrame = method['conditions']
-        self.linesDataframe = method['lines']
+        self.conditionsDataFrame = method["conditions"]
+        self.linesDataframe = method["lines"]
         self.buttonMap = {}
 
         self.setObjectName("analyte-widget")
