@@ -1,16 +1,18 @@
 import socket
-from dataclasses import dataclass, field
-from json import loads
-from pathlib import Path
-from typing import Union
-
 import numpy as np
 import pandas as pd
 import pyqtgraph as pg
+
+from dataclasses import dataclass, field
+from json import loads
+from pathlib import Path
 from PyQt6.QtCore import Qt
+from scipy.interpolate import CubicSpline
+from scipy.signal import find_peaks
 
 from python.utils import calculation
 from python.utils import encryption
+from python.utils.database import getDataframe
 
 
 @dataclass
@@ -18,6 +20,7 @@ class AnalyseData:
     condition: int
     x: np.ndarray
     y: np.ndarray
+    intensities: list = field(default_factory=list, init=False)
 
     def toDict(self) -> dict:
         return {"condition": self.condition, "x": self.x.tolist(), "y": self.y.tolist()}
@@ -43,29 +46,13 @@ class AnalyseData:
 @dataclass
 class Analyse:
     filename: str = field(default=None)
-    name: str = field(default=None)
-    extension: str = field(default=None)
-    generalData: dict[str] = field(default_factory=dict)
     data: list[AnalyseData] = field(default_factory=list)
-    classification: str = field(default=None)
-    concentrations: dict[str, float] = field(default_factory=dict)
-    status: str = field(default="Not Certified")
 
-    def __init__(self, **kwargs) -> None:
-        if "data" not in kwargs:
-            raise ValueError("Data is required for initialization in class Analyse")
-        if "concentrations" not in kwargs:
-            self.classification = "DEF"
-            self.concentrations = {}
-        else:
-            self.classification = "CAL"
-        if "generalData" not in kwargs:
-            self.generalData = {}
-        for key, value in kwargs.items():
-            setattr(self, key, value)
-            if key == "filename":
-                setattr(self, "name", Path(value).stem)
-                setattr(self, "extension", value.split(".")[-1])
+    def __init__(self, filename: str, data: list[AnalyseData]) -> None:
+        self.filename = filename
+        self.data = data
+        self.name = Path(self.filename).stem
+        self.extension = self.filename.split(".")[-1]
 
     def getDataByConditionId(self, condition: int) -> AnalyseData:
         return self.data[condition - 1]
@@ -73,11 +60,7 @@ class Analyse:
     def toDict(self) -> dict:
         return {
             "filename": getattr(self, "filename"),
-            "name": getattr(self, "name"),
-            "extension": getattr(self, "extension"),
-            "generalData": getattr(self, "generalData"),
             "data": [d.toDict() for d in getattr(self, "data")],
-            "concentrations": getattr(self, "concentrations"),
         }
 
     @classmethod
@@ -108,7 +91,7 @@ class Analyse:
         data.sort(key=lambda x: x.condition)
         analyseDict["data"] = data
         analyseDict["filename"] = filename
-        return cls(**analyseDict)
+        return cls(filename, data)
 
     @classmethod
     def fromATXFile(cls, filename: str) -> "Analyse":
@@ -129,6 +112,46 @@ class Analyse:
         analyseDict = loads(received)
         return cls.fromDict(analyseDict)
 
+
+@dataclass
+class Calibration:
+    analyse: Analyse = field(default=None)
+    generalData: dict = field(default_factory=dict)
+    concentrations: dict = field(default_factory=dict)
+    
+    def __init__(self, analyse: Analyse, generalData: dict, concentrations: dict) -> None:
+        self.analyse = analyse
+        self.generalData = generalData
+        self.concentrations = concentrations
+        self.lines = getDataframe("Lines")
+        self.coefficients = self._calculateCoefficients()
+        # interferences: dict = field(default_factory=dict)
+    
+    def _calculateCoefficients(self) -> dict:
+        coefficients = {}
+        for symbol in self.concentrations:
+            rows = self.lines.query(f"symbol == '{symbol}' and active == 1")
+            for row in rows:
+                y = list(filter(lambda d: d.condition == int(row["condition_id"]), self.analyse.data))[0].y
+                minX = calculation.evToPx(row['low_kiloelectron_volt'])
+                maxX = calculation.evToPx(row['high_kiloelectron_volt'])
+                intensity = y[round(minX) : round(maxX)].sum()
+                concentration = self.concentrations[row['symbol']]
+                coefficient = concentration / intensity
+                coefficients[symbol][row['radiation_type']] = coefficient
+        return coefficients
+    
+    @classmethod
+    def fromATXCFile(cls, filename: str) -> "Calibration":
+        key = encryption.loadKey()
+        with open(filename, "r") as f:
+            encryptedText = f.readline()
+        decryptedText = encryption.decryptText(encryptedText, key)
+        calibrationAsDict = loads(decryptedText)
+        kwargs = calibrationAsDict
+        analyse = Analyse.fromDict(calibrationAsDict["analyse"])
+        kwargs["analyse"] = analyse
+        return cls(**kwargs)
 
 @dataclass
 class PlotData:
@@ -218,7 +241,7 @@ class PlotData:
 
     @staticmethod
     def _generateRegion(
-        rng: Union[list[float, float], tuple[float, float]], movable: bool = True
+        rng: list[float, float] | tuple[float, float], movable: bool = True
     ):
         region = pg.LinearRegionItem(swapMode="push")
         region.setZValue(10)

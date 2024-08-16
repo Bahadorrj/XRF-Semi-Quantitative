@@ -1,5 +1,4 @@
 /* 
-
     #222831,
     #383E46,
     #393E46,
@@ -19,6 +18,16 @@
     #EEEEEE,
     WhiteSmoke: #F5F5F5,
     #FFFFFF,
+
+    #001429,
+    #002952,
+    #003D7A,
+    #0052A3,
+    #0066CC,
+    #3385D6,
+    #66A3E0,
+    #99C2EB,
+    #CCE0F5,
 
     #002324,
     #004548,
@@ -46,47 +55,31 @@
     font-size: 12px;
 }
 
-QHeaderView::section {
-    background-color: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #393E46, stop: 0.5 #383E46, stop: 0.6 #222831, stop:1 #4D5159);
-    color: #F5F5F5;
-    border: None;
-}
-
-QTableView::item:hover {
-    background-color: #D3D3D3;
-}
-
-QTableView::item:selected {
-    background-color: #696969;
-    color: #F5F5F5;
-}
-
-QTableView::item:focus {
-    border: 2px solid #222831;
+QTableView {
+    border: 1px solid black;
 }
 
 QTreeView {
-    /*Ensures that the entire row is highlighted when a tree item is selected, not just the item's text.*/
     show-decoration-selected: 1;
     border: 1px solid black;
 }
 
 QTreeView::item {
-    border: None;
+    border: none;
 }
 
 QTreeView::item:hover {
-    background: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1, stop: 0 #E7EFFD, stop: 1 #CBDAF1);
+    background: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1, stop: 0 #EEEEEE, stop: 1 #CCE0F5);
 }
 
 QTreeView::item:selected:active{
-    background-color: #74787E;
-    color: #F5F5F5;
+    background-color: #CCE0F5;
+    color: black;
 }
 
 QTreeView::item:selected:!active {
-    background-color: #696969;
-    color: #F5F5F5;
+    background-color: #CCE0F5;
+    color: black;
 }
 
 QTreeView::branch:has-siblings:!adjoins-item {
@@ -103,14 +96,12 @@ QTreeView::branch:!has-children:!has-siblings:adjoins-item {
 
 QTreeView::branch:has-children:!has-siblings:closed,
 QTreeView::branch:closed:has-children:has-siblings {
-    border-image: none;
-    image: url(icons/branch-closed.png);
+    border-image: url(icons/branch-closed.png) 0;
 }
 
 QTreeView::branch:open:has-children:!has-siblings,
 QTreeView::branch:open:has-children:has-siblings  {
-    border-image: none;
-    image: url(icons/branch-open.png);
+    border-image: url(icons/branch-open.png) 0;
 }
 
 QComboBox {
@@ -118,16 +109,12 @@ QComboBox {
     border-radius: 3px;
 }
 
-QComboBox:hover {
-    border: 2px solid black;
-}
-
 QComboBox::drop-down {
     subcontrol-origin: padding;
     subcontrol-position: top right;
     width: 15px;
     border-left-width: 1px;
-    border-left-color: DarkGray;
+    border-left-color: #A9A9A9;
     border-left-style: solid;
     border-top-right-radius: 3px;
     border-bottom-right-radius: 3px;
@@ -141,48 +128,84 @@ QComboBox::down-arrow {
 QComboBox QAbstractItemView {
     border-radius: 3px;
     border: 1px solid gray;
-    selection-background-color: LightGray;
-    background-color: AliceBlue; /* Custom background color for the drop-down menu */
+    selection-background-color: #C0C0C0;
+    background-color: #696969; 
 }
 
 QComboBox QAbstractItemView::item {
     padding: 5px;
+    color: #F5F5F5;
 }
 
-/* Plot Window */
-#file-tree > QHeaderView::section {
-    font-size: 14px;
-    font-weight: bold;
-    letter-spacing: 2px;
+QLineEdit {
+    border-radius: 3px;
+    border: 1px solid black;
+    padding: 5px;
 }
-
-#condition-form {
+/* PlotWidget */
+#plot-widget {
     border: 1px solid black;
 }
 
-#condition-form > QComboBox {
+/* LineWidget */
+#filter-combo-box {
+    padding: 5px 15px 5px 5px;
+}
+
+/* PeakSearchWidget */
+#search-line-edit {
+    padding: 5px 18px 5px 5px;
+    width: 33px;
+}
+
+#search-combo-box {
+    padding: 5px 18px 5px 5px;
+}
+
+#status-label {
+    font-size: 14px; 
+    color: #A9A9A9;
     padding: 5px;
 }
 
-#condition-form > QTableWidget {
-    border: 1px solid black;
-    font-size: 14px;
+#hide-button {
+    background-color: transparent;
 }
 
-#condition-form > QTableWidget > QHeaderView::section {
+#status-button {
+    width: 75px;
+    font-weight: bold;
     font-size: 14px;
-    background-color: Silver;
-    color: white;
+    color: #F5F5F5;
+    background-color: #0066CC;
+    padding: 2px 5px;
+    border: 2px solid #0066cc;
+    border-radius: 5px;
 }
 
-#plot-widget {
-    border: 1px solid black;
+#status-button:hover {
+    background-color: #F5F5F5;
+    color: #0066cc;
+    border: 2px solid #0066cc;
+}
+
+#status-button:pressed {
+    background-color: #F5F5F5;
+    color: #011B35;
+    border: 2px solid #011B35;
+}
+
+#coordinate-label {
+    font-size: 14px; 
+    color: #A9A9A9;
+    padding: 5px;
+    letter-spacing: 2px
 }
 
 /* Method Explorer */
 #analyte-widget QPushButton {
     width: 30px;
-    height: 30;
+    height: 30px;
     border: 2px inset #696969;
     border-radius: 5px;
     background-color: #F5F5F5;
@@ -196,7 +219,7 @@ QComboBox QAbstractItemView::item {
 }
 
 #analyte-widget QPushButton::pressed  {
-    background-color: #74787E;
+    background-color: #696969;
     color: #F5F5F5;
     font-weight: bold;
 }
@@ -205,4 +228,24 @@ QComboBox QAbstractItemView::item {
     background-color: #33BDC4;
     color: #F5F5F5;
     font-weight: bold;
+}
+
+#analyte-widget QHeaderView::section {
+    background-color: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #980A33, stop: 0.5 #660722, stop: 0.6 #330311, stop:1 #CB0E44);
+    color: #F5F5F5;
+    border: none;
+    border-bottom: 1px solid black;
+}
+
+#condition-table::item:hover {
+    background-color: #D3D3D3;
+}
+
+#condition-table::item:selected {
+    background-color: #696969;
+    color: #F5F5F5;
+}
+
+#condition-table::item:focus {
+    border: 2px solid #222831;
 }

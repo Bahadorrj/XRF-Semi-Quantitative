@@ -11,8 +11,8 @@ from python.utils import encryption
 from python.utils.database import getDatabase
 from python.utils.paths import resourcePath
 from python.views.calibrationdialog import CalibrationDialog
-from python.views.elementswindow import ElementsWindow
-from python.views.peaksearchwindow import PeakSearchWindow
+from python.views.explorers.calibrationexplorer.linestablewidget import LinesTableWidget
+from python.views.explorers.calibrationexplorer.peaksearchwidget import PeakSearchWidget
 
 COLORS = [
     "#FF0000",
@@ -74,7 +74,7 @@ class ConditionForm(QtWidgets.QListView):
         mainLayout = QtWidgets.QVBoxLayout(self)
         mainLayout.addWidget(self._selectorComboBox)
         mainLayout.addWidget(self._tableWidget)
-        self.setMaximumHeight(350)
+        self.setMaximumHeight(360)
         self.setMinimumHeight(150)
         self.setSizePolicy(
             QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Maximum
@@ -94,6 +94,9 @@ class ConditionForm(QtWidgets.QListView):
             QtWidgets.QHeaderView.ResizeMode.Stretch
         )
         self._tableWidget.horizontalHeader().setVisible(False)
+        self._tableWidget.verticalHeader().setSectionResizeMode(
+            QtWidgets.QHeaderView.ResizeMode.Stretch
+        )
         self._tableWidget.setAlternatingRowColors(True)
         self._tableWidget.setEditTriggers(
             QtWidgets.QTreeWidget.EditTrigger.NoEditTriggers
@@ -133,8 +136,8 @@ class PlotWindow(QtWidgets.QMainWindow):
         self._db = getDatabase(resourcePath("fundamentals.db"))
         self._indexOfFile = None
         self._analyseFiles = list()
-        self._elementsWindow: Optional[ElementsWindow] = None
-        self._peakSearchWindow: Optional[PeakSearchWindow] = None
+        self._elementsWindow: Optional[LinesTableWidget] = None
+        self._peakSearchWindow: Optional[PeakSearchWidget] = None
         self._blank = datatypes.Analyse.fromTextFile(
             "Additional/Pure samples/8 mehr/Blank.txt"
         )
@@ -186,7 +189,7 @@ class PlotWindow(QtWidgets.QMainWindow):
         elif key == "close":
             self.close()
         elif key == "elements":
-            self._elementsWindow = ElementsWindow()
+            self._elementsWindow = LinesTableWidget()
             self._elementsWindow.show()
         elif key == "peak-search":
             self._showPeakSearchWindow()
@@ -494,7 +497,7 @@ class PlotWindow(QtWidgets.QMainWindow):
                         f.write(str(i) + "\n")
 
     def _showPeakSearchWindow(self) -> None:
-        self._peakSearchWindow = PeakSearchWindow()
+        self._peakSearchWindow = PeakSearchWidget()
         dataItem = self._treeWidget.currentItem()
         analyseItem = dataItem.parent()
         extensionItem = analyseItem.parent()

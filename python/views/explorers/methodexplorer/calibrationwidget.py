@@ -7,11 +7,8 @@ from python.utils.datatypes import Analyse
 
 
 class CalibrationWidget(QtWidgets.QWidget):
-    def __init__(
-        self,
-        parent: QtWidgets.QWidget | None = ...,
-        method: dict = ...,
-    ) -> None:
+    def __init__(self, parent: QtWidgets.QWidget | None = None, method: dict | None = ...,):
+        assert method is not None, "method must be provided"
         super().__init__(parent)
         self._method = method
 

@@ -1,8 +1,9 @@
 import os
 import sqlite3
-from typing import Optional
 
 import pandas as pd
+
+from python.utils.paths import resourcePath
 
 
 class Database:
@@ -43,11 +44,19 @@ class Database:
         return df
 
 
-db: Optional[Database] = None
+_db = Database(resourcePath("fundamentals.db"))
+_dataframes = {
+    "Lines": _db.dataframe("SELECT * FROM Lines"),
+    "Elements": _db.dataframe("SELECT * FROM Elements"),
+    "Conditions": _db.dataframe("SELECT * FROM Conditions"),
+}
 
 
 def getDatabase(databasePath: str) -> Database:
-    global db
-    if not db:
-        db = Database(databasePath)
-    return db
+    global _db
+    return _db
+
+
+def getDataframe(dataframeName: str) -> pd.DataFrame:
+    global _dataframes
+    return _dataframes[dataframeName]
