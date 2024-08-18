@@ -1,12 +1,15 @@
+import numpy as np
+import pyqtgraph as pg
+
 from functools import partial, cache
 from typing import Optional
 
-import numpy as np
-import pyqtgraph as pg
 from PyQt6 import QtCore, QtGui, QtWidgets
 
 from python.utils import datatypes
 from python.utils.paths import resourcePath
+
+pg.setConfigOptions(antialias=True)
 
 COLORS = [
     "#FF0000",
@@ -28,12 +31,12 @@ COLORS = [
 
 class PlotWidget(QtWidgets.QWidget):
     def __init__(
-        self, parent: QtWidgets.QWidget | None = None, calibration: dict | None = None
+        self, parent: QtWidgets.QWidget | None = None, calibration: datatypes.Calibration | None = None
     ):
-        assert calibration is not None, "Calibration must be provided"
+        assert calibration is not None, "calibration must be provided"
         super(PlotWidget, self).__init__(parent)
         self._calibration = calibration
-        self._analyseFiles = [self._calibration["analyse"]]
+        self._analyseFiles = []
         
         self._createActions()
         self._createToolBar()
@@ -46,14 +49,14 @@ class PlotWidget(QtWidgets.QWidget):
 
     def _createActions(self) -> None:
         self._actionsMap = {}
-        actions = ("New", "Add")
+        actions = ("reset", "Add")
         for label in actions:
             action = QtGui.QAction(label)
             key = "-".join(label.lower().split(" "))
             action.setIcon(QtGui.QIcon(resourcePath(f"icons/{key}.png")))
             self._actionsMap[key] = action
             action.triggered.connect(partial(self._actionTriggered, key))
-        self._actionsMap["new"].setDisabled(True)
+        self._actionsMap["reset"].setDisabled(True)
 
     @QtCore.pyqtSlot()
     def _actionTriggered(self, key: str) -> None:
@@ -71,7 +74,7 @@ class PlotWidget(QtWidgets.QWidget):
                 topLevelItem = self._treeWidget.topLevelItem(mapper[filters])
                 if not topLevelItem.isExpanded():
                     self._treeWidget.expandItem(topLevelItem)
-        elif key == "new":
+        elif key == "reset":
             self.resetWindow()
 
     def _createToolBar(self) -> None:
@@ -83,17 +86,13 @@ class PlotWidget(QtWidgets.QWidget):
         self._fillToolBarWithActions()
 
     def _fillToolBarWithActions(self) -> None:
-        self._toolBar.addAction(self._actionsMap["new"])
+        self._toolBar.addAction(self._actionsMap["reset"])
         self._toolBar.addAction(self._actionsMap["add"])
 
     def _createPlotWidget(self) -> None:
         self._plotWidget = pg.PlotWidget()
         self._plotWidget.setObjectName("plot-widget")
         self._plotWidget.setBackground("#FFFFFF")
-        self._plotWidget.setLabel("bottom", '<span style="font-size:1.5rem">px</span>')
-        self._plotWidget.setLabel(
-            "left", '<span style="font-size:1.5rem">Intensity</span>'
-        )
         self._plotWidget.showGrid(x=True, y=True)
         self._plotWidget.setFrameShape(QtWidgets.QFrame.Shape.NoFrame)
         self._plotWidget.setFixedWidth(700)
@@ -149,6 +148,7 @@ class PlotWidget(QtWidgets.QWidget):
 
     def _setUpView(self) -> None:
         self._mainLayout = QtWidgets.QVBoxLayout()
+        self._mainLayout.setContentsMargins(0, 0, 0, 0)
         self._mainLayout.addWidget(self._toolBar)
         hLayout = QtWidgets.QHBoxLayout()
         hLayout.addWidget(self._plotWidget)
@@ -173,7 +173,7 @@ class PlotWidget(QtWidgets.QWidget):
         extension = filename[-4:]
         analyse: Optional[datatypes.Analyse] = None
         if extension == ".txt":
-            analyse = datatypes.Analyse.fromTextFile(filename)
+            analyse = datatypes.Analyse.fromTXTFile(filename)
         elif extension == ".atx":
             analyse = datatypes.Analyse.fromATXFile(filename)
         return analyse
@@ -181,8 +181,8 @@ class PlotWidget(QtWidgets.QWidget):
     def addAnalyse(self, analyse: datatypes.Analyse) -> None:
         self._analyseFiles.append(analyse)
         self._addAnalyseToTree(analyse)
-        if not self._actionsMap["new"].isEnabled():
-            self._actionsMap["new"].setDisabled(False)
+        if not self._actionsMap["reset"].isEnabled():
+            self._actionsMap["reset"].setDisabled(False)
 
     def _addAnalyseToTree(
         self,
@@ -199,7 +199,7 @@ class PlotWidget(QtWidgets.QWidget):
         )
         for index, data in enumerate(analyse.data):
             child = QtWidgets.QTreeWidgetItem()
-            child.setText(0, f"Condition {data.condition}")
+            child.setText(0, f"Condition {data.conditionId}")
             child.setFlags(child.flags() | QtCore.Qt.ItemFlag.ItemIsUserCheckable)
             child.setCheckState(0, checkState)
             item.addChild(child)
@@ -215,15 +215,15 @@ class PlotWidget(QtWidgets.QWidget):
     def _addCalibrationToTree(self) -> None:
         item = QtWidgets.QTreeWidgetItem()
         item.setCheckState(0, QtCore.Qt.CheckState.Checked)
-        item.setText(0, self._calibration["analyse"].name)
+        item.setText(0, self._calibration.analyse.name)
         item.setFlags(
             item.flags()
             | QtCore.Qt.ItemFlag.ItemIsAutoTristate
             | QtCore.Qt.ItemFlag.ItemIsUserCheckable
         )
-        for index, data in enumerate(self._calibration["analyse"].data):
+        for index, data in enumerate(self._calibration.analyse.data):
             child = QtWidgets.QTreeWidgetItem()
-            child.setText(0, f"Condition {data.condition}")
+            child.setText(0, f"Condition {data.conditionId}")
             child.setFlags(child.flags() | QtCore.Qt.ItemFlag.ItemIsUserCheckable)
             child.setCheckState(0, QtCore.Qt.CheckState.Checked)
             item.addChild(child)
@@ -247,7 +247,7 @@ class PlotWidget(QtWidgets.QWidget):
         messageBox.setIcon(QtWidgets.QMessageBox.Icon.Question)
         result = messageBox.exec()
         if result == QtWidgets.QMessageBox.StandardButton.Yes:
-            self._analyseFiles = self._analyseFiles[:1]
+            self._analyseFiles = []
             for topLevelIndex in range(1, self._treeWidget.topLevelItemCount()):
                 item = self._treeWidget.topLevelItem(topLevelIndex)
                 while item.childCount() != 0:
@@ -283,7 +283,7 @@ class PlotWidget(QtWidgets.QWidget):
                 maxIntensity = temp
                 self._setPlotLimits(maxIntensity)
             if extensionIndex == 0:
-                self._plot(x, y, name=f"Condition {data.condition}", pen=pg.mkPen(color=color, width=2))
+                self._plot(x, y, name=f"Condition {data.conditionId}", pen=pg.mkPen(color=color, width=2))
             else:
                 self._plot(x, y, pen=pg.mkPen(color=color, width=2))
 
@@ -291,6 +291,8 @@ class PlotWidget(QtWidgets.QWidget):
     def _getDataFromIndex(
         self, extensionIndex: int, analyseIndex: int, dataIndex: int
     ) -> datatypes.AnalyseData:
+        if extensionIndex == 0:
+            return self._calibration.analyse.data[dataIndex]
         return self._getAnalyseFromIndex(extensionIndex, analyseIndex).data[dataIndex]
 
     @cache
@@ -298,8 +300,6 @@ class PlotWidget(QtWidgets.QWidget):
         self, extensionIndex: int, analyseIndex: int
     ) -> datatypes.Analyse:
         mapper = {0: "calibration", 1: "txt", 2: "atx"}
-        if extensionIndex == 0:
-            return self._analyseFiles[0]
         analyse = list(
             filter(lambda a: a.extension == mapper[extensionIndex], self._analyseFiles)
         )[analyseIndex]
@@ -314,3 +314,13 @@ class PlotWidget(QtWidgets.QWidget):
 
     def _plot(self, x: np.ndarray, y: np.ndarray, *args, **kwargs) -> None:
         self._plotWidget.plot(x, y, *args, **kwargs)
+
+    def reinitialize(self, calibration: datatypes.Calibration) -> None:
+        self._calibration = calibration
+        self._analyseFiles = []
+        for topLevelIndex in range(1, self._treeWidget.topLevelItemCount()):
+            item = self._treeWidget.topLevelItem(topLevelIndex)
+            while item.childCount() != 0:
+                item.takeChild(0)
+                self._actionsMap['add'].setDisabled(True)
+        self._drawCanvas()

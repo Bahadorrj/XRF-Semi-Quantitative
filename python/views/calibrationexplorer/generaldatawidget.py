@@ -40,3 +40,6 @@ class GeneralDataWidget(QtWidgets.QWidget):
                     layout.addStretch()
             self._mainLayout.addLayout(layout)
         self.setLayout(self._mainLayout)
+        
+    def reinitialize(self):
+        pass

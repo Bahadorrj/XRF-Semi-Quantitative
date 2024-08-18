@@ -1,6 +1,5 @@
 from functools import partial
 from PyQt6 import QtCore, QtGui, QtWidgets
-
 from python.utils.paths import resourcePath
 
 
@@ -9,7 +8,7 @@ class Explorer(QtWidgets.QMainWindow):
         super(Explorer, self).__init__(parent)
         self.setFixedSize(1200, 800)
 
-    def _createActions(self, labels: list[str] | tuple[str]) -> None:
+    def _createActions(self, labels: list | tuple) -> None:
         self._actionsMap = {}
         for label in labels:
             action = QtGui.QAction(label)
@@ -25,7 +24,7 @@ class Explorer(QtWidgets.QMainWindow):
     def _reinitializeWidget(self):
         pass
 
-    def _createMenus(self, labels: list[str] | tuple[str]) -> None:
+    def _createMenus(self, labels: list | tuple) -> None:
         self._menusMap = {}
         menuBar = self.menuBar()
         for label in labels:
@@ -33,7 +32,7 @@ class Explorer(QtWidgets.QMainWindow):
             key = label.lower()[1:]
             self._menusMap[key] = menu
 
-    def _fillMenusWithActions(self, relations: dict[list]) -> None:
+    def _fillMenusWithActions(self, relations: dict) -> None:
         for key, values in relations.items():
             for value in values:
                 self._menusMap[key].addAction(self._actionsMap[value])
@@ -45,7 +44,7 @@ class Explorer(QtWidgets.QMainWindow):
         self._toolBar.setMovable(False)
         self.addToolBar(self._toolBar)
 
-    def _fillToolBarWithActions(self, labels: list[str] | tuple[str]) -> None:
+    def _fillToolBarWithActions(self, labels: list | tuple) -> None:
         for label in labels:
             self._toolBar.addAction(self._actionsMap[label])
 
@@ -54,7 +53,7 @@ class Explorer(QtWidgets.QMainWindow):
         self._treeWidget.setFixedWidth(200)
         self._treeWidget.itemSelectionChanged.connect(self._changeWidget)
 
-    def _fillTreeWithItems(self, header: str, labels: list[str] | tuple[str]) -> None:
+    def _fillTreeWithItems(self, header: str, labels: list | tuple) -> None:
         self._treeItemMap = {}
         headerItem = QtWidgets.QTreeWidgetItem()
         headerItem.setText(0, header)

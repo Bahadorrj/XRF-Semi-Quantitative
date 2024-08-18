@@ -1,32 +1,41 @@
 import socket
+import pandas
+
 import numpy as np
-import pandas as pd
 import pyqtgraph as pg
 
 from dataclasses import dataclass, field
 from json import loads
 from pathlib import Path
+from collections import defaultdict
+
 from PyQt6.QtCore import Qt
-from scipy.interpolate import CubicSpline
-from scipy.signal import find_peaks
 
 from python.utils import calculation
 from python.utils import encryption
 from python.utils.database import getDataframe
 
-
-@dataclass
+@dataclass(order=True)
 class AnalyseData:
-    condition: int
+    conditionId: int
     x: np.ndarray
     y: np.ndarray
-    intensities: list = field(default_factory=list, init=False)
 
-    def toDict(self) -> dict:
-        return {"condition": self.condition, "x": self.x.tolist(), "y": self.y.tolist()}
+    def calculateIntensities(self, lines: pandas.DataFrame) -> dict:
+        intensities = defaultdict(dict)
+        for row in lines.itertuples():
+            intensity = self.y[
+                int(calculation.evToPx(row.low_kiloelectron_volt)):
+                int(calculation.evToPx(row.high_kiloelectron_volt))
+            ].sum()
+            intensities[row.symbol][row.radiation_type] = intensity
+        return intensities
+
+    def toHashableDict(self) -> dict:
+        return {"condition": self.conditionId, "x": self.x.tolist(), "y": self.y.tolist()}
 
     @classmethod
-    def fromDict(cls, data: dict) -> "AnalyseData":
+    def fromHashableDict(cls, data: dict) -> "AnalyseData":
         return cls(data["condition"], np.array(data["x"]), np.array(data["y"]))
 
     @classmethod
@@ -43,35 +52,33 @@ class AnalyseData:
         return cls(condition, x, y) if condition is not None else None
 
 
-@dataclass
+@dataclass(order=True)
 class Analyse:
     filename: str = field(default=None)
     data: list[AnalyseData] = field(default_factory=list)
 
-    def __init__(self, filename: str, data: list[AnalyseData]) -> None:
-        self.filename = filename
-        self.data = data
+    def __post_init__(self) -> None:
         self.name = Path(self.filename).stem
         self.extension = self.filename.split(".")[-1]
 
-    def getDataByConditionId(self, condition: int) -> AnalyseData:
-        return self.data[condition - 1]
+    def getDataByConditionId(self, conditionId: int) -> AnalyseData:
+        return list(filter(lambda d: d.conditionId == conditionId, self.data))[0]
 
-    def toDict(self) -> dict:
+    def toHashableDict(self) -> dict:
         return {
             "filename": getattr(self, "filename"),
-            "data": [d.toDict() for d in getattr(self, "data")],
+            "data": [d.toHashableDict() for d in self.data],
         }
 
     @classmethod
-    def fromDict(cls, analyseDict: dict) -> "Analyse":
+    def fromHashableDict(cls, analyseDict: dict) -> "Analyse":
         analyseDict["data"] = [
-            AnalyseData.fromDict(dataDict) for dataDict in analyseDict["data"]
+            AnalyseData.fromHashableDict(dataDict) for dataDict in analyseDict["data"]
         ]
         return cls(**analyseDict)
 
     @classmethod
-    def fromTextFile(cls, filename: str) -> "Analyse":
+    def fromTXTFile(cls, filename: str) -> "Analyse":
         # TODO change in future
         analyseDict = {}
         data = []
@@ -88,7 +95,7 @@ class Analyse:
                             data.append(analyseData)
                 else:
                     stop += 1
-        data.sort(key=lambda x: x.condition)
+        data.sort(key=lambda x: x.conditionId)
         analyseDict["data"] = data
         analyseDict["filename"] = filename
         return cls(filename, data)
@@ -100,7 +107,7 @@ class Analyse:
             encryptedText = f.readline()
             decryptedText = encryption.decryptText(encryptedText, key)
             analyseDict = loads(decryptedText)
-        return cls.fromDict(analyseDict)
+        return cls.fromHashableDict(analyseDict)
 
     @classmethod
     def fromSocket(cls, connection: socket.socket) -> "Analyse":
@@ -110,36 +117,44 @@ class Analyse:
             if received[-4:] == "stp":
                 break
         analyseDict = loads(received)
-        return cls.fromDict(analyseDict)
+        return cls.fromHashableDict(analyseDict)
 
 
-@dataclass
+@dataclass(order=True)
 class Calibration:
     analyse: Analyse = field(default=None)
     generalData: dict = field(default_factory=dict)
     concentrations: dict = field(default_factory=dict)
+    lines: pandas.DataFrame = field(default=None)
     
-    def __init__(self, analyse: Analyse, generalData: dict, concentrations: dict) -> None:
-        self.analyse = analyse
-        self.generalData = generalData
-        self.concentrations = concentrations
-        self.lines = getDataframe("Lines")
-        self.coefficients = self._calculateCoefficients()
-        # interferences: dict = field(default_factory=dict)
-    
-    def _calculateCoefficients(self) -> dict:
+    def calculateCoefficients(self, lines: pandas.DataFrame) -> dict:
         coefficients = {}
-        for symbol in self.concentrations:
-            rows = self.lines.query(f"symbol == '{symbol}' and active == 1")
-            for row in rows:
-                y = list(filter(lambda d: d.condition == int(row["condition_id"]), self.analyse.data))[0].y
-                minX = calculation.evToPx(row['low_kiloelectron_volt'])
-                maxX = calculation.evToPx(row['high_kiloelectron_volt'])
-                intensity = y[round(minX) : round(maxX)].sum()
-                concentration = self.concentrations[row['symbol']]
-                coefficient = concentration / intensity
-                coefficients[symbol][row['radiation_type']] = coefficient
+        for symbol, concentration in self.concentrations.items():
+            row = lines.query(f"symbol == '{symbol}' and active == 1")
+            conditionId = row["condition_id"].values[0]
+            radiationType = row["radiation_type"].values[0]
+            data = self.analyse.getDataByConditionId(conditionId)
+            intensity = data.calculateIntensities(lines)[symbol][radiationType]
+            coefficient = concentration / intensity if intensity != 0 else 0
+            coefficients[symbol] = coefficient
         return coefficients
+    
+    def calculateInterferences(self, lines: pandas.DataFrame) -> dict:
+        interferences = {}
+        for symbol in self.concentrations.keys():
+            row = lines.query(f"symbol == '{symbol}' and active == 1")
+            conditionId = row["condition_id"].values[0]
+            radiationType = row["radiation_type"].values[0]
+            data = self.analyse.getDataByConditionId(conditionId)
+            intensities = data.calculateIntensities(lines)
+            intensity = intensities[symbol][radiationType]
+            interference = defaultdict(dict)
+            for interfererSymbol, values in intensities.items():
+                for interfererRadiationType, interfererIntensity in values.items():
+                    if interfererSymbol != symbol and interfererRadiationType != radiationType:
+                        interference[interfererSymbol][interfererRadiationType] = interfererIntensity / intensity
+            interferences[symbol] = interference
+        return interferences
     
     @classmethod
     def fromATXCFile(cls, filename: str) -> "Calibration":
@@ -149,29 +164,24 @@ class Calibration:
         decryptedText = encryption.decryptText(encryptedText, key)
         calibrationAsDict = loads(decryptedText)
         kwargs = calibrationAsDict
-        analyse = Analyse.fromDict(calibrationAsDict["analyse"])
+        analyse = Analyse.fromHashableDict(calibrationAsDict["analyse"])
         kwargs["analyse"] = analyse
+        kwargs["lines"] = pandas.DataFrame(kwargs["lines"])
         return cls(**kwargs)
 
-@dataclass
+    def copy(self) -> "Calibration":
+        calibration = Calibration(self.analyse, self.generalData.copy(), self.concentrations.copy(), self.lines.copy())
+        return calibration
+
+@dataclass(order=True)
 class PlotData:
-    def __init__(
-        self,
-        rowId: int,
-        spectrumLine: pg.InfiniteLine,
-        peakLine: pg.InfiniteLine,
-        region: pg.LinearRegionItem,
-        visible: bool,
-        active: bool,
-        condition: int,
-    ):
-        self.rowId = rowId
-        self.spectrumLine = spectrumLine
-        self.peakLine = peakLine
-        self.region = region
-        self.visible = visible
-        self.active = active
-        self.condition = condition
+    rowId: int
+    spectrumLine: pg.InfiniteLine
+    peakLine: pg.InfiniteLine
+    region: pg.LinearRegionItem
+    visible: bool
+    active: bool
+    conditionId: int
 
     def activate(self):
         self.active = True
@@ -184,7 +194,7 @@ class PlotData:
         self.spectrumLine.pen.setStyle(Qt.PenStyle.DashLine)
 
     @classmethod
-    def fromSeries(cls, rowId: int, series: pd.Series) -> "PlotData":
+    def fromSeries(cls, rowId: int, series: pandas.Series) -> "PlotData":
         active = bool(series["active"])
         spectrumLine = cls._generateLine(series)
         peakLine = cls._generateLine(series, lineType="peak")
@@ -202,7 +212,7 @@ class PlotData:
         )
 
     @staticmethod
-    def _generateLine(series: pd.Series, lineType: str = "spectrum") -> pg.InfiniteLine:
+    def _generateLine(series: pandas.Series, lineType: str = "spectrum") -> pg.InfiniteLine:
         value = calculation.evToPx(float(series["kiloelectron_volt"]))
         line = pg.InfiniteLine()
         line.setAngle(90)
@@ -249,3 +259,10 @@ class PlotData:
         region.setBounds((0, 2048))
         region.setMovable(movable)
         return region
+
+
+@dataclass(order=True)
+class Method:
+    conditions: pandas.DataFrame = field(default=None)
+    elements: pandas.DataFrame = field(default=None)
+    calibrations: list[Calibration] = field(default_factory=list)

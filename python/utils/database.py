@@ -52,7 +52,7 @@ _dataframes = {
 }
 
 
-def getDatabase(databasePath: str) -> Database:
+def getDatabase() -> Database:
     global _db
     return _db
 
