@@ -1,19 +1,17 @@
 import socket
-import pandas
-
-import numpy as np
-import pyqtgraph as pg
-
+from collections import defaultdict
 from dataclasses import dataclass, field
 from json import loads
 from pathlib import Path
-from collections import defaultdict
 
+import numpy as np
+import pandas
+import pyqtgraph as pg
 from PyQt6.QtCore import Qt
 
 from python.utils import calculation
 from python.utils import encryption
-from python.utils.database import getDataframe
+
 
 @dataclass(order=True)
 class AnalyseData:
@@ -266,3 +264,7 @@ class Method:
     conditions: pandas.DataFrame = field(default=None)
     elements: pandas.DataFrame = field(default=None)
     calibrations: list[Calibration] = field(default_factory=list)
+
+    def copy(self) -> "Method":
+        method = Method(self.conditions.copy(), self.elements.copy(), self.calibrations.copy())
+        return method

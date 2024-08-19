@@ -1,7 +1,6 @@
-import pyqtgraph as pg
 import numpy as np
-
-from PyQt6 import QtWidgets, QtCore, QtGui
+import pyqtgraph as pg
+from PyQt6 import QtWidgets
 
 from python.utils import datatypes
 
@@ -10,12 +9,15 @@ class CoefficientWidget(QtWidgets.QWidget):
     def __init__(self, parent: QtWidgets.QWidget | None = None, calibration: datatypes.Calibration | None = None):
         assert calibration is not None, "calibration must be provided"
         super(CoefficientWidget, self).__init__(parent)
-        self._calibration = calibration
-        
+        self._initializeClassVariables(calibration)
+
         self._createLineSelectLayout()
         self._createPlotWidget()
         self._setUpView()
         self._drawCanvas()
+
+    def _initializeClassVariables(self, calibration: datatypes.Calibration) -> None:
+        self._calibration = calibration
     
     def _createLineSelectLayout(self) -> None:
         self._lineSelectLayout = QtWidgets.QHBoxLayout()
@@ -75,5 +77,5 @@ class CoefficientWidget(QtWidgets.QWidget):
         self._initializeRadiations()
 
     def reinitialize(self, calibration: datatypes.Calibration):
-        self._calibration = calibration
+        self._initializeClassVariables(calibration)
         self.reinitializeRadiations()

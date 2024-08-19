@@ -1,7 +1,6 @@
 from PyQt6 import QtCore, QtWidgets
 
 from python.utils import datatypes
-
 from python.views.base.tablewidgets import DataframeTableWidget
 
 
@@ -16,7 +15,7 @@ class LinesTableWidget(QtWidgets.QWidget):
         self._createFilterLayout()
         self._createTableWidgets()
         self._setUpView()
-        self.setFilter(self._filterComboBox.currentText())
+        self.setFilter(self._searchComboBox.currentText())
 
     def _initializeClassVariables(self, calibration: datatypes.Calibration) -> None:
         self._calibration = calibration
@@ -28,15 +27,15 @@ class LinesTableWidget(QtWidgets.QWidget):
         )
 
     def _createFilterLayout(self) -> None:
-        self._filterComboBox = QtWidgets.QComboBox()
-        self._filterComboBox.setObjectName("filter-combo-box")
-        self._filterComboBox.addItems(
+        self._searchComboBox = QtWidgets.QComboBox()
+        self._searchComboBox.setObjectName("search-combo-box")
+        self._searchComboBox.addItems(
             ["All Lines", "Active Lines"]
         )
-        self._filterComboBox.currentTextChanged.connect(self.setFilter)
+        self._searchComboBox.currentTextChanged.connect(self.setFilter)
         self._searchLayout = QtWidgets.QHBoxLayout()
         self._searchLayout.addWidget(QtWidgets.QLabel("Filter by: "))
-        self._searchLayout.addWidget(self._filterComboBox)
+        self._searchLayout.addWidget(self._searchComboBox)
         self._searchLayout.addStretch()
 
     def _setUpView(self) -> None:

@@ -1,9 +1,6 @@
 import pandas
 
-from PyQt6 import QtWidgets, QtCore, QtGui
-
-from python.utils.database import getDataframe
-from python.utils.paths import resourcePath
+from PyQt6 import QtWidgets, QtCore
 
 
 class TableItem(QtWidgets.QTableWidgetItem):
@@ -95,8 +92,6 @@ class DataframeTableWidget(TableWidget):
         if self._autofill:
             self.setHeaders(self._df.columns.str.title())
             self.fillTable()
-            self.horizontalHeader().setSectionResizeMode(QtWidgets.QHeaderView.ResizeMode.ResizeToContents)
-            self.horizontalHeader().setStretchLastSection(True)
 
     def fillTable(self) -> None:
         for rowIndex, row in enumerate(self._df.itertuples(index=False)):
@@ -121,7 +116,7 @@ class DataframeTableWidget(TableWidget):
                     row["condition_id"].setText(None)
 
     def reinitialize(self, dataframe: pandas.DataFrame):
-        self.setRowCount(0)
+        self.resetTable()
         self._df = dataframe
         if self._autofill:
             self.setHeaders(self._df.columns.str.title())

@@ -1,22 +1,22 @@
 from functools import partial
+
 from PyQt6 import QtCore, QtGui, QtWidgets
 
 from python.utils import datatypes
 from python.utils.paths import resourcePath
-
 from python.views.base.explorer import Explorer
+from python.views.calibrationexplorer.coefficientwidget import CoefficientWidget
 from python.views.calibrationexplorer.generaldatawidget import GeneralDataWidget
-from python.views.calibrationexplorer.plotwidget import PlotWidget
 from python.views.calibrationexplorer.linestablewidget import LinesTableWidget
 from python.views.calibrationexplorer.peaksearchwidget import PeakSearchWidget
-from python.views.calibrationexplorer.coefficientwidget import CoefficientWidget
+from python.views.calibrationexplorer.plotwidget import PlotWidget
+
 
 class CalibrationExplorer(Explorer):
     def __init__(self, parent: QtWidgets.QWidget | None = None, calibration: datatypes.Calibration | None = None):
         assert calibration is not None, "Calibration must be provided"
         super(CalibrationExplorer, self).__init__(parent)
-        self._calibration = calibration
-        self._initCalibration = calibration.copy()
+        self._initializeClassVariables(calibration)
         self._widgets = {
             "General Data": GeneralDataWidget(),
             "Spectrum": PlotWidget(calibration=self._calibration),
@@ -44,6 +44,10 @@ class CalibrationExplorer(Explorer):
 
         self._connectSignalsAndSlots()
 
+    def _initializeClassVariables(self, calibration: datatypes.Calibration) -> None:
+        self._calibration = calibration
+        self._initCalibration = calibration.copy()
+
     @QtCore.pyqtSlot()
     def _actionTriggered(self, key: str) -> None:
         if key == "new":
@@ -58,11 +62,6 @@ class CalibrationExplorer(Explorer):
             result = messageBox.exec()
             if result == QtWidgets.QMessageBox.StandardButton.Yes:
                 self.reinitialize(self._initCalibration)
-
-    def reinitialize(self, calibration : datatypes.Calibration):
-        for widget in self._widgets.values():
-            widget.reinitialize(calibration)
-        self._treeWidget.setCurrentItem(self._treeWidget.topLevelItem(0))
 
     @QtCore.pyqtSlot()
     def _changeWidget(self):
@@ -95,3 +94,9 @@ class CalibrationExplorer(Explorer):
         self._widgets["Condition"].analyseRadiationChanged.connect(
             self._widgets["Coefficient"].reinitializeRadiations
         )
+
+    def reinitialize(self, calibration: datatypes.Calibration):
+        self._initializeClassVariables(calibration)
+        for widget in self._widgets.values():
+            widget.reinitialize(calibration)
+        self._treeWidget.setCurrentItem(self._treeWidget.topLevelItem(0))

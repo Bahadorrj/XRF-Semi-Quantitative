@@ -142,17 +142,11 @@ QLineEdit {
     border: 1px solid black;
     padding: 5px;
 }
-/* PlotWidget */
+
 #plot-widget {
     border: 1px solid black;
 }
 
-/* LineWidget */
-#filter-combo-box {
-    padding: 5px 15px 5px 5px;
-}
-
-/* PeakSearchWidget */
 #search-line-edit {
     padding: 5px 18px 5px 5px;
     width: 33px;
@@ -168,6 +162,7 @@ QLineEdit {
     padding: 5px;
 }
 
+/* PeakSearchWidget */
 #hide-button {
     background-color: transparent;
 }
@@ -230,22 +225,22 @@ QLineEdit {
     font-weight: bold;
 }
 
-#analyte-widget QHeaderView::section {
+#analyte-widget QTableWidget QHeaderView::section {
     background-color: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #980A33, stop: 0.5 #660722, stop: 0.6 #330311, stop:1 #CB0E44);
     color: #F5F5F5;
     border: none;
     border-bottom: 1px solid black;
 }
 
-#condition-table::item:hover {
+#analyte-widget QTableWidget::item:hover {
     background-color: #D3D3D3;
 }
 
-#condition-table::item:selected {
+#analyte-widget QTableWidget::item:selected {
     background-color: #696969;
     color: #F5F5F5;
 }
 
-#condition-table::item:focus {
+#analyte-widget QTableWidget::item:focus {
     border: 2px solid #222831;
 }

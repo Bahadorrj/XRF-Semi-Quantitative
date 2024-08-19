@@ -1,9 +1,8 @@
-import numpy as np
-import pyqtgraph as pg
-
 from functools import partial, cache
 from typing import Optional
 
+import numpy as np
+import pyqtgraph as pg
 from PyQt6 import QtCore, QtGui, QtWidgets
 
 from python.utils import datatypes
@@ -35,8 +34,7 @@ class PlotWidget(QtWidgets.QWidget):
     ):
         assert calibration is not None, "calibration must be provided"
         super(PlotWidget, self).__init__(parent)
-        self._calibration = calibration
-        self._analyseFiles = []
+        self._initializeClassVariables(calibration)
         
         self._createActions()
         self._createToolBar()
@@ -46,6 +44,10 @@ class PlotWidget(QtWidgets.QWidget):
         self._setUpView()
         self._addCalibrationToTree()
         self._drawCanvas()
+
+    def _initializeClassVariables(self, calibration: datatypes.Calibration) -> None:
+        self._calibration = calibration
+        self._analyseFiles = []
 
     def _createActions(self) -> None:
         self._actionsMap = {}
@@ -169,7 +171,8 @@ class PlotWidget(QtWidgets.QWidget):
             messageBox.setStandardButtons(QtWidgets.QMessageBox.StandardButton.Ok)
             messageBox.show()
 
-    def _constructAnalyseFromFilename(self, filename: str) -> datatypes.Analyse | None:
+    @staticmethod
+    def _constructAnalyseFromFilename(filename: str) -> datatypes.Analyse | None:
         extension = filename[-4:]
         analyse: Optional[datatypes.Analyse] = None
         if extension == ".txt":
@@ -316,11 +319,10 @@ class PlotWidget(QtWidgets.QWidget):
         self._plotWidget.plot(x, y, *args, **kwargs)
 
     def reinitialize(self, calibration: datatypes.Calibration) -> None:
-        self._calibration = calibration
-        self._analyseFiles = []
+        self._initializeClassVariables(calibration)
         for topLevelIndex in range(1, self._treeWidget.topLevelItemCount()):
             item = self._treeWidget.topLevelItem(topLevelIndex)
             while item.childCount() != 0:
                 item.takeChild(0)
-                self._actionsMap['add'].setDisabled(True)
+                self._actionsMap['reset'].setDisabled(True)
         self._drawCanvas()
