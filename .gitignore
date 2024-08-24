@@ -361,3 +361,5 @@ fabric.properties
 /UML
 *.ui
 *.sql
+*.atxc
+*.atxm
