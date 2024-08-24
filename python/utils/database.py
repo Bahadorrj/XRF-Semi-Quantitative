@@ -49,7 +49,18 @@ _dataframes = {
     "Lines": _db.dataframe("SELECT * FROM Lines"),
     "Elements": _db.dataframe("SELECT * FROM Elements"),
     "Conditions": _db.dataframe("SELECT * FROM Conditions"),
+    "Calibrations": _db.dataframe("SELECT * FROM Calibrations"),
 }
+
+
+def reloadDataframes():
+    global _dataframes
+    _dataframes = {
+        "Lines": _db.dataframe("SELECT * FROM Lines"),
+        "Elements": _db.dataframe("SELECT * FROM Elements"),
+        "Conditions": _db.dataframe("SELECT * FROM Conditions"),
+        "Calibrations": _db.dataframe("SELECT * FROM Calibrations"),
+    }
 
 
 def getDatabase() -> Database:

@@ -47,11 +47,14 @@ class TableWidget(QtWidgets.QTableWidget):
     def addRow(self, row: dict) -> None:
         self.setRowCount(self.rowCount() + 1)
         rowIndex = self.rowCount() - 1
-        for columnIndex, component in enumerate(list(row.values())[1:]):
+        columnIndex = 0
+        for component in row.values():
             if isinstance(component, QtWidgets.QWidget):
                 self.setCellWidget(rowIndex, columnIndex, component)
+                columnIndex += 1
             elif isinstance(component, QtWidgets.QTableWidgetItem):
                 self.setItem(rowIndex, columnIndex, component)
+                columnIndex += 1
         self.rows[rowIndex] = row
 
     def getRow(self, rowIndex: int) -> dict:
@@ -85,15 +88,17 @@ class DataframeTableWidget(TableWidget):
     def __init__(
         self, parent: QtWidgets.QWidget | None = None, dataframe: pandas.DataFrame | None = None, autofill: bool = False
     ) -> None:
-        assert dataframe is not None, "dataframe must be provided"
         super(DataframeTableWidget, self).__init__(parent)
         self._df = dataframe
         self._autofill = autofill
-        if self._autofill:
-            self.setHeaders(self._df.columns.str.title())
-            self.fillTable()
+        if self._df is not None:
+            if self._autofill:
+                self.setHeaders([" ".join(column.split("_")).title() for column in self._df.columns])
+                self._fillTable()
 
-    def fillTable(self) -> None:
+    def _fillTable(self) -> None:
+        if self._df.shape[0] == 0:
+            return
         for rowIndex, row in enumerate(self._df.itertuples(index=False)):
             items = {"rowId": rowIndex}
             for columnIndex, value in enumerate(row):
@@ -120,4 +125,4 @@ class DataframeTableWidget(TableWidget):
         self._df = dataframe
         if self._autofill:
             self.setHeaders(self._df.columns.str.title())
-            self.fillTable()
+            self._fillTable()

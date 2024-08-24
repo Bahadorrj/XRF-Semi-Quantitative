@@ -56,23 +56,25 @@ class Analyse:
     data: list[AnalyseData] = field(default_factory=list)
 
     def __post_init__(self) -> None:
-        self.name = Path(self.filename).stem
-        self.extension = self.filename.split(".")[-1]
+        if self.filename:
+            self.name = Path(self.filename).stem
+            self.extension = self.filename.split(".")[-1]
 
     def getDataByConditionId(self, conditionId: int) -> AnalyseData:
         return list(filter(lambda d: d.conditionId == conditionId, self.data))[0]
 
     def toHashableDict(self) -> dict:
         return {
-            "filename": getattr(self, "filename"),
+            "filename": getattr(self, "filename", None),
             "data": [d.toHashableDict() for d in self.data],
         }
 
     @classmethod
     def fromHashableDict(cls, analyseDict: dict) -> "Analyse":
-        analyseDict["data"] = [
-            AnalyseData.fromHashableDict(dataDict) for dataDict in analyseDict["data"]
-        ]
+        if analyseDict["data"]:
+            analyseDict["data"] = [
+                AnalyseData.fromHashableDict(dataDict) for dataDict in analyseDict["data"]
+            ]
         return cls(**analyseDict)
 
     @classmethod
@@ -112,7 +114,7 @@ class Analyse:
         received = ""
         while True:
             received += connection.recv(10).decode("utf-8")
-            if received[-4:] == "stp":
+            if received[-4:] == "-stp":
                 break
         analyseDict = loads(received)
         return cls.fromHashableDict(analyseDict)
@@ -124,6 +126,14 @@ class Calibration:
     generalData: dict = field(default_factory=dict)
     concentrations: dict = field(default_factory=dict)
     lines: pandas.DataFrame = field(default=None)
+
+    def toHashableDict(self) -> dict:
+        return {
+            "analyse": self.analyse.toHashableDict(),
+            "generalData": self.generalData,
+            "concentrations": self.concentrations,
+            "lines": self.lines.to_dict()
+        }
     
     def calculateCoefficients(self, lines: pandas.DataFrame) -> dict:
         coefficients = {}

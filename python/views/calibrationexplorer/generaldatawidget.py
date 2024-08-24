@@ -1,9 +1,9 @@
-from PyQt6 import QtWidgets, QtCore, QtGui
+from PyQt6 import QtWidgets
+
 
 class GeneralDataWidget(QtWidgets.QWidget):
     def __init__(self, parent: QtWidgets.QWidget | None = None) -> None:
         super().__init__(parent)
-        
         self._setUpView()
 
     def _setUpView(self) -> None:

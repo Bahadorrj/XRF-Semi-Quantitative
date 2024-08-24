@@ -30,22 +30,29 @@ COLORS = [
 
 class PlotWidget(QtWidgets.QWidget):
     def __init__(
-        self, parent: QtWidgets.QWidget | None = None, calibration: datatypes.Calibration | None = None
+            self, parent: QtWidgets.QWidget | None = None, calibration: datatypes.Calibration | None = None
     ):
-        assert calibration is not None, "calibration must be provided"
         super(PlotWidget, self).__init__(parent)
-        self._initializeClassVariables(calibration)
-        
+        self._calibration = calibration
+        self._analyseFiles = []
+        self._initializeUi()
+        self._connectSignalsAndSlots()
+        if self._calibration is not None:
+            self._addCalibrationToTree()
+            self._drawCanvas()
+
+    def _initializeUi(self) -> None:
         self._createActions()
         self._createToolBar()
         self._createPlotWidget()
         self._createTreeWidget()
         self._createCoordinateLabel()
         self._setUpView()
-        self._addCalibrationToTree()
-        self._drawCanvas()
 
-    def _initializeClassVariables(self, calibration: datatypes.Calibration) -> None:
+    def _connectSignalsAndSlots(self) -> None:
+        self._treeWidget.itemChanged.connect(self._drawCanvas)
+
+    def _resetClassVariables(self, calibration: datatypes.Calibration) -> None:
         self._calibration = calibration
         self._analyseFiles = []
 
@@ -131,7 +138,6 @@ class PlotWidget(QtWidgets.QWidget):
         )
         self._treeWidget.setTabKeyNavigation(True)
         self._fillTreeWidget()
-        self._treeWidget.itemChanged.connect(self._drawCanvas)
 
     def _fillTreeWidget(self) -> None:
         items = ["Calibration", "Text Files", "Antique'X Files", "Packet Files"]
@@ -188,9 +194,9 @@ class PlotWidget(QtWidgets.QWidget):
             self._actionsMap["reset"].setDisabled(False)
 
     def _addAnalyseToTree(
-        self,
-        analyse: datatypes.Analyse,
-        checkState: QtCore.Qt.CheckState = QtCore.Qt.CheckState.Unchecked,
+            self,
+            analyse: datatypes.Analyse,
+            checkState: QtCore.Qt.CheckState = QtCore.Qt.CheckState.Unchecked,
     ) -> None:
         item = QtWidgets.QTreeWidgetItem()
         item.setCheckState(0, checkState)
@@ -214,7 +220,7 @@ class PlotWidget(QtWidgets.QWidget):
             self._treeWidget.setItemWidget(child, 1, colorButton)
         mapper = {"txt": 1, "atx": 2}
         self._treeWidget.topLevelItem(mapper[analyse.extension]).addChild(item)
-    
+
     def _addCalibrationToTree(self) -> None:
         item = QtWidgets.QTreeWidgetItem()
         item.setCheckState(0, QtCore.Qt.CheckState.Checked)
@@ -250,7 +256,7 @@ class PlotWidget(QtWidgets.QWidget):
         messageBox.setIcon(QtWidgets.QMessageBox.Icon.Question)
         result = messageBox.exec()
         if result == QtWidgets.QMessageBox.StandardButton.Yes:
-            self._analyseFiles = []
+            self._resetClassVariables(self._calibration)
             for topLevelIndex in range(1, self._treeWidget.topLevelItemCount()):
                 item = self._treeWidget.topLevelItem(topLevelIndex)
                 while item.childCount() != 0:
@@ -292,7 +298,7 @@ class PlotWidget(QtWidgets.QWidget):
 
     @cache
     def _getDataFromIndex(
-        self, extensionIndex: int, analyseIndex: int, dataIndex: int
+            self, extensionIndex: int, analyseIndex: int, dataIndex: int
     ) -> datatypes.AnalyseData:
         if extensionIndex == 0:
             return self._calibration.analyse.data[dataIndex]
@@ -300,7 +306,7 @@ class PlotWidget(QtWidgets.QWidget):
 
     @cache
     def _getAnalyseFromIndex(
-        self, extensionIndex: int, analyseIndex: int
+            self, extensionIndex: int, analyseIndex: int
     ) -> datatypes.Analyse:
         mapper = {0: "calibration", 1: "txt", 2: "atx"}
         analyse = list(
@@ -319,7 +325,7 @@ class PlotWidget(QtWidgets.QWidget):
         self._plotWidget.plot(x, y, *args, **kwargs)
 
     def reinitialize(self, calibration: datatypes.Calibration) -> None:
-        self._initializeClassVariables(calibration)
+        self._resetClassVariables(calibration)
         for topLevelIndex in range(1, self._treeWidget.topLevelItemCount()):
             item = self._treeWidget.topLevelItem(topLevelIndex)
             while item.childCount() != 0:

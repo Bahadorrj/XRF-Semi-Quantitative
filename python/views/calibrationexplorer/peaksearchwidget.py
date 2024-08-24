@@ -7,10 +7,9 @@ from PyQt6 import QtWidgets, QtCore, QtGui
 from pandas import DataFrame
 
 from python.utils import calculation, datatypes
-from python.utils.paths import resourcePath
 from python.utils.database import getDataframe
-
-from python.views.base.tablewidgets import DataframeTableWidget, TableItem
+from python.utils.paths import resourcePath
+from python.views.base.tablewidgets import DataframeTableWidget, TableItem, TableWidget
 
 
 class StatusButton(QtWidgets.QPushButton):
@@ -112,10 +111,32 @@ class PeakSearchWidget(QtWidgets.QWidget):
     def __init__(
             self, parent: QtWidgets.QWidget | None = None, calibration: datatypes.Calibration | None = None
     ):
-        assert calibration is not None, "calibration must be provided"
         super(PeakSearchWidget, self).__init__(parent)
-        self._initializeClassVariables(calibration)
+        self._calibration = calibration
+        self._initializeUi()
+        if self._calibration is not None:
+            self._analyse = self._calibration.analyse
+            self._df = getDataframe("Lines").copy()
+            items = self._df["radiation_type"].unique().tolist()
+            items.insert(0, "")
+            self._searchComboBox.addItems(items)
+            self._kev = [calculation.pxToEv(i) for i in self._analyse.data[0].x]
+            self._plotDataList = [
+                datatypes.PlotData.fromSeries(rowId, s)
+                for rowId, s in self._df.iterrows()
+            ]
+            self._undoStack = deque()
+            self._redoStack = deque()
+            self._flag = False
+            self._regionActive = False
+            tableWidget = PeakSearchTableWidget(self, self._df)
+            self._mainLayout.replaceWidget(self._tableWidget, tableWidget)
+            self._tableWidget.deleteLater()
+            self._tableWidget = tableWidget
+            self._fillTable()
+            self._connectSignalsAndSlots()
 
+    def _initializeUi(self) -> None:
         self._createToolBar()
         self._createSearchLayout()
         self._createStatusLayout()
@@ -123,7 +144,24 @@ class PeakSearchWidget(QtWidgets.QWidget):
         self._createPlotViewBox()
         self._setUpView()
 
-    def _initializeClassVariables(self, calibration: datatypes.Calibration) -> None:
+    def _connectSignalsAndSlots(self) -> None:
+        for plotData in self._plotDataList:
+            plotData.region.sigRegionChangeFinished.connect(
+                partial(self._emitPlotDataChanged, plotData.rowId, "region")
+            )
+            plotData.peakLine.sigClicked.connect(partial(self._selectPlotData, plotData))
+            plotData.spectrumLine.sigClicked.connect(partial(self._selectPlotData, plotData))
+        self._undoAction.triggered.connect(self._undo)
+        self._regionAction.triggered.connect(self._toggleRegions)
+        self._searchLineEdit.editingFinished.connect(self._search)
+        self._searchComboBox.currentTextChanged.connect(self._search)
+        self._tableWidget.cellClicked.connect(self._cellClicked)
+        self._peakPlot.sigRangeChanged.connect(self._adjustZoom)
+        self._peakPlot.scene().sigMouseMoved.connect(self._mouseMoved)
+        self._peakPlot.scene().sigMouseClicked.connect(self._openPopUp)
+        self._zoomRegion.sigRegionChanged.connect(self._showZoomedRegion)
+
+    def _resetClassVariables(self, calibration: datatypes.Calibration) -> None:
         self._calibration = calibration
         self._analyse = self._calibration.analyse
         self._df = self._calibration.lines
@@ -166,9 +204,7 @@ class PeakSearchWidget(QtWidgets.QWidget):
         toolBar.addAction(self._undoAction)
         # toolBar.addAction(self._redoAction)
         toolBar.addAction(self._regionAction)
-        self._undoAction.triggered.connect(self._undo)
         # self._redoAction.triggered.connect(self._redo)
-        self._regionAction.triggered.connect(self._toggleRegions)
 
     def _undo(self) -> None:
         if self._undoStack:
@@ -214,9 +250,6 @@ class PeakSearchWidget(QtWidgets.QWidget):
         )
         self._searchComboBox = QtWidgets.QComboBox()
         self._searchComboBox.setObjectName("search-combo-box")
-        items = self._df["radiation_type"].unique().tolist()
-        items.insert(0, "")
-        self._searchComboBox.addItems(items)
         self._searchComboBox.setCurrentIndex(0)
         self._searchLineEdit.setDisabled(True)
         self._searchComboBox.setDisabled(True)
@@ -226,8 +259,6 @@ class PeakSearchWidget(QtWidgets.QWidget):
         self._searchLayout.addWidget(QtWidgets.QLabel("Radiation Type: "))
         self._searchLayout.addWidget(self._searchComboBox)
         self._searchLayout.addStretch()
-        self._searchLineEdit.editingFinished.connect(self._search)
-        self._searchComboBox.currentTextChanged.connect(self._search)
 
     @QtCore.pyqtSlot()
     def _search(self) -> None:
@@ -253,10 +284,8 @@ class PeakSearchWidget(QtWidgets.QWidget):
                 self._tableWidget.addRow(self._createTableRow(plotData))
 
     def _createTableWidget(self) -> None:
-        self._tableWidget = PeakSearchTableWidget(self, self._df)
+        self._tableWidget = TableWidget()
         self._tableWidget.setMaximumHeight(200)
-        self._fillTable()
-        self._tableWidget.cellClicked.connect(self._cellClicked)
 
     @QtCore.pyqtSlot(int, int)
     def _cellClicked(self, row: int, column: int) -> None:
@@ -361,9 +390,6 @@ class PeakSearchWidget(QtWidgets.QWidget):
         self._peakPlot.vb.scaleBy(center=(0, 0))
         self._peakPlot.vb.menu.clear()
         self._peakPlot.setMinimumHeight(250)
-        self._peakPlot.sigRangeChanged.connect(self._adjustZoom)
-        self._peakPlot.scene().sigMouseMoved.connect(self._mouseMoved)
-        self._peakPlot.scene().sigMouseClicked.connect(self._openPopUp)
 
     def _createSpectrumPlot(self) -> None:
         self._spectrumPlot = self._graphicsLayoutWidget.addPlot(row=1, col=0)
@@ -371,7 +397,6 @@ class PeakSearchWidget(QtWidgets.QWidget):
         self._spectrumPlot.showGrid(x=True, y=True)
         self._spectrumPlot.showGrid(x=True, y=True)
         self._zoomRegion = pg.LinearRegionItem(clipItem=self._spectrumPlot)
-        self._zoomRegion.sigRegionChanged.connect(self._showZoomedRegion)
 
     def _setUpView(self) -> None:
         self._mainLayout = QtWidgets.QVBoxLayout()
@@ -675,14 +700,14 @@ class PeakSearchWidget(QtWidgets.QWidget):
 
     def mousePressEvent(self, a0):
         if (
-            not self._searchLineEdit.geometry().contains(a0.pos())
-            and self._searchLineEdit.hasFocus()
+                not self._searchLineEdit.geometry().contains(a0.pos())
+                and self._searchLineEdit.hasFocus()
         ):
             self._searchLineEdit.clearFocus()
         return super().mousePressEvent(a0)
 
     def reinitialize(self, calibration: datatypes.Calibration) -> None:
-        self._initializeClassVariables(calibration)
+        self._resetClassVariables(calibration)
         self._fillTable()
         self._peakPlot.clear()
         self._spectrumPlot.clear()

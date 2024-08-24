@@ -1,12 +1,17 @@
 from functools import partial
+
 from PyQt6 import QtCore, QtGui, QtWidgets
+
 from python.utils.paths import resourcePath
 
 
-class Explorer(QtWidgets.QMainWindow):
+class Explorer(QtWidgets.QWidget):
     def __init__(self, parent: QtWidgets.QWidget | None = None):
         super(Explorer, self).__init__(parent)
         self.setFixedSize(1200, 800)
+
+    def _connectSignalsAndSlots(self):
+        self._treeWidget.itemSelectionChanged.connect(self._changeWidget)
 
     def _createActions(self, labels: list | tuple) -> None:
         self._actionsMap = {}
@@ -21,14 +26,11 @@ class Explorer(QtWidgets.QMainWindow):
     def _actionTriggered(self, key: str) -> None:
         pass
 
-    def _reinitializeWidget(self):
-        pass
-
     def _createMenus(self, labels: list | tuple) -> None:
         self._menusMap = {}
-        menuBar = self.menuBar()
+        self._menuBar = QtWidgets.QMenuBar()
         for label in labels:
-            menu = menuBar.addMenu(label)
+            menu = self._menuBar.addMenu(label)
             key = label.lower()[1:]
             self._menusMap[key] = menu
 
@@ -42,7 +44,6 @@ class Explorer(QtWidgets.QMainWindow):
         self._toolBar.setIconSize(QtCore.QSize(16, 16))
         self._toolBar.setToolButtonStyle(QtCore.Qt.ToolButtonStyle.ToolButtonIconOnly)
         self._toolBar.setMovable(False)
-        self.addToolBar(self._toolBar)
 
     def _fillToolBarWithActions(self, labels: list | tuple) -> None:
         for label in labels:
@@ -51,7 +52,6 @@ class Explorer(QtWidgets.QMainWindow):
     def _createTreeWidget(self) -> None:
         self._treeWidget = QtWidgets.QTreeWidget(self)
         self._treeWidget.setFixedWidth(200)
-        self._treeWidget.itemSelectionChanged.connect(self._changeWidget)
 
     def _fillTreeWithItems(self, header: str, labels: list | tuple) -> None:
         self._treeItemMap = {}
@@ -76,6 +76,8 @@ class Explorer(QtWidgets.QMainWindow):
         self._mainLayout = QtWidgets.QHBoxLayout()
         self._mainLayout.addWidget(self._treeWidget)
         self._mainLayout.addWidget(QtWidgets.QWidget(self))
-        centralWidget = QtWidgets.QWidget()
-        centralWidget.setLayout(self._mainLayout)
-        self.setCentralWidget(centralWidget)
+        vLayout = QtWidgets.QVBoxLayout()
+        vLayout.addWidget(self._menuBar)
+        vLayout.addWidget(self._toolBar)
+        vLayout.addLayout(self._mainLayout)
+        self.setLayout(vLayout)

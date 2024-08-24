@@ -55,6 +55,14 @@
     font-size: 12px;
 }
 
+QListView {
+    border: 1px solid black;    
+}
+
+QTabWidget {
+    border: 1px solid black;
+}
+
 QTableView {
     border: 1px solid black;
 }

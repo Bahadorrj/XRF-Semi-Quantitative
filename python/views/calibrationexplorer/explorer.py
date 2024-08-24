@@ -14,17 +14,23 @@ from python.views.calibrationexplorer.plotwidget import PlotWidget
 
 class CalibrationExplorer(Explorer):
     def __init__(self, parent: QtWidgets.QWidget | None = None, calibration: datatypes.Calibration | None = None):
-        assert calibration is not None, "Calibration must be provided"
         super(CalibrationExplorer, self).__init__(parent)
-        self._initializeClassVariables(calibration)
-        self._widgets = {
-            "General Data": GeneralDataWidget(),
-            "Spectrum": PlotWidget(calibration=self._calibration),
-            "Peak Search": LinesTableWidget(calibration=self._calibration),
-            "Condition": PeakSearchWidget(calibration=self._calibration),
-            "Coefficient": CoefficientWidget(calibration=self._calibration)
-        }
+        self._calibration = calibration
+        self._initializeUi()
+        if self._calibration is not None:
+            self._initCalibration = self._calibration.copy()
+            self._widgets = {
+                "General Data": GeneralDataWidget(),
+                "Spectrum": PlotWidget(calibration=self._calibration),
+                "Peak Search": LinesTableWidget(calibration=self._calibration),
+                "Condition": PeakSearchWidget(calibration=self._calibration),
+                "Coefficient": CoefficientWidget(calibration=self._calibration)
+            }
+            self._connectSignalsAndSlots()
+            self._implementAnalyse()
+            self._treeWidget.setCurrentItem(self._treeWidget.topLevelItem(0))
 
+    def _initializeUi(self) -> None:
         self.setObjectName("calibration-explorer")
         self.setWindowTitle("Calibration explorer")
 
@@ -38,13 +44,18 @@ class CalibrationExplorer(Explorer):
             "Calibration Contents",
             ("General Data", "Spectrum", "Peak Search", "Coefficient"),
         )
-        self._implementAnalyse()
         self._setUpView()
-        self._treeWidget.setCurrentItem(self._treeWidget.topLevelItem(0))
 
-        self._connectSignalsAndSlots()
+    def _connectSignalsAndSlots(self) -> None:
+        super()._connectSignalsAndSlots()
+        self._widgets["Condition"].dataframeChanged.connect(
+            partial(self._widgets["Peak Search"].reinitialize, self._calibration)
+        )
+        self._widgets["Condition"].analyseRadiationChanged.connect(
+            self._widgets["Coefficient"].reinitializeRadiations
+        )
 
-    def _initializeClassVariables(self, calibration: datatypes.Calibration) -> None:
+    def _resetClassVariables(self, calibration: datatypes.Calibration) -> None:
         self._calibration = calibration
         self._initCalibration = calibration.copy()
 
@@ -54,7 +65,7 @@ class CalibrationExplorer(Explorer):
             messageBox = QtWidgets.QMessageBox()
             messageBox.setIcon(QtWidgets.QMessageBox.Icon.Question)
             messageBox.setWindowTitle("New method")
-            messageBox.setText("Are you sure you want to rset all the changes?")
+            messageBox.setText("Are you sure you want to reset all the changes?")
             messageBox.setStandardButtons(
                 QtWidgets.QMessageBox.StandardButton.Yes
                 | QtWidgets.QMessageBox.StandardButton.No
@@ -80,6 +91,10 @@ class CalibrationExplorer(Explorer):
             newWidget.show()
 
     def _implementAnalyse(self) -> None:
+        for topLevelIndex in range(1, self._treeWidget.topLevelItemCount()):
+            item = self._treeWidget.topLevelItem(topLevelIndex)
+            while item.childCount() != 0:
+                item.takeChild(0)
         for data in self._calibration.analyse.data:
             child = QtWidgets.QTreeWidgetItem()
             child.setText(0, f"Condition {data.conditionId}")
@@ -87,16 +102,9 @@ class CalibrationExplorer(Explorer):
             self._treeItemMap['peak-search'].addChild(child)
             self._treeWidget.expandItem(self._treeItemMap['peak-search'])
 
-    def _connectSignalsAndSlots(self) -> None:
-        self._widgets["Condition"].dataframeChanged.connect(
-            partial(self._widgets["Peak Search"].reinitialize, self._calibration)
-        )
-        self._widgets["Condition"].analyseRadiationChanged.connect(
-            self._widgets["Coefficient"].reinitializeRadiations
-        )
-
     def reinitialize(self, calibration: datatypes.Calibration):
-        self._initializeClassVariables(calibration)
+        self._resetClassVariables(calibration)
+        self._implementAnalyse()
         for widget in self._widgets.values():
             widget.reinitialize(calibration)
         self._treeWidget.setCurrentItem(self._treeWidget.topLevelItem(0))
