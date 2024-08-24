@@ -1,3 +1,4 @@
+import os
 from functools import partial
 from json import dumps
 
@@ -83,11 +84,11 @@ class CalibrationTrayWidget(TrayWidget):
         self._calibration = None
         self._initializeUi()
         if self._df is not None:
-            self._tableWidget.reinitialize(self._df)
+            self._tableWidget.reinitialize(self._df.drop("calibration_id", axis=1))
             self._connectSignalsAndSlots()
             if self._df.empty is False:
                 self._tableWidget.setCurrentCell(0, 0)
-                self._actionsMap["edit"].setDisabled(False)
+                self._actionsMap["remove"].setDisabled(False)
 
     def _initializeUi(self) -> None:
         self.setWindowTitle("Calibration Tray List")
@@ -110,40 +111,62 @@ class CalibrationTrayWidget(TrayWidget):
         self._setUpView()
 
     def _resetVariables(self, dataframe: pandas.DataFrame) -> None:
-        self._df = dataframe.iloc[:, 1:]
+        self._df = dataframe
 
     @QtCore.pyqtSlot(str)
-    def _actionTriggered(self, key: str) -> None:
-        if key == "add":
-            addDialog = AddDialog(inputs=self._df.columns[:-1])
-            result = addDialog.exec()
-            if result:
-                filename = addDialog.fields["filename"]
-                element = addDialog.fields["element"]
-                concentration = addDialog.fields["concentration"]
+    def _actionTriggered(self, action: str) -> None:
+        if action == "add":
+            # Ask the user for the filename, element, concentration and create a new calibration
+            add_dialog = AddDialog(inputs=self._df.columns[1:-1])
+            if add_dialog.exec():
+                filename = add_dialog.fields["filename"]
+                element = add_dialog.fields["element"]
+                concentration = add_dialog.fields["concentration"]
                 status = "Proceed to acquisition"
-                if not (df := getDataframe("Lines").query(f"symbol == '{element}' and active == 1")).empty:
-                    radiationType = df["radiation_type"].values[0]
-                    defaultDict = {radiationType: concentration}
-                    calibrationPath = f"calibrations/{filename}.atxc"
-                    self._calibration = Calibration(Analyse(), {}, {element: defaultDict}, None)
-                    self._saveCalibrationFile(calibrationPath)
+                # Find the default radiation type for the element
+                if not (lines_df := getDataframe("Lines").query(f"symbol == '{element}' and active == 1")).empty:
+                    radiation_type = lines_df["radiation_type"].values[0]
+                    default_dict = {radiation_type: concentration}
+                    calibration_path = f"calibrations/{filename}.atxc"
+                    self._calibration = Calibration(
+                        Analyse(), {}, {element: default_dict}, pandas.DataFrame([])
+                    )
+                    self._saveCalibrationFile(calibration_path)
+                    # Insert the calibration into the database
                     getDatabase().executeQuery(
                         "INSERT INTO Calibrations (filename, element, concentration, status) VALUES (?, ?, ?, ?)",
                         [filename, element, concentration, status]
                     )
                     reloadDataframes()
-                    self._df = getDataframe("Calibrations")
+                    self._resetVariables(getDataframe("Calibrations"))
                     items = {
                         "filename": TableItem(filename),
                         "element": TableItem(element),
                         "concentration": TableItem(str(concentration)),
-                        "status": TableItem("Proceed to acquisition")
+                        "status": TableItem(status)
                     }
                     self._tableWidget.addRow(items)
                     self._tableWidget.setCurrentCell(self._tableWidget.rowCount() - 1, 0)
-        elif key == "edit":
+                    # Enable the remove action if there are more than one calibration
+                    if not self._actionsMap["remove"].isEnabled():
+                        self._actionsMap["remove"].setDisabled(False)
+        elif action == "edit":
             self._openCalibrationExplorer()
+        elif action == "remove":
+            # Ask the user if they are sure to remove the calibration
+            message_box = QtWidgets.QMessageBox()
+            message_box.setIcon(QtWidgets.QMessageBox.Icon.Warning)
+            message_box.setText("Are you sure you want to remove the selected calibration?")
+            message_box.setWindowTitle("Remove Calibration")
+            message_box.setStandardButtons(
+                QtWidgets.QMessageBox.StandardButton.Yes | QtWidgets.QMessageBox.StandardButton.No
+            )
+            message_box.setDefaultButton(QtWidgets.QMessageBox.StandardButton.No)
+            if message_box.exec() == QtWidgets.QMessageBox.StandardButton.Yes:
+                filename = self._tableWidget.getRow(self._tableWidget.currentRow())["filename"].text()
+                os.remove(f"calibrations/{filename}.atxc")
+                getDatabase().executeQuery("DELETE FROM Calibrations WHERE filename = ?", (filename,))
+                self._tableWidget.removeRow(self._tableWidget.currentRow())
 
     def _saveCalibrationFile(self, calibrationPath: str) -> None:
         with open(calibrationPath, "wb") as f:
@@ -177,7 +200,7 @@ class CalibrationTrayWidget(TrayWidget):
 
     def _currentCellChanged(self, currentRow: int, currentColumn: int, previousRow: int, previousColumn: int):
         """Called when the current cell in the table changes."""
-        if currentRow != previousRow:
+        if currentRow != previousRow and currentRow != -1:
             self._widgets.clear()
             self._tabWidget.clear()
             tableRow = self._tableWidget.getRow(currentRow)
@@ -188,8 +211,15 @@ class CalibrationTrayWidget(TrayWidget):
                 self._calibration = Calibration.fromATXCFile(path)
                 if status == "Proceed to acquisition":
                     self._addAcquisitionWidget()
+                    self._actionsMap["edit"].setDisabled(True)
                 else:
                     self._addCalibrationWidgets()
+                    self._actionsMap["edit"].setDisabled(False)
+        elif currentRow == -1:
+            self._widgets.clear()
+            self._tabWidget.clear()
+            self._actionsMap["edit"].setDisabled(True)
+            self._actionsMap["remove"].setDisabled(True)
 
     def _addAcquisitionWidget(self):
         """Adds a widget for the acquisition of a calibration."""
@@ -214,7 +244,10 @@ class CalibrationTrayWidget(TrayWidget):
         """Adds widgets for the calibration."""
         self._addWidgets(
             {
-                "General Data": GeneralDataWidget(),
+                "General Data": GeneralDataWidget(
+                    calibration=self._calibration,
+                    element=self._tableWidget.item(self._tableWidget.currentRow(), 1).text()
+                ),
                 "Coefficient": CoefficientWidget(calibration=self._calibration),
                 "Lines": LinesTableWidget(calibration=self._calibration)
             }
@@ -233,12 +266,12 @@ class CalibrationTrayWidget(TrayWidget):
             self._calibration.lines = getDataframe("Lines").copy()
             tableRow = self._tableWidget.getRow(self._tableWidget.currentRow())
             calibrationPath = f"./calibrations/{tableRow.get('filename').text()}.atxc"
-            self._saveCalibrationFile(calibrationPath)
             calibrationId = self._df.at[self._tableWidget.currentRow(), "calibration_id"]
-            tableRow.get("status").setText("Initial state")
+            self._saveCalibrationFile(calibrationPath)
             getDatabase().executeQuery(
                 f"UPDATE Calibrations SET status = 'Initial state' WHERE calibration_id = {calibrationId}"
             )
             reloadDataframes()
-            self._df = getDataframe("Calibrations")
+            self._resetVariables(getDataframe("Calibrations"))
+            tableRow.get("status").setText("Initial state")
             self._addCalibrationWidgets()
