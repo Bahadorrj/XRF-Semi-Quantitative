@@ -8,7 +8,7 @@ from PyQt6 import QtWidgets, QtGui
 
 from python.controllers import GuiHandler, ClientHandler
 from python.utils.paths import resourcePath
-from python.views.window.plotwindow import PlotWindow
+from python.views.windows.plotwindow import PlotWindow
 
 
 def connectServerAndGUI(host, port, plotWindow: PlotWindow, app: QtWidgets.QApplication) -> None:

@@ -7,7 +7,7 @@ from PyQt6 import QtCore, QtWidgets
 from python.utils.database import getDatabase
 from python.utils.datatypes import Analyse
 from python.utils.paths import resourcePath
-from python.views.window.plotwindow import PlotWindow
+from python.views.windows.plotwindow import PlotWindow
 
 
 class GuiHandler(QtCore.QObject):

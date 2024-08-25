@@ -10,7 +10,7 @@ from python.utils import datatypes
 from python.utils import encryption
 from python.utils.database import getDataframe
 from python.utils.paths import resourcePath
-from python.views.calibrationtray.traywidget import CalibrationTrayWidget
+from python.views.trays.calibrationtray import CalibrationTrayWidget
 
 COLORS = [
     "#FF0000",

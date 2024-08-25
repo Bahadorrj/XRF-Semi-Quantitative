@@ -9,12 +9,12 @@ from PyQt6 import QtCore, QtGui, QtWidgets
 from python.utils import encryption
 from python.utils.database import getDataframe, getDatabase, reloadDataframes
 from python.utils.datatypes import Calibration, Analyse
-from python.views.base.tablewidgets import TableItem
+from python.views.base.tablewidget import TableItem
 from python.views.base.traywidget import TrayWidget
-from python.views.calibrationexplorer.coefficientwidget import CoefficientWidget
-from python.views.calibrationexplorer.explorer import CalibrationExplorer
-from python.views.calibrationexplorer.generaldatawidget import GeneralDataWidget
-from python.views.calibrationexplorer.linestablewidget import LinesTableWidget
+from python.views.explorers.calibrationexplorer import CalibrationExplorer
+from python.views.widgets.coefficientwidget import CoefficientWidget
+from python.views.widgets.generaldatawidget import GeneralDataWidget
+from python.views.widgets.linestablewidget import LinesTableWidget
 
 
 class FormDialog(QtWidgets.QDialog):

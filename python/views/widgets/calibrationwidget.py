@@ -4,7 +4,7 @@ from PyQt6 import QtWidgets, QtGui, QtCore
 
 from python.utils import datatypes
 from python.utils.paths import resourcePath
-from python.views.base.tablewidgets import TableWidget
+from python.views.base.tablewidget import TableWidget
 
 
 class CalibrationWidget(QtWidgets.QWidget):

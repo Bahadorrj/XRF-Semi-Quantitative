@@ -2,10 +2,10 @@ from PyQt6 import QtCore, QtGui, QtWidgets
 
 from python.utils import datatypes
 from python.utils.paths import resourcePath
-from python.views.base.explorer import Explorer
-from python.views.calibrationexplorer.coefficientwidget import CoefficientWidget
-from python.views.calibrationexplorer.generaldatawidget import GeneralDataWidget
-from python.views.calibrationexplorer.peaksearchwidget import PeakSearchWidget
+from python.views.base.explorerwidget import Explorer
+from python.views.widgets.coefficientwidget import CoefficientWidget
+from python.views.widgets.generaldatawidget import GeneralDataWidget
+from python.views.widgets.peaksearchwidget import PeakSearchWidget
 
 
 class CalibrationExplorer(Explorer):

@@ -1,9 +1,9 @@
 from PyQt6 import QtCore, QtWidgets
 
 from python.utils import datatypes
-from python.views.base.explorer import Explorer
-from python.views.methodexplorer.analytewidget import AnalytesAndConditionsWidget
-from python.views.methodexplorer.calibrationwidget import CalibrationWidget
+from python.views.base.explorerwidget import Explorer
+from python.views.widgets.analytewidget import AnalytesAndConditionsWidget
+from python.views.widgets.calibrationwidget import CalibrationWidget
 
 
 class MethodExplorer(Explorer):
