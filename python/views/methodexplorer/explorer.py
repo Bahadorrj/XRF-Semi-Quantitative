@@ -1,7 +1,5 @@
 from PyQt6 import QtCore, QtWidgets
 
-from PyQt6 import QtCore, QtWidgets
-
 from python.utils import datatypes
 from python.views.base.explorer import Explorer
 from python.views.methodexplorer.analytewidget import AnalytesAndConditionsWidget
@@ -33,6 +31,7 @@ class MethodExplorer(Explorer):
             "Method Contents", ("Analytes And Conditions", "Calibrations", "Properties")
         )
         self._setUpView()
+        self._connectSignalsAndSlots()
         self._treeWidget.setCurrentItem(self._treeWidget.topLevelItem(0))
 
     @QtCore.pyqtSlot()
@@ -76,10 +75,10 @@ class MethodExplorer(Explorer):
         if selectedItems:
             selectedItem = selectedItems[0]
             label = selectedItem.text(0)
-            oldWidget = self._mainLayout.itemAt(1).widget()
+            oldWidget = self.mainLayout.itemAt(1).widget()
             oldWidget.hide()
             newWidget = self._widgets[label]
-            self._mainLayout.replaceWidget(oldWidget, newWidget)
+            self.mainLayout.replaceWidget(oldWidget, newWidget)
             newWidget.show()
             newWidget.setFocus()
 

@@ -10,6 +10,7 @@ from python.utils import datatypes
 from python.utils import encryption
 from python.utils.database import getDataframe
 from python.utils.paths import resourcePath
+from python.views.calibrationtray.traywidget import CalibrationTrayWidget
 
 COLORS = [
     "#FF0000",
@@ -83,6 +84,11 @@ class ConditionForm(QtWidgets.QListView):
 class PlotWindow(QtWidgets.QMainWindow):
     def __init__(self):
         super(PlotWindow, self).__init__()
+        self._indexOfFile = None
+        self._analyseFiles = list()
+        self._initializeUi()
+
+    def _initializeUi(self) -> None:
         self.resize(1200, 800)
         self.setWindowTitle("XRF Semi Quantitative")
         self._createActions()
@@ -93,12 +99,6 @@ class PlotWindow(QtWidgets.QMainWindow):
         self._createListWidget()
         self._createCoordinateLabel()
         self._setUpView()
-
-        self._indexOfFile = None
-        self._analyseFiles = list()
-        self._blank = datatypes.Analyse.fromTXTFile(
-            "Additional/Pure samples/8 mehr/Blank.txt"
-        )
 
     def _createActions(self) -> None:
         self._actionsMap = {}
@@ -150,6 +150,8 @@ class PlotWindow(QtWidgets.QMainWindow):
             pass
         elif key == "new":
             self.resetWindow()
+        elif key == "standards-tray-list":
+            self._openCalibrationTrayListWidget()
         elif key == "close":
             self.close()
 
@@ -262,11 +264,11 @@ class PlotWindow(QtWidgets.QMainWindow):
         secondSplitter.addWidget(self._formWidget)
         secondSplitter.setChildrenCollapsible(False)
         splitter.addWidget(secondSplitter)
-        self._mainLayout = QtWidgets.QVBoxLayout()
-        self._mainLayout.addWidget(splitter)
-        self._mainLayout.addWidget(self._coordinateLabel)
+        self.mainLayout = QtWidgets.QVBoxLayout()
+        self.mainLayout.addWidget(splitter)
+        self.mainLayout.addWidget(self._coordinateLabel)
         mainWidget = QtWidgets.QWidget(self)
-        mainWidget.setLayout(self._mainLayout)
+        mainWidget.setLayout(self.mainLayout)
         self.setCentralWidget(mainWidget)
 
     def _addAnalyseFromFileName(self, filename: str) -> None:
@@ -337,6 +339,10 @@ class PlotWindow(QtWidgets.QMainWindow):
                 while item.childCount() != 0:
                     item.takeChild(0)
             self._plotWidget.clear()
+
+    def _openCalibrationTrayListWidget(self):
+        calibrationTrayWidget = CalibrationTrayWidget(dataframe=getDataframe("Calibrations"))
+        calibrationTrayWidget.show()
 
     def _findActivePlotAttrs(self) -> list:
         activePlotAttrs = []

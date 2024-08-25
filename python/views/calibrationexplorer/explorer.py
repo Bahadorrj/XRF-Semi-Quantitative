@@ -1,5 +1,3 @@
-from functools import partial
-
 from PyQt6 import QtCore, QtGui, QtWidgets
 
 from python.utils import datatypes
@@ -7,27 +5,24 @@ from python.utils.paths import resourcePath
 from python.views.base.explorer import Explorer
 from python.views.calibrationexplorer.coefficientwidget import CoefficientWidget
 from python.views.calibrationexplorer.generaldatawidget import GeneralDataWidget
-from python.views.calibrationexplorer.linestablewidget import LinesTableWidget
 from python.views.calibrationexplorer.peaksearchwidget import PeakSearchWidget
-from python.views.calibrationexplorer.plotwidget import PlotWidget
 
 
 class CalibrationExplorer(Explorer):
     def __init__(self, parent: QtWidgets.QWidget | None = None, calibration: datatypes.Calibration | None = None):
         super(CalibrationExplorer, self).__init__(parent)
         self._calibration = calibration
+        self._widgets = None
         self._initializeUi()
         if self._calibration is not None:
             self._initCalibration = self._calibration.copy()
             self._widgets = {
-                "General Data": GeneralDataWidget(),
-                "Spectrum": PlotWidget(calibration=self._calibration),
-                "Peak Search": LinesTableWidget(calibration=self._calibration),
+                "General Data": GeneralDataWidget(calibration=calibration),
                 "Condition": PeakSearchWidget(calibration=self._calibration),
                 "Coefficient": CoefficientWidget(calibration=self._calibration)
             }
-            self._connectSignalsAndSlots()
             self._implementAnalyse()
+            self._connectSignalsAndSlots()
             self._treeWidget.setCurrentItem(self._treeWidget.topLevelItem(0))
 
     def _initializeUi(self) -> None:
@@ -36,21 +31,18 @@ class CalibrationExplorer(Explorer):
 
         self._createActions(("New", "Open", "Save", "Close"))
         self._createMenus(("&File", "&Edit", "&View", "&Window", "&Help"))
-        self._fillMenusWithActions({"file": ["new", "open", "save", "close"]})
+        self._fillMenusWithActions()
         self._createToolBar()
-        self._fillToolBarWithActions(("new", "open", "save"))
+        self._fillToolBarWithActions()
         self._createTreeWidget()
         self._fillTreeWithItems(
             "Calibration Contents",
-            ("General Data", "Spectrum", "Peak Search", "Coefficient"),
+            ("General Data", "Peak Search", "Coefficient"),
         )
         self._setUpView()
 
     def _connectSignalsAndSlots(self) -> None:
         super()._connectSignalsAndSlots()
-        self._widgets["Condition"].dataframeChanged.connect(
-            partial(self._widgets["Peak Search"].reinitialize, self._calibration)
-        )
         self._widgets["Condition"].analyseRadiationChanged.connect(
             self._widgets["Coefficient"].reinitializeRadiations
         )
@@ -74,20 +66,33 @@ class CalibrationExplorer(Explorer):
             if result == QtWidgets.QMessageBox.StandardButton.Yes:
                 self.reinitialize(self._initCalibration)
 
+    def _fillMenusWithActions(self) -> None:
+        self._menusMap["file"].addAction(self._actionsMap["new"])
+        self._menusMap["file"].addAction(self._actionsMap["open"])
+        self._menusMap["file"].addAction(self._actionsMap["save"])
+        self._menusMap["file"].addAction(self._actionsMap["close"])
+
+    def _fillToolBarWithActions(self) -> None:
+        self._toolBar.addAction(self._actionsMap["new"])
+        self._toolBar.addAction(self._actionsMap["open"])
+        self._toolBar.addAction(self._actionsMap["save"])
+
     @QtCore.pyqtSlot()
     def _changeWidget(self):
         selectedItems = self._treeWidget.selectedItems()
         if selectedItems:
             selectedItem = selectedItems[0]
             label = selectedItem.text(0)
-            oldWidget = self._mainLayout.itemAt(1).widget()
+            if label == 'Peak Search':
+                return
+            oldWidget = self.mainLayout.itemAt(1).widget()
             oldWidget.hide()
             if "Condition" in label:
                 newWidget = self._widgets["Condition"]
                 newWidget.displayAnalyseData(int(label.split(' ')[-1]))
             else:
                 newWidget = self._widgets[label]
-            self._mainLayout.replaceWidget(oldWidget, newWidget)
+            self.mainLayout.replaceWidget(oldWidget, newWidget)
             newWidget.show()
 
     def _implementAnalyse(self) -> None:

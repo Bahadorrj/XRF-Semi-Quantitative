@@ -16,6 +16,7 @@ class TableItem(QtWidgets.QTableWidgetItem):
         self.currentText = text
         return super().setText(text)
 
+
 class TableWidget(QtWidgets.QTableWidget):
     rowChanged = QtCore.pyqtSignal(int, str)
 
@@ -46,8 +47,7 @@ class TableWidget(QtWidgets.QTableWidget):
 
     def addRow(self, row: dict) -> None:
         self.setRowCount(self.rowCount() + 1)
-        rowIndex = self.rowCount() - 1
-        columnIndex = 0
+        rowIndex, columnIndex = self.rowCount() - 1, 0
         for component in row.values():
             if isinstance(component, QtWidgets.QWidget):
                 self.setCellWidget(rowIndex, columnIndex, component)
@@ -62,6 +62,9 @@ class TableWidget(QtWidgets.QTableWidget):
 
     def getRowById(self, rowId: int) -> dict:
         return list(filter(lambda d: d["rowId"] == rowId, self.rows.values()))[0]
+
+    def getCurrentRow(self) -> dict:
+        return self.rows[self.currentRow()]
 
     def selectRowByID(self, rowId: int) -> None:
         for rowIndex, row in self.rows.items():
@@ -86,17 +89,17 @@ class TableWidget(QtWidgets.QTableWidget):
 
 class DataframeTableWidget(TableWidget):
     def __init__(
-        self, parent: QtWidgets.QWidget | None = None, dataframe: pandas.DataFrame | None = None, autofill: bool = False
+            self, parent: QtWidgets.QWidget | None = None, dataframe: pandas.DataFrame | None = None,
+            autofill: bool = False
     ) -> None:
         super(DataframeTableWidget, self).__init__(parent)
         self._df = dataframe
         self._autofill = autofill
-        if self._df is not None:
-            if self._autofill:
-                self.setHeaders([" ".join(column.split("_")).title() for column in self._df.columns])
-                self._fillTable()
+        if self._df is not None and self._autofill:
+            self._fillTable()
 
     def _fillTable(self) -> None:
+        self.setHeaders([" ".join(column.split("_")).title() for column in self._df.columns])
         if self._df.shape[0] == 0:
             return
         for rowIndex, row in enumerate(self._df.itertuples(index=False)):
@@ -124,5 +127,4 @@ class DataframeTableWidget(TableWidget):
         self.resetTable()
         self._df = dataframe
         if self._autofill:
-            self.setHeaders(self._df.columns.str.title())
             self._fillTable()

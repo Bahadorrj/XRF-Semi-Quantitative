@@ -14,7 +14,7 @@ class Database:
         except sqlite3.Error as e:
             print(e)
 
-    def executeQuery(self, query: str, values: list = None):
+    def executeQuery(self, query: str, values: list | tuple | None = None):
         try:
             cursor = self.conn.cursor()
             if values is None:

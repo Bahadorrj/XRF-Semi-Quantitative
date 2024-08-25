@@ -55,8 +55,8 @@ class CalibrationWidget(QtWidgets.QWidget):
         self._table.horizontalHeader().setStretchLastSection(True)
 
     def _setUpView(self) -> None:
-        self._mainLayout = QtWidgets.QVBoxLayout()
-        self._mainLayout.setContentsMargins(30, 30, 30, 30)
-        self._mainLayout.addWidget(self._toolBar)
-        self._mainLayout.addWidget(self._table)
-        self.setLayout(self._mainLayout)
+        self.mainLayout = QtWidgets.QVBoxLayout()
+        self.mainLayout.setContentsMargins(30, 30, 30, 30)
+        self.mainLayout.addWidget(self._toolBar)
+        self.mainLayout.addWidget(self._table)
+        self.setLayout(self.mainLayout)

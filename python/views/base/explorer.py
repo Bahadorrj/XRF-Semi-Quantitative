@@ -34,10 +34,8 @@ class Explorer(QtWidgets.QWidget):
             key = label.lower()[1:]
             self._menusMap[key] = menu
 
-    def _fillMenusWithActions(self, relations: dict) -> None:
-        for key, values in relations.items():
-            for value in values:
-                self._menusMap[key].addAction(self._actionsMap[value])
+    def _fillMenusWithActions(self) -> None:
+        pass
 
     def _createToolBar(self) -> None:
         self._toolBar = QtWidgets.QToolBar(self)
@@ -45,9 +43,8 @@ class Explorer(QtWidgets.QWidget):
         self._toolBar.setToolButtonStyle(QtCore.Qt.ToolButtonStyle.ToolButtonIconOnly)
         self._toolBar.setMovable(False)
 
-    def _fillToolBarWithActions(self, labels: list | tuple) -> None:
-        for label in labels:
-            self._toolBar.addAction(self._actionsMap[label])
+    def _fillToolBarWithActions(self) -> None:
+        pass
 
     def _createTreeWidget(self) -> None:
         self._treeWidget = QtWidgets.QTreeWidget(self)
@@ -73,11 +70,13 @@ class Explorer(QtWidgets.QWidget):
         pass
 
     def _setUpView(self) -> None:
-        self._mainLayout = QtWidgets.QHBoxLayout()
-        self._mainLayout.addWidget(self._treeWidget)
-        self._mainLayout.addWidget(QtWidgets.QWidget(self))
+        self.mainLayout = QtWidgets.QHBoxLayout()
+        self.mainLayout.setContentsMargins(10, 10, 10, 10)
+        self.mainLayout.addWidget(self._treeWidget)
+        self.mainLayout.addWidget(QtWidgets.QWidget(self))
         vLayout = QtWidgets.QVBoxLayout()
+        vLayout.setContentsMargins(0, 0, 0, 0)
         vLayout.addWidget(self._menuBar)
         vLayout.addWidget(self._toolBar)
-        vLayout.addLayout(self._mainLayout)
+        vLayout.addLayout(self.mainLayout)
         self.setLayout(vLayout)

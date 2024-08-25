@@ -32,6 +32,9 @@ class CoefficientWidget(QtWidgets.QWidget):
         self._searchComboBox.setObjectName("search-combo-box")
         self._lineSelectLayout.addWidget(self._searchComboBox)
         self._lineSelectLayout.addStretch()
+        self._slopeLabel = QtWidgets.QLabel("Slope:")
+        self._lineSelectLayout.addWidget(self._slopeLabel)
+        self._lineSelectLayout.addStretch()
 
     def _createPlotWidget(self) -> None:
         self._plotWidget = pg.PlotWidget()
@@ -43,25 +46,32 @@ class CoefficientWidget(QtWidgets.QWidget):
         plotItem.setContentsMargins(10, 10, 10, 10)
 
     def _setUpView(self) -> None:
-        self._mainLayout = QtWidgets.QVBoxLayout()
-        # self._mainLayout.setContentsMargins(0, 0, 0, 0)
-        self._mainLayout.addLayout(self._lineSelectLayout)
-        self._mainLayout.addWidget(self._plotWidget)
-        self.setLayout(self._mainLayout)
+        self.mainLayout = QtWidgets.QVBoxLayout()
+        self.mainLayout.setContentsMargins(0, 0, 0, 0)
+        self.mainLayout.addLayout(self._lineSelectLayout)
+        self.mainLayout.addWidget(self._plotWidget)
+        self.setLayout(self.mainLayout)
 
     def _drawCanvas(self) -> None:
         self._plotWidget.clear()
         currentRadiationType = self._searchComboBox.currentText()
         if currentRadiationType:
             conditionId = self._calibration.lines.query(
-                f"symbol == '{self._calibration.analyse.name}' and radiation_type == '{currentRadiationType}'"
+                f"symbol == '{self._calibration.element}' and radiation_type == '{currentRadiationType}'"
             )['condition_id'].values[0]
             data = self._calibration.analyse.getDataByConditionId(conditionId)
-            intensity = data.calculateIntensities(self._calibration.lines)[self._calibration.analyse.name][
-                currentRadiationType]
-            y = np.arange(0, intensity, 1)
-            x = np.arange(0, 100, 100 / y.size)
+            intensity = data.calculateIntensities(
+                self._calibration.lines
+            )[self._calibration.element][currentRadiationType]
+
+            # Calculate the line points
+            x = np.arange(0, intensity, 1)
+            y = np.arange(0, 100, 100 / x.size)
+
+            # Plot the line
             self._plotWidget.plot(x=x, y=y, pen=pg.mkPen(color="r", width=2))
+            slope = self._calibration.coefficients[currentRadiationType]
+            self._slopeLabel.setText(f"Slope: {slope:.5f}")
 
     def _initializeRadiations(self) -> None:
         if self._calibration.analyse.data:

@@ -7,9 +7,7 @@ import threading
 from PyQt6 import QtWidgets, QtGui
 
 from python.controllers import GuiHandler, ClientHandler
-from python.utils.database import getDataframe
 from python.utils.paths import resourcePath
-from python.views.calibrationtray.traywidget import CalibrationTrayWidget
 from python.views.window.plotwindow import PlotWindow
 
 
@@ -38,6 +36,8 @@ def main() -> None:
     with open(resourcePath("style.qss")) as f:
         _style = f.read()
         app.setStyleSheet(_style)
-    window = CalibrationTrayWidget(dataframe=getDataframe("Calibrations").iloc[:, 1:])
+    # window = CalibrationTrayWidget(dataframe=getDataframe("Calibrations").copy())
+    # method = Method(getDataframe("Conditions").copy(), getDataframe("Elements").copy(), [])
+    window = PlotWindow()
     window.show()
     sys.exit(app.exec())

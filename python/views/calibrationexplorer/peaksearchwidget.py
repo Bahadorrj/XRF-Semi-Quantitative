@@ -81,9 +81,9 @@ class PeakSearchTableWidget(DataframeTableWidget):
             "",
             "Element",
             "Type",
-            "Kev",
-            "Low Kev",
-            "High Kev",
+            "KeV",
+            "Low KeV",
+            "High KeV",
             "Intensity",
             "Condition",
             "Status",
@@ -113,6 +113,13 @@ class PeakSearchWidget(QtWidgets.QWidget):
     ):
         super(PeakSearchWidget, self).__init__(parent)
         self._calibration = calibration
+        self._df = None
+        self._kev = None
+        self._plotDataList = None
+        self._undoStack = None
+        self._redoStack = None
+        self._flag = None
+        self._regionActive = None
         self._initializeUi()
         if self._calibration is not None:
             self._analyse = self._calibration.analyse
@@ -130,7 +137,7 @@ class PeakSearchWidget(QtWidgets.QWidget):
             self._flag = False
             self._regionActive = False
             tableWidget = PeakSearchTableWidget(self, self._df)
-            self._mainLayout.replaceWidget(self._tableWidget, tableWidget)
+            self.mainLayout.replaceWidget(self._tableWidget, tableWidget)
             self._tableWidget.deleteLater()
             self._tableWidget = tableWidget
             self._fillTable()
@@ -399,14 +406,14 @@ class PeakSearchWidget(QtWidgets.QWidget):
         self._zoomRegion = pg.LinearRegionItem(clipItem=self._spectrumPlot)
 
     def _setUpView(self) -> None:
-        self._mainLayout = QtWidgets.QVBoxLayout()
-        self._mainLayout.setContentsMargins(0, 0, 0, 0)
-        self._mainLayout.addWidget(self._toolBar)
-        self._mainLayout.addLayout(self._searchLayout)
-        self._mainLayout.addWidget(self._tableWidget)
-        self._mainLayout.addLayout(self._statusLayout)
-        self._mainLayout.addWidget(self._graphicsLayoutWidget)
-        self.setLayout(self._mainLayout)
+        self.mainLayout = QtWidgets.QVBoxLayout()
+        self.mainLayout.setContentsMargins(0, 0, 0, 0)
+        self.mainLayout.addWidget(self._toolBar)
+        self.mainLayout.addLayout(self._searchLayout)
+        self.mainLayout.addWidget(self._tableWidget)
+        self.mainLayout.addLayout(self._statusLayout)
+        self.mainLayout.addWidget(self._graphicsLayoutWidget)
+        self.setLayout(self.mainLayout)
 
     # def _addRowToRedoStack(self, rowId: int, action: str) -> None:
     #     if not self._redoStack:
@@ -537,7 +544,8 @@ class PeakSearchWidget(QtWidgets.QWidget):
             analyseData = list(filter(lambda d: d.conditionId == plotData.conditionId, self._analyse.data))[0]
             y = analyseData.y
             intensity = y[round(minX): round(maxX)].sum()
-            analyseData.intensities[tableRow.get("symbol").text()][tableRow.get("radiation-type").text()] = intensity
+            analyseData.calculateIntensities(self._df)[tableRow.get("symbol").text()][
+                tableRow.get("radiation-type").text()] = intensity
         else:
             intensity = 0
         self._df.at[plotData.rowId, "low_kiloelectron_volt"] = minKev

@@ -8,9 +8,8 @@ from python.views.base.tablewidgets import DataframeTableWidget
 
 class TrayWidget(QtWidgets.QWidget):
     def __init__(self, parent: QtWidgets.QWidget | None = None) -> None:
-        self._widgets = {}
         super().__init__(parent)
-        self.setFixedSize(800, 800)
+        self.setFixedSize(1000, 800)
 
     def _connectSignalsAndSlots(self) -> None:
         self._tableWidget.currentCellChanged.connect(self._currentCellChanged)
@@ -58,14 +57,6 @@ class TrayWidget(QtWidgets.QWidget):
     def _currentCellChanged(self, currentRow: int, currentColumn: int, previousRow: int, previousColumn: int) -> None:
         pass
 
-    def _createTabLayout(self):
-        toolBar = QtWidgets.QToolBar()
-        toolBar.addAction(self._actionsMap["edit"])
-        self._createTabWidget()
-        self._viewLayout = QtWidgets.QVBoxLayout()
-        self._viewLayout.addWidget(toolBar)
-        self._viewLayout.addWidget(self._tabWidget)
-
     def _createTabWidget(self) -> None:
         self._tabWidget = QtWidgets.QTabWidget()
 
@@ -79,10 +70,11 @@ class TrayWidget(QtWidgets.QWidget):
         vLayout = QtWidgets.QVBoxLayout()
         vLayout.setContentsMargins(0, 0, 0, 0)
         vLayout.addWidget(self._menuBar)
-        self._mainLayout = QtWidgets.QVBoxLayout()
-        self._mainLayout.setContentsMargins(10, 10, 10, 10)
-        self._mainLayout.addWidget(self._toolBar)
-        self._mainLayout.addWidget(self._tableWidget)
-        self._mainLayout.addLayout(self._viewLayout)
-        vLayout.addLayout(self._mainLayout)
+        self.mainLayout = QtWidgets.QVBoxLayout()
+        self.mainLayout.setContentsMargins(10, 10, 10, 10)
+        self.mainLayout.setSpacing(10)
+        self.mainLayout.addWidget(self._toolBar)
+        self.mainLayout.addWidget(self._tableWidget)
+        self.mainLayout.addWidget(self._tabWidget)
+        vLayout.addLayout(self.mainLayout)
         self.setLayout(vLayout)

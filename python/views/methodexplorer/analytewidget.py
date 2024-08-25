@@ -22,12 +22,12 @@ class AnalytesAndConditionsWidget(QtWidgets.QWidget):
         self.selectCondition(1)
 
     def _setUpView(self) -> None:
-        self._mainLayout = QtWidgets.QVBoxLayout()
-        self._mainLayout.setContentsMargins(30, 30, 30, 30)
-        self._mainLayout.setSpacing(30)
-        self._mainLayout.addLayout(self._periodicTableLayout)
-        self._mainLayout.addWidget(self._conditionTable)
-        self.setLayout(self._mainLayout)
+        self.mainLayout = QtWidgets.QVBoxLayout()
+        self.mainLayout.setContentsMargins(30, 30, 30, 30)
+        self.mainLayout.setSpacing(30)
+        self.mainLayout.addLayout(self._periodicTableLayout)
+        self.mainLayout.addWidget(self._conditionTable)
+        self.setLayout(self.mainLayout)
 
     def _createPeriodicLayout(self) -> None:
         vLayout = QtWidgets.QVBoxLayout()

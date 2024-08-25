@@ -11,6 +11,7 @@ from PyQt6.QtCore import Qt
 
 from python.utils import calculation
 from python.utils import encryption
+from python.utils.database import getDataframe
 
 
 @dataclass(order=True)
@@ -23,14 +24,18 @@ class AnalyseData:
         intensities = defaultdict(dict)
         for row in lines.itertuples():
             intensity = self.y[
-                int(calculation.evToPx(row.low_kiloelectron_volt)):
-                int(calculation.evToPx(row.high_kiloelectron_volt))
-            ].sum()
+                        int(calculation.evToPx(row.low_kiloelectron_volt)):
+                        int(calculation.evToPx(row.high_kiloelectron_volt))
+                        ].sum()
             intensities[row.symbol][row.radiation_type] = intensity
         return intensities
 
     def toHashableDict(self) -> dict:
-        return {"condition": self.conditionId, "x": self.x.tolist(), "y": self.y.tolist()}
+        return {
+            "condition": self.conditionId,
+            "x": self.x.tolist(),
+            "y": self.y.tolist()
+        }
 
     @classmethod
     def fromHashableDict(cls, data: dict) -> "AnalyseData":
@@ -52,29 +57,29 @@ class AnalyseData:
 
 @dataclass(order=True)
 class Analyse:
-    filename: str = field(default=None)
+    filename: str
     data: list[AnalyseData] = field(default_factory=list)
+    generalData: dict = field(default_factory=dict)
 
     def __post_init__(self) -> None:
-        if self.filename:
-            self.name = Path(self.filename).stem
-            self.extension = self.filename.split(".")[-1]
+        self.name = Path(self.filename).stem
+        self.extension = self.filename.split(".")[-1]
 
     def getDataByConditionId(self, conditionId: int) -> AnalyseData:
         return list(filter(lambda d: d.conditionId == conditionId, self.data))[0]
 
     def toHashableDict(self) -> dict:
         return {
-            "filename": getattr(self, "filename", None),
+            "filename": self.filename,
             "data": [d.toHashableDict() for d in self.data],
+            "generalData": self.generalData
         }
 
     @classmethod
     def fromHashableDict(cls, analyseDict: dict) -> "Analyse":
-        if analyseDict["data"]:
-            analyseDict["data"] = [
-                AnalyseData.fromHashableDict(dataDict) for dataDict in analyseDict["data"]
-            ]
+        analyseDict["data"] = [
+            AnalyseData.fromHashableDict(dataDict) for dataDict in analyseDict["data"]
+        ]
         return cls(**analyseDict)
 
     @classmethod
@@ -96,8 +101,8 @@ class Analyse:
                 else:
                     stop += 1
         data.sort(key=lambda x: x.conditionId)
-        analyseDict["data"] = data
         analyseDict["filename"] = filename
+        analyseDict["data"] = data
         return cls(filename, data)
 
     @classmethod
@@ -119,66 +124,72 @@ class Analyse:
         analyseDict = loads(received)
         return cls.fromHashableDict(analyseDict)
 
+    def copy(self) -> "Analyse":
+        analyse = Analyse(self.filename, self.data.copy(), self.generalData.copy())
+        return analyse
+
 
 @dataclass(order=True)
 class Calibration:
+    element: str
+    concentration: float
+    state: int = field(default=0)  # 0: Proceed to acquisition, 1: Initial state, 2: Edited by user
     analyse: Analyse = field(default=None)
-    generalData: dict = field(default_factory=dict)
-    concentrations: dict = field(default_factory=dict)
-    lines: pandas.DataFrame = field(default=None)
+    lines: pandas.DataFrame = field(default_factory=lambda: getDataframe("Lines").copy())
+    coefficients: dict = field(default_factory=dict)
 
     def toHashableDict(self) -> dict:
         return {
-            "analyse": self.analyse.toHashableDict(),
-            "generalData": self.generalData,
-            "concentrations": self.concentrations,
-            "lines": self.lines.to_dict()
+            "element": self.element,
+            "concentration": self.concentration,
+            "state": self.state,
+            "analyse": self.analyse.toHashableDict() if self.analyse else None,
+            "lines": self.lines.to_dict(),
+            "coefficients": self.coefficients
         }
-    
-    def calculateCoefficients(self, lines: pandas.DataFrame) -> dict:
-        coefficients = {}
-        for symbol, concentration in self.concentrations.items():
-            row = lines.query(f"symbol == '{symbol}' and active == 1")
-            conditionId = row["condition_id"].values[0]
-            radiationType = row["radiation_type"].values[0]
-            data = self.analyse.getDataByConditionId(conditionId)
-            intensity = data.calculateIntensities(lines)[symbol][radiationType]
-            coefficient = concentration / intensity if intensity != 0 else 0
-            coefficients[symbol] = coefficient
-        return coefficients
-    
+
     def calculateInterferences(self, lines: pandas.DataFrame) -> dict:
         interferences = {}
-        for symbol in self.concentrations.keys():
-            row = lines.query(f"symbol == '{symbol}' and active == 1")
-            conditionId = row["condition_id"].values[0]
-            radiationType = row["radiation_type"].values[0]
-            data = self.analyse.getDataByConditionId(conditionId)
-            intensities = data.calculateIntensities(lines)
-            intensity = intensities[symbol][radiationType]
-            interference = defaultdict(dict)
-            for interfererSymbol, values in intensities.items():
-                for interfererRadiationType, interfererIntensity in values.items():
-                    if interfererSymbol != symbol and interfererRadiationType != radiationType:
-                        interference[interfererSymbol][interfererRadiationType] = interfererIntensity / intensity
-            interferences[symbol] = interference
+        row = lines.query(f"symbol == '{self.element}' and active == 1")
+        conditionId = row["condition_id"].values[0]
+        radiationType = row["radiation_type"].values[0]
+        data = self.analyse.getDataByConditionId(conditionId)
+        intensities = data.calculateIntensities(lines)
+        intensity = intensities[self.element][radiationType]
+        interference = defaultdict(dict)
+        for interfererSymbol, values in intensities.items():
+            for interfererRadiationType, interfererIntensity in values.items():
+                if interfererSymbol != self.element and interfererRadiationType != radiationType:
+                    interference[interfererSymbol][interfererRadiationType] = interfererIntensity / intensity
+        interferences[self.element] = interference
         return interferences
-    
+
+    @classmethod
+    def fromHashableDict(cls, calibrationDict: dict) -> "Calibration":
+        if calibrationDict["analyse"]:
+            analyse = Analyse.fromHashableDict(calibrationDict["analyse"])
+            calibrationDict["analyse"] = analyse
+        calibrationDict["lines"] = pandas.DataFrame(calibrationDict["lines"])
+        return cls(**calibrationDict)
+
     @classmethod
     def fromATXCFile(cls, filename: str) -> "Calibration":
         key = encryption.loadKey()
         with open(filename, "r") as f:
             encryptedText = f.readline()
         decryptedText = encryption.decryptText(encryptedText, key)
-        calibrationAsDict = loads(decryptedText)
-        kwargs = calibrationAsDict
-        analyse = Analyse.fromHashableDict(calibrationAsDict["analyse"])
-        kwargs["analyse"] = analyse
-        kwargs["lines"] = pandas.DataFrame(kwargs["lines"])
-        return cls(**kwargs)
+        kwargs = loads(decryptedText)
+        return cls.fromHashableDict(kwargs)
 
     def copy(self) -> "Calibration":
-        calibration = Calibration(self.analyse, self.generalData.copy(), self.concentrations.copy(), self.lines.copy())
+        calibration = Calibration(
+            self.element,
+            self.concentration,
+            self.state,
+            self.analyse.copy() if self.analyse else None,
+            self.lines.copy(),
+            self.coefficients
+        )
         return calibration
 
 @dataclass(order=True)
@@ -195,11 +206,13 @@ class PlotData:
         self.active = True
         self.peakLine.pen.setStyle(Qt.PenStyle.SolidLine)
         self.spectrumLine.pen.setStyle(Qt.PenStyle.SolidLine)
+        self.region.setMovable(False)
 
     def deactivate(self):
         self.active = False
         self.peakLine.pen.setStyle(Qt.PenStyle.DashLine)
         self.spectrumLine.pen.setStyle(Qt.PenStyle.DashLine)
+        self.region.setMovable(True)
 
     @classmethod
     def fromSeries(cls, rowId: int, series: pandas.Series) -> "PlotData":
@@ -259,7 +272,7 @@ class PlotData:
 
     @staticmethod
     def _generateRegion(
-        rng: list[float, float] | tuple[float, float], movable: bool = True
+            rng: list[float, float] | tuple[float, float], movable: bool = True
     ):
         region = pg.LinearRegionItem(swapMode="push")
         region.setZValue(10)
