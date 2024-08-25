@@ -3,71 +3,53 @@ from PyQt6 import QtCore, QtWidgets
 from python.utils import datatypes
 from python.views.base.explorerwidget import Explorer
 from python.views.widgets.analytewidget import AnalytesAndConditionsWidget
-from python.views.widgets.calibrationwidget import CalibrationWidget
 
 
 class MethodExplorer(Explorer):
     def __init__(self, parent: QtWidgets.QWidget | None = None, method: datatypes.Method | None = None):
-        assert method is not None, "Method must be provided!"
         super(MethodExplorer, self).__init__(parent)
         self._method = method
-        self._initMethod = self._method.copy()
-        self._widgets = {
-            "Analytes And Conditions": AnalytesAndConditionsWidget(method=self._method),
-            "Calibrations": CalibrationWidget(method=self._method),
-            "Properties": QtWidgets.QWidget(self)
-        }
+        self._initMethod = None
+        self._widgets = None
+        self._initializeUi()
+        if self._method is not None:
+            self._initMethod = self._method.copy()
+            self._widgets = {
+                "Analytes And Conditions": AnalytesAndConditionsWidget(method=self._method),
+                "Calibrations": QtWidgets.QWidget(self),
+                "Properties": QtWidgets.QWidget(self)
+            }
+            self._connectSignalsAndSlots()
+            self._treeWidget.setCurrentItem(self._treeWidget.topLevelItem(0))
 
+    def _initializeUi(self) -> None:
         self.setObjectName("method-explorer")
         self.setWindowTitle("Method explorer")
-
         self._createActions(("New", "Open", "Save", "Close"))
         self._createMenus(("&File", "&Edit", "&View", "&Window", "&Help"))
-        self._fillMenusWithActions({"file": ["new", "open", "save", "close"]})
+        self._fillMenusWithActions()
         self._createToolBar()
-        self._fillToolBarWithActions(("new", "open", "save"))
+        self._fillToolBarWithActions()
         self._createTreeWidget()
         self._fillTreeWithItems(
             "Method Contents", ("Analytes And Conditions", "Calibrations", "Properties")
         )
         self._setUpView()
-        self._connectSignalsAndSlots()
-        self._treeWidget.setCurrentItem(self._treeWidget.topLevelItem(0))
 
     @QtCore.pyqtSlot()
     def _actionTriggered(self, key: str) -> None:
-        if key == "new":
-            messageBox = QtWidgets.QMessageBox()
-            messageBox.setIcon(QtWidgets.QMessageBox.Icon.Question)
-            messageBox.setWindowTitle("New method")
-            messageBox.setText("Are you sure you want to open a new method?")
-            messageBox.setStandardButtons(
-                QtWidgets.QMessageBox.StandardButton.Yes
-                | QtWidgets.QMessageBox.StandardButton.No
-            )
-            result = messageBox.exec()
-            if result == QtWidgets.QMessageBox.StandardButton.Yes:
-                self.reinitialize(self._initMethod)
-        elif key == "open":
-            filename, filters = QtWidgets.QFileDialog.getOpenFileName(
-                self,
-                "Open File",
-                "./",
-                "Antique'X Method (*.atxm)",
-            )
-            if filename:
-                pass
-        elif key == "save-as":
-            filename, filters = QtWidgets.QFileDialog.getSaveFileName(
-                self,
-                "Save Method",
-                "./",
-                "Antique'X Method (*.atxm)",
-            )
-            if filename:
-                pass
-        elif key == "close":
-            self.close()
+        pass
+
+    def _fillMenusWithActions(self) -> None:
+        self._menusMap["file"].addAction(self._actionsMap["new"])
+        self._menusMap["file"].addAction(self._actionsMap["open"])
+        self._menusMap["file"].addAction(self._actionsMap["save"])
+        self._menusMap["file"].addAction(self._actionsMap["close"])
+
+    def _fillToolBarWithActions(self) -> None:
+        self._toolBar.addAction(self._actionsMap["new"])
+        self._toolBar.addAction(self._actionsMap["open"])
+        self._toolBar.addAction(self._actionsMap["save"])
 
     @QtCore.pyqtSlot()
     def _changeWidget(self) -> None:
