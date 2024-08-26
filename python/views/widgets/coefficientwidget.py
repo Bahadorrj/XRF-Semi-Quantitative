@@ -77,7 +77,7 @@ class CoefficientWidget(QtWidgets.QWidget):
         if self._calibration.analyse.data:
             try:
                 items = self._calibration.lines.query(
-                    f"symbol == '{self._calibration.analyse.name}' and active == 1"
+                    f"symbol == '{self._calibration.analyse.filename}' and active == 1"
                 )["radiation_type"].unique().tolist()
                 items = list(map(str, items))
             except IndexError:
