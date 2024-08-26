@@ -496,7 +496,7 @@ class PeakSearchWidget(QtWidgets.QWidget):
             changed = True
             plotData.deactivate()
             self._df.at[plotData.rowId, "active"] = 0
-            if self._df.at[plotData.rowId, "symbol"] == self._calibration.analyse.name:
+            if self._df.at[plotData.rowId, "symbol"] == self._calibration.analyse.filename:
                 self.analyseRadiationChanged.emit()
             statusItem.setText("Deactivated")
             statusItem.setForeground(QtCore.Qt.GlobalColor.red)
@@ -506,7 +506,7 @@ class PeakSearchWidget(QtWidgets.QWidget):
             changed = True
             plotData.activate()
             self._df.at[plotData.rowId, "active"] = 1
-            if self._df.at[plotData.rowId, "symbol"] == self._calibration.analyse.name:
+            if self._df.at[plotData.rowId, "symbol"] == self._calibration.analyse.filename:
                 self.analyseRadiationChanged.emit()
             statusItem.setText("Activated")
             statusItem.setForeground(QtCore.Qt.GlobalColor.darkGreen)
