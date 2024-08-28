@@ -1,13 +1,13 @@
 import socket
+import pandas
+import numpy as np
+import pyqtgraph as pg
+
 from collections import defaultdict
 from dataclasses import dataclass, field
 from json import loads, dumps
 from pathlib import Path
 from typing import Optional
-
-import numpy as np
-import pandas
-import pyqtgraph as pg
 from PyQt6.QtCore import Qt
 
 from src.utils import calculation
@@ -20,6 +20,12 @@ class AnalyseData:
     conditionId: int
     x: np.ndarray
     y: np.ndarray
+    
+    def __eq__(self, others) -> bool:
+        assert isinstance(others, AnalyseData), "Comparison Error"
+        return (self.conditionId == others.conditionId and
+                np.all(np.equal(self.x, others.x)) and 
+                np.all(np.equal(self.y, others.y)))
 
     def calculateIntensities(self, lines: pandas.DataFrame) -> dict:
         intensities = defaultdict(dict)
@@ -33,24 +39,24 @@ class AnalyseData:
 
     def toHashableDict(self) -> dict:
         return {
-            "condition": self.conditionId,
+            "conditionId": self.conditionId,
             "x": self.x.tolist(),
             "y": self.y.tolist(),
         }
 
     @classmethod
     def fromHashableDict(cls, data: dict) -> "AnalyseData":
-        return cls(data["condition"], np.array(data["x"]), np.array(data["y"]))
+        return cls(data["conditionId"], np.array(data["x"]), np.array(data["y"]))
 
     @classmethod
     def fromList(cls, data: list) -> "AnalyseData":
         temp = [int(d) for d in data if d.isdigit()]
-        condition = next(
+        conditionId = next(
             (int(d.split()[-1]) for d in data if "condition" in d.lower()), None
         )
         y = np.array(temp)
         x = np.arange(0, y.size, 1)
-        return cls(condition, x, y) if condition is not None else None
+        return cls(conditionId, x, y) if conditionId is not None else None
 
 
 @dataclass(order=True)
