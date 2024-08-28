@@ -38,7 +38,7 @@ class Explorer(QtWidgets.QWidget):
         pass
 
     def _createToolBar(self) -> None:
-        self._toolBar = QtWidgets.QToolBar(self)
+        self._toolBar = QtWidgets.QToolBar()
         self._toolBar.setIconSize(QtCore.QSize(16, 16))
         self._toolBar.setToolButtonStyle(QtCore.Qt.ToolButtonStyle.ToolButtonIconOnly)
         self._toolBar.setMovable(False)
@@ -47,7 +47,7 @@ class Explorer(QtWidgets.QWidget):
         pass
 
     def _createTreeWidget(self) -> None:
-        self._treeWidget = QtWidgets.QTreeWidget(self)
+        self._treeWidget = QtWidgets.QTreeWidget()
         self._treeWidget.setFixedWidth(200)
 
     def _fillTreeWithItems(self, header: str, labels: list | tuple) -> None:
@@ -73,7 +73,7 @@ class Explorer(QtWidgets.QWidget):
         self.mainLayout = QtWidgets.QHBoxLayout()
         self.mainLayout.setContentsMargins(10, 10, 10, 10)
         self.mainLayout.addWidget(self._treeWidget)
-        self.mainLayout.addWidget(QtWidgets.QWidget(self))
+        self.mainLayout.addWidget(QtWidgets.QWidget())
         vLayout = QtWidgets.QVBoxLayout()
         vLayout.setContentsMargins(0, 0, 0, 0)
         vLayout.addWidget(self._menuBar)
