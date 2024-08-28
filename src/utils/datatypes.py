@@ -70,6 +70,10 @@ class Analyse:
     def __post_init__(self) -> None:
         self.filename = Path(self.filePath).stem
         self.extension = self.filePath.split(".")[-1]
+        
+    def __eq__(self, other) -> bool:
+        assert isinstance(other, Analyse), "Comparison Error"
+        return all(self.data[i] == other.data[i] for i in range(len(self.data))) and self.generalData == other.generalData
 
     def getDataByConditionId(self, conditionId: int) -> AnalyseData:
         return next(d for d in self.data if d.conditionId == conditionId)
