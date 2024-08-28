@@ -78,13 +78,6 @@ class Analyse:
     def getDataByConditionId(self, conditionId: int) -> AnalyseData:
         return next(d for d in self.data if d.conditionId == conditionId)
 
-    def toHashableDict(self) -> dict:
-        return {
-            "filePath": self.filePath,
-            "data": [d.toHashableDict() for d in self.data],
-            "generalData": self.generalData,
-        }
-
     def isEmpty(self) -> bool:
         return len(self.data) == 0
 
@@ -94,9 +87,9 @@ class Analyse:
     def saveTo(self, filePath) -> None:
         if filePath.endswith(".atx"):
             key = encryption.loadKey()
+            jsonText = dumps(self.toHashableDict())
+            encryptedText = encryption.encryptText(jsonText, key)
             with open(filePath, "wb") as f:
-                jsonText = dumps(self.toHashableDict())
-                encryptedText = encryption.encryptText(jsonText, key)
                 f.write(encryptedText + b"\n")
         elif filePath.endswith(".txt"):
             with open(filePath, "w") as f:
@@ -106,6 +99,13 @@ class Analyse:
                     f.write(f"Condition {data.conditionId}\n")
                     for i in data.y:
                         f.write(str(i) + "\n")
+
+    def toHashableDict(self) -> dict:
+        return {
+            "filePath": self.filePath,
+            "data": [d.toHashableDict() for d in self.data],
+            "generalData": self.generalData,
+        }
 
     @classmethod
     def fromHashableDict(cls, analyseDict: dict) -> "Analyse":
@@ -144,6 +144,7 @@ class Analyse:
         while True:
             received += connection.recv(10).decode("utf-8")
             if received[-4:] == "-stp":
+                received = received[:-4]
                 break
         analyseDict = loads(received)
         return cls.fromHashableDict(analyseDict)
