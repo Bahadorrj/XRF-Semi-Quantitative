@@ -1,17 +1,17 @@
 import pandas
 from PyQt6 import QtCore, QtWidgets
 
-from python.utils import datatypes
-from python.utils.database import getDataframe, getDatabase, reloadDataframes
-from python.utils.datatypes import Calibration, Method
-from python.views.base.explorerwidget import Explorer
-from python.views.base.tablewidget import TableItem
-from python.views.base.traywidget import TrayWidget
-from python.views.trays.calibrationtray import CalibrationTrayWidget
-from python.views.widgets.analytewidget import AnalytesAndConditionsWidget
-from python.views.widgets.coefficientwidget import CoefficientWidget
-from python.views.widgets.generaldatawidget import GeneralDataWidget
-from python.views.widgets.linestablewidget import LinesTableWidget
+from src.utils import datatypes
+from src.utils.database import getDataframe, getDatabase, reloadDataframes
+from src.utils.datatypes import Calibration, Method
+from src.views.base.explorerwidget import Explorer
+from src.views.base.tablewidget import TableItem
+from src.views.base.traywidget import TrayWidget
+from src.views.trays.calibrationtray import CalibrationTrayWidget
+from src.views.widgets.analytewidget import AnalytesAndConditionsWidget
+from src.views.widgets.coefficientwidget import CoefficientWidget
+from src.views.widgets.generaldatawidget import GeneralDataWidget
+from src.views.widgets.linestablewidget import LinesTableWidget
 
 
 class MethodsCalibrationTrayWidget(CalibrationTrayWidget):

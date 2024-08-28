@@ -3,8 +3,8 @@ from functools import partial
 import pyqtgraph as pg
 from PyQt6 import QtWidgets, QtCore
 
-from python.utils import datatypes, calculation
-from python.utils.database import getDataframe
+from src.utils import datatypes, calculation
+from src.utils.database import getDataframe
 
 pg.setConfigOptions(antialias=True)
 

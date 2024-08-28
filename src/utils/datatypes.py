@@ -10,9 +10,9 @@ import pandas
 import pyqtgraph as pg
 from PyQt6.QtCore import Qt
 
-from python.utils import calculation
-from python.utils import encryption
-from python.utils.database import getDataframe
+from src.utils import calculation
+from src.utils import encryption
+from src.utils.database import getDataframe
 
 
 @dataclass(order=True)

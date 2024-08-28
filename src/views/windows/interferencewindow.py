@@ -5,9 +5,9 @@
 # import pyqtgraph as pg
 # from PyQt6 import QtCore, QtWidgets, QtGui
 
-# from python.utils.color import generateGradiant
-# from python.utils.database import getDatabase
-# from python.utils.paths import resourcePath
+# from src.utils.color import generateGradiant
+# from src.utils.database import getDatabase
+# from src.utils.paths import resourcePath
 
 
 # class RadiationComboBox(QtWidgets.QComboBox):

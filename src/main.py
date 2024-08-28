@@ -6,14 +6,14 @@ import threading
 
 from PyQt6 import QtWidgets, QtGui
 
-from python.controllers import GuiHandler, ClientHandler
-from python.utils.database import getDataframe
-from python.utils.datatypes import Method
-from python.utils.paths import resourcePath
-from python.views.explorers.methodexplorer import MethodExplorer
-from python.views.trays.calibrationtray import CalibrationTrayWidget
-from python.views.trays.methodtray import MethodTrayWidget
-from python.views.windows.plotwindow import PlotWindow
+from src.controllers import GuiHandler, ClientHandler
+from src.utils.database import getDataframe
+from src.utils.datatypes import Method
+from src.utils.paths import resourcePath
+from src.views.explorers.methodexplorer import MethodExplorer
+from src.views.trays.calibrationtray import CalibrationTrayWidget
+from src.views.trays.methodtray import MethodTrayWidget
+from src.views.windows.plotwindow import PlotWindow
 
 
 def connectServerAndGUI(host, port, plotWindow: PlotWindow, app: QtWidgets.QApplication) -> None:

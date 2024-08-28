@@ -4,15 +4,15 @@ from pathlib import Path
 import pandas
 from PyQt6 import QtCore, QtWidgets
 
-from python.utils.database import getDataframe, getDatabase, reloadDataframes
-from python.utils.datatypes import Calibration, Analyse
-from python.views.base.formdialog import FormDialog
-from python.views.base.tablewidget import TableItem
-from python.views.base.traywidget import TrayWidget
-from python.views.explorers.calibrationexplorer import CalibrationExplorer
-from python.views.widgets.coefficientwidget import CoefficientWidget
-from python.views.widgets.generaldatawidget import GeneralDataWidget
-from python.views.widgets.linestablewidget import LinesTableWidget
+from src.utils.database import getDataframe, getDatabase, reloadDataframes
+from src.utils.datatypes import Calibration, Analyse
+from src.views.base.formdialog import FormDialog
+from src.views.base.tablewidget import TableItem
+from src.views.base.traywidget import TrayWidget
+from src.views.explorers.calibrationexplorer import CalibrationExplorer
+from src.views.widgets.coefficientwidget import CoefficientWidget
+from src.views.widgets.generaldatawidget import GeneralDataWidget
+from src.views.widgets.linestablewidget import LinesTableWidget
 
 class AcquisitionWidget(QtWidgets.QWidget):
     getAnalyseFile = QtCore.pyqtSignal()

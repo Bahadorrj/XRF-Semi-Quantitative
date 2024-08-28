@@ -2,7 +2,7 @@ from functools import partial
 
 from PyQt6 import QtCore, QtGui, QtWidgets
 
-from python.utils.paths import resourcePath
+from src.utils.paths import resourcePath
 
 
 class Explorer(QtWidgets.QWidget):

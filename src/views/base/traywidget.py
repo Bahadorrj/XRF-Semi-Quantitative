@@ -2,8 +2,8 @@ from functools import partial
 
 from PyQt6 import QtCore, QtGui, QtWidgets
 
-from python.utils.paths import resourcePath
-from python.views.base.tablewidget import DataframeTableWidget
+from src.utils.paths import resourcePath
+from src.views.base.tablewidget import DataframeTableWidget
 
 
 class TrayWidget(QtWidgets.QWidget):

@@ -4,10 +4,10 @@ import threading
 
 from PyQt6 import QtCore, QtWidgets
 
-from python.utils.database import getDatabase
-from python.utils.datatypes import Analyse
-from python.utils.paths import resourcePath
-from python.views.windows.plotwindow import PlotWindow
+from src.utils.database import getDatabase
+from src.utils.datatypes import Analyse
+from src.utils.paths import resourcePath
+from src.views.windows.plotwindow import PlotWindow
 
 
 class GuiHandler(QtCore.QObject):

@@ -3,7 +3,7 @@ import sqlite3
 
 import pandas as pd
 
-from python.utils.paths import resourcePath
+from src.utils.paths import resourcePath
 
 
 class Database:

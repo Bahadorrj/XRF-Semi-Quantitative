@@ -3,14 +3,14 @@ import os
 import pandas
 from PyQt6 import QtCore, QtWidgets
 
-from python.utils import datatypes
-from python.utils.database import getDataframe, getDatabase, reloadDataframes
-from python.utils.datatypes import Method
-from python.views.base.formdialog import FormDialog
-from python.views.base.tablewidget import TableItem, DataframeTableWidget
-from python.views.base.traywidget import TrayWidget
-from python.views.explorers.methodexplorer import MethodExplorer
-from python.views.widgets.analytewidget import AnalytesAndConditionsWidget
+from src.utils import datatypes
+from src.utils.database import getDataframe, getDatabase, reloadDataframes
+from src.utils.datatypes import Method
+from src.views.base.formdialog import FormDialog
+from src.views.base.tablewidget import TableItem, DataframeTableWidget
+from src.views.base.traywidget import TrayWidget
+from src.views.explorers.methodexplorer import MethodExplorer
+from src.views.widgets.analytewidget import AnalytesAndConditionsWidget
 
 class CalibrationsWidget(QtWidgets.QWidget):
     def __init__(self, parent: QtWidgets.QWidget | None = None, method: datatypes.Method | None = None) -> None:

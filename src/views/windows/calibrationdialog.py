@@ -8,9 +8,9 @@
 # from scipy.interpolate import CubicSpline
 # from scipy.signal import find_peaks
 
-# from python.utils import datatypes, calculation
-# from python.utils.database import getDatabase
-# from python.utils.paths import resourcePath
+# from src.utils import datatypes, calculation
+# from src.utils.database import getDatabase
+# from src.utils.paths import resourcePath
 
 # pg.setConfigOptions(antialias=True)
 

@@ -2,7 +2,7 @@ import numpy as np
 import pyqtgraph as pg
 from PyQt6 import QtWidgets
 
-from python.utils import datatypes
+from src.utils import datatypes
 
 
 class CoefficientWidget(QtWidgets.QWidget):

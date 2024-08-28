@@ -1,7 +1,7 @@
 from PyQt6 import QtCore, QtWidgets
 
-from python.utils import datatypes
-from python.views.base.tablewidget import DataframeTableWidget
+from src.utils import datatypes
+from src.views.base.tablewidget import DataframeTableWidget
 
 
 class LinesTableWidget(QtWidgets.QWidget):

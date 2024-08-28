@@ -6,11 +6,11 @@ import numpy as np
 import pyqtgraph as pg
 from PyQt6 import QtCore, QtGui, QtWidgets
 
-from python.utils import datatypes
-from python.utils import encryption
-from python.utils.database import getDataframe
-from python.utils.paths import resourcePath
-from python.views.trays.calibrationtray import CalibrationTrayWidget
+from src.utils import datatypes
+from src.utils import encryption
+from src.utils.database import getDataframe
+from src.utils.paths import resourcePath
+from src.views.trays.calibrationtray import CalibrationTrayWidget
 
 COLORS = [
     "#FF0000",

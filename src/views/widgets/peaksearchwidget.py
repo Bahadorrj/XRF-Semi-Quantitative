@@ -6,10 +6,10 @@ import pyqtgraph as pg
 from PyQt6 import QtWidgets, QtCore, QtGui
 from pandas import DataFrame
 
-from python.utils import calculation, datatypes
-from python.utils.database import getDataframe
-from python.utils.paths import resourcePath
-from python.views.base.tablewidget import DataframeTableWidget, TableItem, TableWidget
+from src.utils import calculation, datatypes
+from src.utils.database import getDataframe
+from src.utils.paths import resourcePath
+from src.views.base.tablewidget import DataframeTableWidget, TableItem, TableWidget
 
 
 class StatusButton(QtWidgets.QPushButton):
