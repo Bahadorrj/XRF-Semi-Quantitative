@@ -26,10 +26,13 @@ class Database:
         except sqlite3.Error as e:
             print(e)
 
-    def fetchData(self, query: str) -> list:
+    def fetchData(self, query: str, values: list | tuple | None = None) -> list:
         try:
             cursor = self.conn.cursor()
-            cursor.execute(query)
+            if values is None:
+                cursor.execute(query)
+            else:
+                cursor.execute(query, values)
             rows = cursor.fetchall()
             return rows
         except sqlite3.Error as e:
