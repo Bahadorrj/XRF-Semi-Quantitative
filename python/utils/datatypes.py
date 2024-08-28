@@ -12,7 +12,7 @@ from PyQt6.QtCore import Qt
 
 from python.utils import calculation
 from python.utils import encryption
-from python.utils.database import getDataframe
+from python.utils.database import getDataframe, getDatabase, reloadDataframes
 
 
 @dataclass(order=True)
@@ -25,9 +25,9 @@ class AnalyseData:
         intensities = defaultdict(dict)
         for row in lines.itertuples():
             intensity = self.y[
-                        int(calculation.evToPx(row.low_kiloelectron_volt)):
-                        int(calculation.evToPx(row.high_kiloelectron_volt))
-                        ].sum()
+                int(calculation.evToPx(row.low_kiloelectron_volt)) : 
+                int(calculation.evToPx(row.high_kiloelectron_volt))
+            ].sum()
             intensities[row.symbol][row.radiation_type] = intensity
         return intensities
 
@@ -35,7 +35,7 @@ class AnalyseData:
         return {
             "condition": self.conditionId,
             "x": self.x.tolist(),
-            "y": self.y.tolist()
+            "y": self.y.tolist(),
         }
 
     @classmethod
@@ -44,13 +44,10 @@ class AnalyseData:
 
     @classmethod
     def fromList(cls, data: list) -> "AnalyseData":
-        temp = list()
-        condition = None
-        for d in data:
-            if d.isdigit():
-                temp.append(int(d))
-            elif "condition" in d.lower():
-                condition = int(d.split()[-1])
+        temp = [int(d) for d in data if d.isdigit()]
+        condition = next(
+            (int(d.split()[-1]) for d in data if "condition" in d.lower()), None
+        )
         y = np.array(temp)
         x = np.arange(0, y.size, 1)
         return cls(condition, x, y) if condition is not None else None
@@ -69,21 +66,20 @@ class Analyse:
         self.extension = self.filePath.split(".")[-1]
 
     def getDataByConditionId(self, conditionId: int) -> AnalyseData:
-        return list(filter(lambda d: d.conditionId == conditionId, self.data))[0]
+        return next(d for d in self.data if d.conditionId == conditionId)
 
     def toHashableDict(self) -> dict:
         return {
             "filePath": self.filePath,
             "data": [d.toHashableDict() for d in self.data],
-            "generalData": self.generalData
+            "generalData": self.generalData,
         }
 
     def isEmpty(self) -> bool:
         return len(self.data) == 0
 
     def copy(self) -> "Analyse":
-        analyse = Analyse(self.filePath, self.data.copy(), self.generalData.copy())
-        return analyse
+        return Analyse(self.filePath, self.data.copy(), self.generalData.copy())
 
     def saveTo(self, filePath) -> None:
         if filePath.endswith(".atx"):
@@ -110,25 +106,17 @@ class Analyse:
 
     @classmethod
     def fromTXTFile(cls, filePath: str) -> "Analyse":
-        # TODO change in future
-        analyseDict = {}
         data = []
         with open(filePath, "r") as f:
-            lines = list(map(lambda s: s.strip(), f.readlines()))
+            lines = [line.strip() for line in f]
             start = 0
-            stop = 0
-            for line in lines:
+            for stop, line in enumerate(lines):
                 if "<<EndData>>" in line:
                     analyseData = AnalyseData.fromList(lines[start:stop])
-                    if analyseData is not None:
-                        start = stop
-                        if analyseData.y.size != 0:
-                            data.append(analyseData)
-                else:
-                    stop += 1
+                    if analyseData and analyseData.y.size != 0:
+                        data.append(analyseData)
+                    start = stop
         data.sort(key=lambda x: x.conditionId)
-        analyseDict["filePath"] = filePath
-        analyseDict["data"] = data
         return cls(filePath, data)
 
     @classmethod
@@ -136,8 +124,8 @@ class Analyse:
         key = encryption.loadKey()
         with open(filePath, "r") as f:
             encryptedText = f.readline()
-            decryptedText = encryption.decryptText(encryptedText, key)
-            analyseDict = loads(decryptedText)
+        decryptedText = encryption.decryptText(encryptedText, key)
+        analyseDict = loads(decryptedText)
         return cls.fromHashableDict(analyseDict)
 
     @classmethod
@@ -158,7 +146,9 @@ class Calibration:
     concentration: float
     state: int = field(default=0)
     _analyse: Optional[Analyse] = field(default=None)
-    _lines: pandas.DataFrame = field(default_factory=lambda: getDataframe("Lines").copy())
+    _lines: pandas.DataFrame = field(
+        default_factory=lambda: getDataframe("Lines").copy()
+    )
     coefficients: dict = field(default_factory=dict)
     interferences: dict = field(default_factory=dict)
 
@@ -189,14 +179,12 @@ class Calibration:
     def calculateCoefficients(self) -> None:
         if self.analyse is None:
             return
-        df = self.lines.query(
-            f"symbol == '{self.element}' and active == 1"
-        )
+        df = self.lines.query(f"symbol == '{self.element}' and active == 1")
         for row in df.itertuples(index=False):
             data = self.analyse.getDataByConditionId(row.condition_id)
-            intensity = data.calculateIntensities(
-                self.lines
-            )[self.element][row.radiation_type]
+            intensity = data.calculateIntensities(self.lines)[self.element][
+                row.radiation_type
+            ]
             self.coefficients[row.radiation_type] = self.concentration / intensity
 
     def calculateInterferences(self) -> None:
@@ -208,24 +196,21 @@ class Calibration:
         data = self.analyse.getDataByConditionId(conditionId)
         intensities = data.calculateIntensities(self.lines)
         intensity = intensities[self.element][radiationType]
-        interference = defaultdict(dict)
-        for interfererSymbol, values in intensities.items():
-            for interfererRadiationType, interfererIntensity in values.items():
-                if interfererSymbol != self.element and interfererRadiationType != radiationType:
-                    interference[interfererSymbol][interfererRadiationType] = interfererIntensity / intensity
-        self.interferences[self.element] = interference
+        self.interferences[self.element] = {
+            interfererSymbol: {
+                interfererRadiationType: interfererIntensity / intensity
+                for interfererRadiationType, interfererIntensity in values.items()
+                if interfererRadiationType != radiationType
+            }
+            for interfererSymbol, values in intensities.items()
+            if interfererSymbol != self.element
+        }
 
     def status(self) -> str:
-        if self.state == 0:
-            status = "Proceed to acquisition"
-        elif self.state == 1:
-            status = "Initial state"
-        else:
-            status = "Edited by user"
-        return status
+        return self.convertStateToStatus(self.state)
 
     def copy(self) -> "Calibration":
-        calibration = Calibration(
+        return Calibration(
             self.filename,
             self.element,
             self.concentration,
@@ -233,9 +218,8 @@ class Calibration:
             self.analyse.copy() if self.analyse else None,
             self.lines.copy(),
             self.coefficients.copy(),
-            self.interferences.copy()
+            self.interferences.copy(),
         )
-        return calibration
 
     def save(self) -> None:
         filePath = f"calibrations/{self.filename}.atxc"
@@ -253,7 +237,7 @@ class Calibration:
             "_analyse": self.analyse.toHashableDict() if self.analyse else None,
             "_lines": self.lines.to_dict(),
             "coefficients": self.coefficients,
-            "interferences": self.interferences
+            "interferences": self.interferences,
         }
 
     @classmethod
@@ -273,6 +257,102 @@ class Calibration:
         kwargs = loads(decryptedText)
         kwargs["filename"] = Path(filePath).stem
         return cls.fromHashableDict(kwargs)
+
+    @classmethod
+    def convertStateToStatus(cls, state: int) -> str:
+        if state == 0:
+            status = "Proceed to acquisition"
+        elif state == 1:
+            status = "Initial state"
+        else:
+            status = "Edited by user"
+        return status
+
+
+@dataclass(order=True)
+class Method:
+    methodId: int
+    filename: str
+    description: str = field(default="")
+    state: int = field(default=0)
+    calibrations: Optional[pandas.DataFrame] = field(
+        default_factory=lambda: pandas.DataFrame(
+            columns=getDataframe("Calibrations").columns[1:]
+        )
+    )
+    conditions: pandas.DataFrame = field(
+        default_factory=lambda: getDataframe("Conditions").copy()
+    )
+    elements: pandas.DataFrame = field(
+        default_factory=lambda: getDataframe("Elements").copy()
+    )
+
+    def status(self) -> str:
+        return self.convertStateToStatus(self.state)
+
+    def copy(self) -> "Method":
+        return Method(
+            self.methodId,
+            self.filename,
+            self.description,
+            self.state,
+            self.calibrations.copy(),
+            self.conditions.copy(),
+            self.elements.copy(),
+        )
+
+    def save(self) -> None:
+        methodPath = f"methods/{self.filename}.atxm"
+        key = encryption.loadKey()
+        jsonText = dumps(self.toHashableDict())
+        encryptedText = encryption.encryptText(jsonText, key)
+        with open(methodPath, "wb") as f:
+            f.write(encryptedText + b"\n")
+
+    def toHashableDict(self) -> dict:
+        return {
+            "methodId": self.methodId,
+            "filename": self.filename,
+            "description": self.description,
+            "state": self.state,
+            "calibrations": self.calibrations.to_dict(),
+            "conditions": self.conditions.to_dict(),
+            "elements": self.elements.to_dict(),
+        }
+
+    @classmethod
+    def fromHashableDict(cls, kwargs: dict):
+        kwargs["conditions"] = pandas.DataFrame(kwargs["conditions"])
+        kwargs["elements"] = pandas.DataFrame(kwargs["elements"])
+        kwargs["calibrations"] = pandas.DataFrame(kwargs["calibrations"])
+        return cls(**kwargs)
+
+    @classmethod
+    def fromATXMFile(cls, filePath: str):
+        key = encryption.loadKey()
+        with open(filePath, "r") as f:
+            encryptedText = f.readline()
+        decryptedText = encryption.decryptText(encryptedText, key)
+        kwargs = loads(decryptedText)
+        return cls.fromHashableDict(kwargs)
+
+    @classmethod
+    def convertStateToStatus(cls, state: int) -> str:
+        if state == 0:
+            return "Initial state"
+        elif state == 1:
+            return "Edited"
+
+    def __eq__(self, other: "Method"):
+        assert isinstance(other, Method), "Comparison Error"
+        return (
+            self.filename == other.filename
+            and self.description == other.description
+            and self.state == other.state
+            and self.calibrations.equals(other.calibrations)
+            and self.conditions.equals(other.conditions)
+            and self.elements.equals(other.elements)
+        )
 
 
 @dataclass(order=True)
@@ -316,7 +396,9 @@ class PlotData:
         )
 
     @staticmethod
-    def _generateLine(series: pandas.Series, lineType: str = "spectrum") -> pg.InfiniteLine:
+    def _generateLine(
+        series: pandas.Series, lineType: str = "spectrum"
+    ) -> pg.InfiniteLine:
         value = calculation.evToPx(float(series["kiloelectron_volt"]))
         line = pg.InfiniteLine()
         line.setAngle(90)
@@ -355,7 +437,7 @@ class PlotData:
 
     @staticmethod
     def _generateRegion(
-            rng: list[float, float] | tuple[float, float], movable: bool = True
+        rng: list[float, float] | tuple[float, float], movable: bool = True
     ):
         region = pg.LinearRegionItem(swapMode="push")
         region.setZValue(10)
@@ -363,64 +445,3 @@ class PlotData:
         region.setBounds((0, 2048))
         region.setMovable(movable)
         return region
-
-
-@dataclass(order=True)
-class Method:
-    filename: str
-    description: str = field(default="")
-    calibrations: dict[str, Calibration] = field(default_factory=dict)
-    state: int = field(default=0)
-    conditions: pandas.DataFrame = field(default_factory=lambda: getDataframe("Conditions").copy())
-    elements: pandas.DataFrame = field(default_factory=lambda: getDataframe("Elements").copy())
-
-    def status(self) -> str:
-        if self.state == 0:
-            return "Initial state"
-        elif self.state == 1:
-            return "Edited"
-
-    def copy(self) -> "Method":
-        method = Method(
-            self.filename,
-            self.description,
-            self.calibrations.copy(),
-            self.state,
-            self.conditions.copy(),
-            self.elements.copy()
-        )
-        return method
-
-    def save(self) -> None:
-        methodPath = f"methods/{self.filename}.atxm"
-        with open(methodPath, "wb") as f:
-            key = encryption.loadKey()
-            jsonText = dumps(self.toHashableDict())
-            encryptedText = encryption.encryptText(jsonText, key)
-            f.write(encryptedText + b"\n")
-
-    def toHashableDict(self) -> dict:
-        return {
-            "description": self.description,
-            "calibrations": self.calibrations,
-            "state": self.state,
-            "conditions": self.conditions.to_dict(),
-            "elements": self.elements.to_dict()
-        }
-
-    @classmethod
-    def fromHashableDict(cls, kwargs: dict):
-        kwargs["conditions"] = pandas.DataFrame(kwargs["conditions"])
-        kwargs["elements"] = pandas.DataFrame(kwargs["elements"])
-        kwargs["calibrations"] = {k: Calibration.fromHashableDict(v) for k, v in kwargs["calibrations"].items()}
-        return cls(**kwargs)
-
-    @classmethod
-    def fromATXMFile(cls, filePath: str):
-        key = encryption.loadKey()
-        with open(filePath, "r") as f:
-            encryptedText = f.readline()
-        decryptedText = encryption.decryptText(encryptedText, key)
-        kwargs = loads(decryptedText)
-        kwargs["filename"] = Path(filePath).stem
-        return cls.fromHashableDict(kwargs)
