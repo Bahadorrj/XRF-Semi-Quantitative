@@ -1,3 +1,4 @@
+from re import S
 import socket
 import pandas
 import numpy as np
@@ -23,8 +24,7 @@ class AnalyseData:
     
     def __eq__(self, others) -> bool:
         assert isinstance(others, AnalyseData), "Comparison Error"
-        return (self.conditionId == others.conditionId and
-                np.all(np.equal(self.x, others.x)) and 
+        return (np.all(np.equal(self.x, others.x)) and 
                 np.all(np.equal(self.y, others.y)))
 
     def calculateIntensities(self, lines: pandas.DataFrame) -> dict:
@@ -152,6 +152,7 @@ class Analyse:
 
 @dataclass(order=True)
 class Calibration:
+    calibrationId: int
     filename: str
     element: str
     concentration: float
@@ -166,6 +167,13 @@ class Calibration:
     def __post_init__(self):
         self.calculateCoefficients()
         self.calculateInterferences()
+        
+    def __eq__(self, other) -> bool:
+        return (self.element == other.element and
+                self.concentration == other.concentration and
+                self.state == other.state and
+                self.analyse == other.analyse and
+                self.lines.equals(other.lines))
 
     @property
     def analyse(self) -> Analyse:
@@ -222,6 +230,7 @@ class Calibration:
 
     def copy(self) -> "Calibration":
         return Calibration(
+            self.calibrationId,
             self.filename,
             self.element,
             self.concentration,
@@ -234,14 +243,16 @@ class Calibration:
 
     def save(self) -> None:
         filePath = f"calibrations/{self.filename}.atxc"
+        key = encryption.loadKey()
+        jsonText = dumps(self.toHashableDict())
+        encryptedText = encryption.encryptText(jsonText, key)
         with open(filePath, "wb") as f:
-            key = encryption.loadKey()
-            jsonText = dumps(self.toHashableDict())
-            encryptedText = encryption.encryptText(jsonText, key)
             f.write(encryptedText + b"\n")
 
     def toHashableDict(self) -> dict:
         return {
+            "calibrationId": self.calibrationId,
+            "filename": self.filename,
             "element": self.element,
             "concentration": self.concentration,
             "state": self.state,
@@ -266,18 +277,16 @@ class Calibration:
             encryptedText = f.readline()
         decryptedText = encryption.decryptText(encryptedText, key)
         kwargs = loads(decryptedText)
-        kwargs["filename"] = Path(filePath).stem
         return cls.fromHashableDict(kwargs)
 
     @classmethod
     def convertStateToStatus(cls, state: int) -> str:
         if state == 0:
-            status = "Proceed to acquisition"
+            return "Proceed to acquisition"
         elif state == 1:
-            status = "Initial state"
+            return "Initial state"
         else:
-            status = "Edited by user"
-        return status
+            return "Edited by user"
 
 
 @dataclass(order=True)
