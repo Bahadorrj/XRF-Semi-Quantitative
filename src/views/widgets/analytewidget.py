@@ -8,18 +8,30 @@ from python.views.base.tablewidget import DataframeTableWidget
 
 
 class AnalytesAndConditionsWidget(QtWidgets.QWidget):
-    def __init__(self, parent: QtWidgets.QWidget | None = None, method: datatypes.Method | None = None):
-        assert method is not None, "method must be provided"
+    def __init__(
+        self,
+        parent: QtWidgets.QWidget | None = None,
+        method: datatypes.Method | None = None,
+        editable: bool = False,
+    ):
         super(AnalytesAndConditionsWidget, self).__init__(parent)
         self._method = method
-        self.buttonMap = {}
+        self._editable = editable
+        self.buttonsMap = {}
+        self._initializeUi()
+        if self._method is not None:
+            self._conditionTable.reinitialize(self._method.conditions)
+            self._connectSignalsAndSlots()
+            self._conditionTable.setCurrentCell(0, 0)
 
+    def _resetClassVariables(self, method: datatypes.Method):
+        self._method = method
+
+    def _initializeUi(self) -> None:
         self.setObjectName("analyte-widget")
         self._createPeriodicLayout()
         self._createConditionTable()
         self._setUpView()
-
-        self.selectCondition(1)
 
     def _setUpView(self) -> None:
         self.mainLayout = QtWidgets.QVBoxLayout()
@@ -28,6 +40,11 @@ class AnalytesAndConditionsWidget(QtWidgets.QWidget):
         self.mainLayout.addLayout(self._periodicTableLayout)
         self.mainLayout.addWidget(self._conditionTable)
         self.setLayout(self.mainLayout)
+
+    def _connectSignalsAndSlots(self) -> None:
+        for symbol, button in self.buttonsMap.items():
+            button.toggled.connect(partial(self._addElementToCondition, symbol))
+        self._conditionTable.currentCellChanged.connect(self._currentCellChanged)
 
     def _createPeriodicLayout(self) -> None:
         vLayout = QtWidgets.QVBoxLayout()
@@ -51,13 +68,17 @@ class AnalytesAndConditionsWidget(QtWidgets.QWidget):
             layout.setContentsMargins(0, 0, 0, 0)
             for symbol in row:
                 if symbol:
-                    button = QtWidgets.QPushButton(symbol, self)
+                    button = QtWidgets.QPushButton(symbol)
                     button.setCheckable(True)
-                    button.setSizePolicy(QtWidgets.QSizePolicy.Policy.Fixed, QtWidgets.QSizePolicy.Policy.Fixed)
-                    button.toggled.connect(partial(self._addElementToCondition, symbol))
+                    if self._editable is False:
+                        button.setDisabled(True)
+                    button.setSizePolicy(
+                        QtWidgets.QSizePolicy.Policy.Fixed,
+                        QtWidgets.QSizePolicy.Policy.Fixed,
+                    )
                     layout.addWidget(button)
-                    if symbol not in ['L', 'A']:
-                        self.buttonMap[symbol] = button
+                    if symbol not in ["L", "A"]:
+                        self.buttonsMap[symbol] = button
                     else:
                         button.setDisabled(True)
                         button.setStyleSheet(
@@ -76,34 +97,49 @@ class AnalytesAndConditionsWidget(QtWidgets.QWidget):
     def _addElementToCondition(self, symbol: str, checked: bool) -> None:
         index = self._method.elements.query(f"symbol == '{symbol}'").index
         for i in index:
-            self._method.elements.at[i, "excite"] = int(checked)
-            self._method.elements.at[i, "condition_id"] = int(
-                self._conditionTable.item(self._conditionTable.currentRow(), 0)
-                .text()
-                .split(" ")[-1]
-            ) if checked else nan
+            self._method.elements.at[i, "active"] = int(checked)
+            self._method.elements.at[i, "condition_id"] = (
+                int(
+                    self._conditionTable.item(self._conditionTable.currentRow(), 0)
+                    .text()
+                    .split(" ")[-1]
+                )
+                if checked
+                else nan
+            )
 
     def _createConditionTable(self) -> None:
-        self._conditionTable = DataframeTableWidget(self, self._method.conditions, autofill=True)
-        self._conditionTable.verticalHeader().setSectionResizeMode(QtWidgets.QHeaderView.ResizeMode.Stretch)
+        self._conditionTable = DataframeTableWidget(autofill=True)
+        self._conditionTable.verticalHeader().setSectionResizeMode(
+            QtWidgets.QHeaderView.ResizeMode.Stretch
+        )
         self._conditionTable.verticalHeader().setVisible(False)
-        self._conditionTable.cellClicked.connect(self._cellClicked)
 
-    @QtCore.pyqtSlot(int, int)
-    def _cellClicked(self, row: int, column: int) -> None:
-        conditionId = int(self._conditionTable.item(row, 0).text().split(' ')[-1])
+    @QtCore.pyqtSlot(int, int, int, int)
+    def _currentCellChanged(
+        self, currentRow: int, currentColumn: int, previousRow: int, previousColumn: int
+    ) -> None:
+        conditionId = int(
+            self._conditionTable.item(currentRow, 0).text().split(" ")[-1]
+        )
         self._toggleConditionElements(conditionId)
 
     def _toggleConditionElements(self, conditionId: int) -> None:
-        symbols = self._method.elements.query(f"condition_id == {conditionId} and active == 1")['symbol'].values
-        for symbol, button in self.buttonMap.items():
+        symbols = self._method.elements.query(
+            f"condition_id == {conditionId} and active == 1"
+        )["symbol"].values
+        for symbol, button in self.buttonsMap.items():
             button.blockSignals(True)
             button.setChecked(symbol in symbols)
             button.blockSignals(False)
 
-    def selectCondition(self, conditionId: int) -> None:
-        self._conditionTable.selectRow(conditionId - 1)
-        self._toggleConditionElements(conditionId)
-
     def setFocus(self):
         self._conditionTable.setFocus()
+
+    def reinitialize(self, method: datatypes.Method) -> None:
+        self.blockSignals(True)
+        self._resetClassVariables(method)
+        self._conditionTable.reinitialize(method.conditions)
+        self._connectSignalsAndSlots()
+        self.blockSignals(False)
+        self._conditionTable.setCurrentCell(0, 0)

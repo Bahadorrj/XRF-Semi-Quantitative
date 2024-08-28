@@ -12,7 +12,7 @@ from PyQt6.QtCore import Qt
 
 from python.utils import calculation
 from python.utils import encryption
-from python.utils.database import getDataframe, getDatabase, reloadDataframes
+from python.utils.database import getDataframe
 
 
 @dataclass(order=True)
@@ -24,10 +24,10 @@ class AnalyseData:
     def calculateIntensities(self, lines: pandas.DataFrame) -> dict:
         intensities = defaultdict(dict)
         for row in lines.itertuples():
-            intensity = self.y[
+            intensity = int(self.y[
                 int(calculation.evToPx(row.low_kiloelectron_volt)) : 
                 int(calculation.evToPx(row.high_kiloelectron_volt))
-            ].sum()
+            ].sum())
             intensities[row.symbol][row.radiation_type] = intensity
         return intensities
 

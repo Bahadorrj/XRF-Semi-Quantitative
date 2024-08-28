@@ -77,7 +77,6 @@ class TableWidget(QtWidgets.QTableWidget):
 
     def resetTable(self) -> None:
         self.setRowCount(0)
-        self._resetClassVariables({})
 
     def updateRow(self, rowIndex: int, row: dict) -> None:
         rowIndex = self.rows[rowIndex]
@@ -131,8 +130,10 @@ class DataframeTableWidget(TableWidget):
                     row["condition_id"].setText(None)
 
     def reinitialize(self, dataframe: pandas.DataFrame):
-        self.resetTable()
+        self.blockSignals(True)
         self._resetClassVariables(dataframe)
+        self.resetTable()
         self.setHeaders([" ".join(column.split("_")).title() for column in self._df.columns])
         if self._autofill:
             self._fillTable()
+        self.blockSignals(False)

@@ -303,7 +303,7 @@ class PlotWindow(QtWidgets.QMainWindow):
     def _addAnalyseToTree(self, analyse: datatypes.Analyse) -> None:
         item = QtWidgets.QTreeWidgetItem()
         item.setCheckState(0, QtCore.Qt.CheckState.Unchecked)
-        item.setText(0, analyse.name)
+        item.setText(0, analyse.filename)
         item.setFlags(
             item.flags()
             | QtCore.Qt.ItemFlag.ItemIsAutoTristate

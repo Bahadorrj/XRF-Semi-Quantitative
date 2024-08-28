@@ -3,13 +3,42 @@ import os
 import pandas
 from PyQt6 import QtCore, QtWidgets
 
+from python.utils import datatypes
 from python.utils.database import getDataframe, getDatabase, reloadDataframes
 from python.utils.datatypes import Method
 from python.views.base.formdialog import FormDialog
-from python.views.base.tablewidget import TableItem
+from python.views.base.tablewidget import TableItem, DataframeTableWidget
 from python.views.base.traywidget import TrayWidget
+from python.views.explorers.methodexplorer import MethodExplorer
 from python.views.widgets.analytewidget import AnalytesAndConditionsWidget
-from python.views.widgets.calibrationwidget import CalibrationWidget
+
+class CalibrationsWidget(QtWidgets.QWidget):
+    def __init__(self, parent: QtWidgets.QWidget | None = None, method: datatypes.Method | None = None) -> None:
+        super().__init__(parent)
+        self._method = method
+        self._initializeUi()
+        if self._method is not None:
+            self._tableWidget.reinitialize(self._method.calibrations)
+
+    def _resetClassVariables(self, method: datatypes.Method) -> None:
+        self._method = method
+
+    def _initializeUi(self) -> None:
+        self._tableWidget = DataframeTableWidget(autofill=True)
+        self._setUpView()
+
+    def _setUpView(self) -> None:
+        self.mainLayout = QtWidgets.QVBoxLayout()
+        self.mainLayout.setContentsMargins(10, 10, 10, 10)
+        self.mainLayout.setSpacing(5)
+        self.mainLayout.addWidget(self._tableWidget)
+        self.setLayout(self.mainLayout)
+
+    def reinitialize(self, method: datatypes.Method) -> None:
+        self.blockSignals(True)
+        self._resetClassVariables(method)
+        self._tableWidget.reinitialize(self._method.calibrations)
+        self.blockSignals(False)
 
 
 class MethodFormDialog(FormDialog):
@@ -24,6 +53,9 @@ class MethodFormDialog(FormDialog):
             methodPath = f"methods/{lineEdit.text()}.atxm"
             if os.path.exists(methodPath):
                 self._errorLabel.setText("This filename already exists!")
+                return
+        lineEdit.setStyleSheet("color: black;")
+        self._errorLabel.setText(None)
         super()._fill(lineEdit, key)
 
 
@@ -35,7 +67,14 @@ class MethodTrayWidget(TrayWidget):
         self._widgets = None
         self._initializeUi()
         if self._df is not None:
-            self._tableWidget.reinitialize(self._df.drop("method_id", axis=1))
+            df = self._df.drop("method_id", axis=1)
+            status = list(map(Method.convertStateToStatus, df["state"].tolist()))
+            df["state"] = status
+            self._tableWidget.reinitialize(df)
+            self._widgets = {
+                "Analytes And Conditions": AnalytesAndConditionsWidget(method=self._method),
+                "Calibrations": CalibrationsWidget(method=self._method),
+            }
             self._connectSignalsAndSlots()
             if self._df.empty is False:
                 self._tableWidget.setCurrentCell(0, 0)
@@ -69,10 +108,7 @@ class MethodTrayWidget(TrayWidget):
         if action == "add":
             self._addMethod()
         elif action == "edit":
-            if self._method.state == 0:
-                self._editMethod()
-            else:
-                self._openMethodExplorer()
+            self._openMethodExplorer()
         elif action == "remove":
             self._removeMethod()
         elif action == "import":
@@ -83,7 +119,14 @@ class MethodTrayWidget(TrayWidget):
         if addDialog.exec():
             filename = addDialog.fields["filename"]
             description = addDialog.fields["description"]
-            self._method = Method(filename, description)
+            getDatabase().executeQuery(
+                f"INSERT INTO Methods (filename, description, state) VALUES (?, ?, ?)",
+                (filename, description, 0)
+            )
+            reloadDataframes()
+            self._resetClassVariables(getDataframe("Methods"))
+            methodId = int(getDataframe("Methods").iloc[-1].values[0])
+            self._method = Method(methodId, filename, description)
             self._method.save()
             self._insertMethod()
             self._actionsMap["edit"].setDisabled(False)
@@ -91,14 +134,7 @@ class MethodTrayWidget(TrayWidget):
     def _insertMethod(self) -> None:
         filename = self._method.filename
         description = self._method.description
-        state = self._method.state
         status = self._method.status()
-        getDatabase().executeQuery(
-            f"INSERT INTO Methods (filename, description, state) VALUES (?, ?, ?)",
-            (filename, description, state)
-        )
-        reloadDataframes()
-        self._resetClassVariables(getDataframe("Methods"))
         items = {
             "filename": TableItem(filename),
             "description": TableItem(description),
@@ -117,11 +153,6 @@ class MethodTrayWidget(TrayWidget):
         if editDialog.exec():
             filename = editDialog.fields["filename"]
             description = editDialog.fields["description"]
-            self._method.filename = filename
-            self._method.description = description
-            self._method.save()
-            self._tableWidget.getCurrentRow()["filename"].setText(filename)
-            self._tableWidget.getCurrentRow()["description"].setText(description)
             getDatabase().executeQuery(
                 f"UPDATE Methods "
                 f"SET filename = '{filename}', description = '{description}' "
@@ -129,10 +160,17 @@ class MethodTrayWidget(TrayWidget):
             )
             reloadDataframes()
             self._resetClassVariables(getDataframe("Methods"))
+            self._method.filename = filename
+            self._method.description = description
+            self._method.save()
+            self._tableWidget.getCurrentRow()["filename"].setText(filename)
+            self._tableWidget.getCurrentRow()["description"].setText(description)
 
     def _openMethodExplorer(self) -> None:
         if self._method is not None:
-            pass
+            methodExplorer = MethodExplorer(method=self._method)
+            methodExplorer.show()
+            methodExplorer.saved.connect(self._reinitializeWidgets)
 
     def _removeMethod(self) -> None:
         # Ask the user if they are sure to remove the calibration
@@ -160,7 +198,22 @@ class MethodTrayWidget(TrayWidget):
             "Antique'X method (*.atxm)"
         )
         if filePath:
-            pass
+            self._method = Method.fromATXMFile(filePath)
+            if self._df.query(f"filename == '{self._method.filename}'").empty:
+                self._insertMethod()
+                getDatabase().executeQuery(
+                    f"INSERT INTO Methods (filename, description, state) VALUES (?, ?, ?)",
+                    (self._method.filename, self._method.description, self._method.state)
+                )
+                reloadDataframes()
+                self._resetClassVariables(getDataframe("Methods"))
+            else:
+                messageBox = QtWidgets.QMessageBox()
+                messageBox.setIcon(QtWidgets.QMessageBox.Icon.Warning)
+                messageBox.setText("The selected method already exists in the database.")
+                messageBox.setWindowTitle("Import method failed")
+                messageBox.setStandardButtons(QtWidgets.QMessageBox.StandardButton.Ok)
+                messageBox.exec()
 
     def _fillMenusWithActions(self) -> None:
         self._menusMap["file"].addAction(self._actionsMap["import"])
@@ -193,29 +246,21 @@ class MethodTrayWidget(TrayWidget):
     def _currentCellChanged(self, currentRow: int, currentColumn: int, previousRow: int, previousColumn: int):
         """Called when the current cell in the table changes."""
         if currentRow != previousRow and currentRow != -1:
-            if self._widgets:
-                self._widgets.clear()
-                self._tabWidget.clear()
+            if self._tabWidget.count() == 0:
+                self._addWidgets(self._widgets)
             tableRow = self._tableWidget.getRow(currentRow)
             filename = tableRow.get("filename").text()
             path = f"methods/{filename}.atxm"
             self._method = Method.fromATXMFile(path)
             self._actionsMap["edit"].setDisabled(False)
             self._actionsMap["remove"].setDisabled(False)
-            self._addMethodWidgets()
+            self._reinitializeWidgets()
         elif currentRow == -1:
-            self._widgets.clear()
             self._tabWidget.clear()
             self._method = None
             self._actionsMap["edit"].setDisabled(True)
             self._actionsMap["remove"].setDisabled(True)
 
-    def _addMethodWidgets(self) -> None:
-        self._addWidgets(
-            {
-                "Analytes And Conditions": AnalytesAndConditionsWidget(method=self._method),
-                "Calibrations": CalibrationWidget(method=self._method),
-            }
-        )
-        for widget in self._widgets.values():
-            widget.mainLayout.setContentsMargins(10, 10, 10, 10)
+    def _reinitializeWidgets(self):
+        self._widgets["Analytes And Conditions"].reinitialize(self._method)
+        self._widgets["Calibrations"].reinitialize(self._method)

@@ -89,5 +89,8 @@ class CoefficientWidget(QtWidgets.QWidget):
         self._initializeRadiations()
 
     def reinitialize(self, calibration: datatypes.Calibration):
+        self.blockSignals(True)
         self._resetClassVariables(calibration)
+        self._connectSignalsAndSlots()
         self.reinitializeRadiations()
+        self.blockSignals(False)

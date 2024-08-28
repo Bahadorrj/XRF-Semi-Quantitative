@@ -61,9 +61,8 @@ class TrayWidget(QtWidgets.QWidget):
         self._tabWidget = QtWidgets.QTabWidget()
 
     def _addWidgets(self, widgets: dict):
-        self._widgets = widgets
         self._tabWidget.clear()
-        for label, widget in self._widgets.items():
+        for label, widget in widgets.items():
             self._tabWidget.addTab(widget, label)
 
     def _setUpView(self) -> None:

@@ -12,6 +12,7 @@ class CalibrationExplorer(Explorer):
     def __init__(self, parent: QtWidgets.QWidget | None = None, calibration: datatypes.Calibration | None = None):
         super(CalibrationExplorer, self).__init__(parent)
         self._calibration = calibration
+        self._initCalibration = None
         self._widgets = None
         self._initializeUi()
         if self._calibration is not None:
@@ -108,8 +109,11 @@ class CalibrationExplorer(Explorer):
             self._treeWidget.expandItem(self._treeItemMap['peak-search'])
 
     def reinitialize(self, calibration: datatypes.Calibration):
+        self.blockSignals(True)
         self._resetClassVariables(calibration)
         self._implementAnalyse()
+        self._connectSignalsAndSlots()
         for widget in self._widgets.values():
             widget.reinitialize(calibration)
+        self.blockSignals(False)
         self._treeWidget.setCurrentItem(self._treeWidget.topLevelItem(0))

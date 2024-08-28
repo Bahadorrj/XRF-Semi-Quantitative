@@ -72,6 +72,9 @@ class LinesTableWidget(QtWidgets.QWidget):
         self._activeTableWidget = DataframeTableWidget(autofill=True)
 
     def reinitialize(self, calibration: datatypes.Calibration) -> None:
+        self.blockSignals(True)
         self._resetClassVariables(calibration)
+        self._connectSignalsAndSlots()
         self._linesTableWidget.reinitialize(self._linesDf)
         self._activeTableWidget.reinitialize(self._activeDf)
+        self.blockSignals(False)

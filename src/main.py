@@ -7,7 +7,12 @@ import threading
 from PyQt6 import QtWidgets, QtGui
 
 from python.controllers import GuiHandler, ClientHandler
+from python.utils.database import getDataframe
+from python.utils.datatypes import Method
 from python.utils.paths import resourcePath
+from python.views.explorers.methodexplorer import MethodExplorer
+from python.views.trays.calibrationtray import CalibrationTrayWidget
+from python.views.trays.methodtray import MethodTrayWidget
 from python.views.windows.plotwindow import PlotWindow
 
 
@@ -36,8 +41,10 @@ def main() -> None:
     with open(resourcePath("style.qss")) as f:
         _style = f.read()
         app.setStyleSheet(_style)
-    # window = CalibrationTrayWidget(dataframe=getDataframe("Calibrations").copy())
-    # method = Method(getDataframe("Conditions").copy(), getDataframe("Elements").copy(), [])
-    window = PlotWindow()
+    # window = CalibrationTrayWidget(dataframe=getDataframe("Calibrations"))
+    # window = PlotWindow()
+    # method = Method.fromATXMFile(resourcePath("methods/test1.atxm"))
+    # window = MethodExplorer(method=method)
+    window = MethodTrayWidget(dataframe=getDataframe("Methods"))
     window.show()
     sys.exit(app.exec())

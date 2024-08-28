@@ -715,8 +715,11 @@ class PeakSearchWidget(QtWidgets.QWidget):
         return super().mousePressEvent(a0)
 
     def reinitialize(self, calibration: datatypes.Calibration) -> None:
+        self.blockSignals(True)
         self._resetClassVariables(calibration)
+        self._connectSignalsAndSlots()
         self._fillTable()
         self._peakPlot.clear()
         self._spectrumPlot.clear()
         self._showCoordinate(0, 0)
+        self.blockSignals(False)
