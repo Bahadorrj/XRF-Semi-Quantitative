@@ -28,6 +28,9 @@ class TableWidget(QtWidgets.QTableWidget):
         self.setSelectionMode(QtWidgets.QTableWidget.SelectionMode.SingleSelection)
         self.setSelectionBehavior(QtWidgets.QTableWidget.SelectionBehavior.SelectRows)
 
+    def _resetClassVariables(self, rows: dict):
+        self.rows = rows
+
     def setHeaders(self, headers: list | tuple):
         self.setColumnCount(len(headers))
         self.setHorizontalHeaderLabels(headers)
@@ -74,7 +77,7 @@ class TableWidget(QtWidgets.QTableWidget):
 
     def resetTable(self) -> None:
         self.setRowCount(0)
-        self.rows.clear()
+        self._resetClassVariables({})
 
     def updateRow(self, rowIndex: int, row: dict) -> None:
         rowIndex = self.rows[rowIndex]
@@ -95,12 +98,16 @@ class DataframeTableWidget(TableWidget):
         super(DataframeTableWidget, self).__init__(parent)
         self._df = dataframe
         self._autofill = autofill
-        if self._df is not None and self._autofill:
-            self._fillTable()
+        if self._df is not None:
+            self.setHeaders([" ".join(column.split("_")).title() for column in self._df.columns])
+            if self._autofill:
+                self._fillTable()
+
+    def _resetClassVariables(self, dataframe: pandas.DataFrame):
+        self._df = dataframe
 
     def _fillTable(self) -> None:
-        self.setHeaders([" ".join(column.split("_")).title() for column in self._df.columns])
-        if self._df.shape[0] == 0:
+        if self._df.empty:
             return
         for rowIndex, row in enumerate(self._df.itertuples(index=False)):
             items = {"rowId": rowIndex}
@@ -125,6 +132,7 @@ class DataframeTableWidget(TableWidget):
 
     def reinitialize(self, dataframe: pandas.DataFrame):
         self.resetTable()
-        self._df = dataframe
+        self._resetClassVariables(dataframe)
+        self.setHeaders([" ".join(column.split("_")).title() for column in self._df.columns])
         if self._autofill:
             self._fillTable()
