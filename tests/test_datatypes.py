@@ -79,6 +79,7 @@ class TestAnalyse:
     def test_copy(self, example_Analyse):
         # Test copying the Analyse object
         assert example_Analyse == example_Analyse.copy()
+        assert example_Analyse is not example_Analyse.copy()
 
     def test_save(self, shared_tmp_path):
         # Test if the saved file exists
@@ -234,6 +235,149 @@ class TestCalibration:
 
         # Assert
         mock_open.assert_called_once_with(f"calibrations/{filename}.atxc", "wb")
+        # Access the mock file handle and check the write method call
+        mock_file_handle = mock_open.return_value.__enter__.return_value
+        mock_file_handle.write.assert_called_once_with(b"encrypted_text\n")
+
+@pytest.fixture
+def example_calibrations():
+    # Create a sample dataframe similar to what getDataframe("Calibrations") would return
+    return pd.DataFrame({
+        "calibrationId": [1, 2],
+        "element": ["Fe", "Cu"],
+        "concentration": [10.0, 20.0]
+    })
+
+@pytest.fixture
+def example_conditions():
+    # Create a sample dataframe similar to what getDataframe("Conditions") would return
+    return pd.DataFrame({
+        "conditionId": [1, 2],
+        "parameter": ["A", "B"]
+    })
+
+@pytest.fixture
+def example_elements():
+    # Create a sample dataframe similar to what getDataframe("Elements") would return
+    return pd.DataFrame({
+        "elementId": [1, 2],
+        "symbol": ["Fe", "Cu"]
+    })
+
+class TestMethod:
+    
+    @pytest.mark.parametrize(
+        "methodId, filename, description, state, expected_status",
+        [
+            (1, "method1", "Test method 1", 0, "Initial state"),
+            (2, "method2", "Test method 2", 1, "Edited"),
+        ],
+        ids=["status_0", "status_1"],
+    )
+    def test_status(
+        self,
+        methodId,
+        filename,
+        description,
+        state,
+        expected_status,
+        example_calibrations,
+        example_conditions,
+        example_elements,
+    ):
+        # Arrange
+        method = datatypes.Method(
+            methodId,
+            filename,
+            description,
+            state,
+            example_calibrations,
+            example_conditions,
+            example_elements,
+        )
+
+        # Act
+        status = method.status()
+
+        # Assert
+        assert status == expected_status
+
+    @pytest.mark.parametrize(
+        "methodId, filename, description, state",
+        [
+            (1, "method1", "Test method 1", 0),
+            (2, "method2", "Test method 2", 1),
+        ],
+        ids=["copy_1", "copy_2"],
+    )
+    def test_copy(
+        self,
+        methodId,
+        filename,
+        description,
+        state,
+        example_calibrations,
+        example_conditions,
+        example_elements,
+    ):
+        # Arrange
+        method = datatypes.Method(
+            methodId,
+            filename,
+            description,
+            state,
+            example_calibrations,
+            example_conditions,
+            example_elements,
+        )
+
+        # Act
+        copied_method = method.copy()
+
+        # Assert
+        assert copied_method == method
+        assert copied_method is not method
+
+    @pytest.mark.parametrize(
+        "methodId, filename, description, state",
+        [
+            (1, "method1", "Test method 1", 0),
+            (2, "method2", "Test method 2", 1),
+        ],
+        ids=["save_1", "save_2"],
+    )
+    @patch("src.utils.encryption.loadKey", return_value=b"key")
+    @patch("src.utils.encryption.encryptText", return_value=b"encrypted_text")
+    @patch("builtins.open", new_callable=MagicMock)
+    def test_save(
+        self,
+        mock_open,
+        mock_encryptText,
+        mock_loadKey,
+        methodId,
+        filename,
+        description,
+        state,
+        example_calibrations,
+        example_conditions,
+        example_elements,
+    ):
+        # Arrange
+        method = datatypes.Method(
+            methodId,
+            filename,
+            description,
+            state,
+            example_calibrations,
+            example_conditions,
+            example_elements,
+        )
+
+        # Act
+        method.save()
+
+        # Assert
+        mock_open.assert_called_once_with(f"methods/{filename}.atxm", "wb")
         # Access the mock file handle and check the write method call
         mock_file_handle = mock_open.return_value.__enter__.return_value
         mock_file_handle.write.assert_called_once_with(b"encrypted_text\n")

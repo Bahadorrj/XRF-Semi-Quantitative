@@ -169,11 +169,12 @@ class Calibration:
         self.calculateInterferences()
         
     def __eq__(self, other) -> bool:
-        return (self.element == other.element and
-                self.concentration == other.concentration and
-                self.state == other.state and
-                self.analyse == other.analyse and
-                self.lines.equals(other.lines))
+        return (self.filename == other.filename
+                and self.element == other.element
+                and self.concentration == other.concentration
+                and self.state == other.state
+                and self.analyse == other.analyse
+                and self.lines.equals(other.lines))
 
     @property
     def analyse(self) -> Analyse:
@@ -297,7 +298,7 @@ class Method:
     state: int = field(default=0)
     calibrations: Optional[pandas.DataFrame] = field(
         default_factory=lambda: pandas.DataFrame(
-            columns=getDataframe("Calibrations").columns[1:]
+            columns=getDataframe("Calibrations").columns
         )
     )
     conditions: pandas.DataFrame = field(
@@ -306,6 +307,17 @@ class Method:
     elements: pandas.DataFrame = field(
         default_factory=lambda: getDataframe("Elements").copy()
     )
+    
+    def __eq__(self, other: "Method"):
+        assert isinstance(other, Method), "Comparison Error"
+        return (
+            self.filename == other.filename
+            and self.description == other.description
+            and self.state == other.state
+            and self.calibrations.equals(other.calibrations)
+            and self.conditions.equals(other.conditions)
+            and self.elements.equals(other.elements)
+        )
 
     def status(self) -> str:
         return self.convertStateToStatus(self.state)
@@ -362,17 +374,6 @@ class Method:
             return "Initial state"
         elif state == 1:
             return "Edited"
-
-    def __eq__(self, other: "Method"):
-        assert isinstance(other, Method), "Comparison Error"
-        return (
-            self.filename == other.filename
-            and self.description == other.description
-            and self.state == other.state
-            and self.calibrations.equals(other.calibrations)
-            and self.conditions.equals(other.conditions)
-            and self.elements.equals(other.elements)
-        )
 
 
 @dataclass(order=True)
