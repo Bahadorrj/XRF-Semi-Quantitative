@@ -16,7 +16,9 @@ from src.views.trays.methodtray import MethodTrayWidget
 from src.views.windows.plotwindow import PlotWindow
 
 
-def connectServerAndGUI(host, port, plotWindow: PlotWindow, app: QtWidgets.QApplication) -> None:
+def connectServerAndGUI(
+    host, port, plotWindow: PlotWindow, app: QtWidgets.QApplication
+) -> None:
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         s.bind((host, port))
         s.listen(1)
@@ -34,7 +36,7 @@ def main() -> None:
     app = QtWidgets.QApplication(arg)
     app.setWindowIcon(QtGui.QIcon(resourcePath("CSAN.ico")))
     # connectServerAndGUI('127.0.0.1', 16000, window, app)
-    for root, _, files in os.walk(resourcePath("fonts")):
+    for root, _, files in os.walk(resourcePath("resources/fonts")):
         for file in files:
             path = os.path.join(root, file)
             QtGui.QFontDatabase.addApplicationFont(path)

@@ -19,7 +19,7 @@ class TrayWidget(QtWidgets.QWidget):
         for label, disabled in labels.items():
             action = QtGui.QAction(label)
             key = "-".join(label.lower().split(" "))
-            action.setIcon(QtGui.QIcon(resourcePath(f"icons/{key}.png")))
+            action.setIcon(QtGui.QIcon(resourcePath(f"resources/icons/{key}.png")))
             action.setDisabled(disabled)
             self._actionsMap[key] = action
             action.triggered.connect(partial(self._actionTriggered, key))
@@ -31,7 +31,9 @@ class TrayWidget(QtWidgets.QWidget):
     def _createMenus(self, labels: list | tuple) -> None:
         self._menusMap = {}
         self._menuBar = QtWidgets.QMenuBar()
-        self._menuBar.setSizePolicy(QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Fixed)
+        self._menuBar.setSizePolicy(
+            QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Fixed
+        )
         for label in labels:
             menu = self._menuBar.addMenu(label)
             key = label.lower()[1:]
@@ -43,7 +45,9 @@ class TrayWidget(QtWidgets.QWidget):
     def _createToolBar(self) -> None:
         self._toolBar = QtWidgets.QToolBar()
         self._toolBar.setIconSize(QtCore.QSize(16, 16))
-        self._toolBar.setToolButtonStyle(QtCore.Qt.ToolButtonStyle.ToolButtonTextUnderIcon)
+        self._toolBar.setToolButtonStyle(
+            QtCore.Qt.ToolButtonStyle.ToolButtonTextUnderIcon
+        )
         self._toolBar.setMovable(False)
         self._fillToolBarWithActions()
 
@@ -54,7 +58,9 @@ class TrayWidget(QtWidgets.QWidget):
         self._tableWidget = DataframeTableWidget(autofill=True)
 
     @QtCore.pyqtSlot(int, int)
-    def _currentCellChanged(self, currentRow: int, currentColumn: int, previousRow: int, previousColumn: int) -> None:
+    def _currentCellChanged(
+        self, currentRow: int, currentColumn: int, previousRow: int, previousColumn: int
+    ) -> None:
         pass
 
     def _createTabWidget(self) -> None:

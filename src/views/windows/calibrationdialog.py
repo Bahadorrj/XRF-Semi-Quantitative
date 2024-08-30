@@ -31,7 +31,7 @@
 #                 font-size: 12px;
 #                 height: 1.65em;
 #                 width: 1.65em;
-#             } 
+#             }
 #         """
 #         )
 
@@ -53,7 +53,7 @@
 #             QPushButton:hover {
 #                 background-color: white;
 #                 color: black;
-#             }    
+#             }
 
 #             QPushButton:pressed {
 #                 background-color: whitesmoke;
@@ -88,7 +88,7 @@
 #                 border-bottom-right-radius: 3px;
 #             }
 #             QComboBox::down-arrow {
-#                 image: url(icons/down-arrow-resized.png)
+#                 image: url(resources/icons/down-arrow-resized.png)
 #             }
 #             QComboBox QAbstractItemView {
 #                 border-radius: 3px;
@@ -163,7 +163,7 @@
 #                 padding: 5px 2px;
 #                 margin-top: 10px;
 #             }
-            
+
 #             QLineEdit:focus {
 #                 border: 1px solid black;
 #             }
@@ -209,7 +209,7 @@
 #         for label in actions:
 #             action = QtGui.QAction(label)
 #             key = "-".join(label.lower().split(" "))
-#             action.setIcon(QtGui.QIcon(resourcePath(f"icons/{key}.png")))
+#             action.setIcon(QtGui.QIcon(resourcePath(f"resources/icons/{key}.png")))
 #             self._actionsMap[key] = action
 #             # signals
 #             action.triggered.connect(partial(self._actionTriggered, key))
@@ -277,9 +277,9 @@
 #         if not self._profiles.empty:
 #             self._profileComboBox.addItems(self._profiles["name"])
 #         addProfileButton = AddProfileButton()
-#         addProfileButton.setIcon(QtGui.QIcon(resourcePath("icons/plus.png")))
+#         addProfileButton.setIcon(QtGui.QIcon(resourcePath("resources/icons/plus.png")))
 #         editProfileButton = AddProfileButton()
-#         editProfileButton.setIcon(QtGui.QIcon(resourcePath("icons/pencil.png")))
+#         editProfileButton.setIcon(QtGui.QIcon(resourcePath("resources/icons/pencil.png")))
 #         self._profileSelectionLayout.addWidget(label)
 #         self._profileSelectionLayout.addWidget(self._profileComboBox)
 #         self._profileSelectionLayout.addWidget(editProfileButton)

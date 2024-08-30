@@ -18,7 +18,7 @@ class Explorer(QtWidgets.QWidget):
         for label in labels:
             action = QtGui.QAction(label)
             key = "-".join(label.lower().split(" "))
-            action.setIcon(QtGui.QIcon(resourcePath(f"icons/{key}.png")))
+            action.setIcon(QtGui.QIcon(resourcePath(f"resources/icons/{key}.png")))
             self._actionsMap[key] = action
             action.triggered.connect(partial(self._actionTriggered, key))
 
@@ -54,14 +54,14 @@ class Explorer(QtWidgets.QWidget):
         self._treeItemMap = {}
         headerItem = QtWidgets.QTreeWidgetItem()
         headerItem.setText(0, header)
-        headerItem.setIcon(0, QtGui.QIcon(resourcePath("icons/contents.png")))
+        headerItem.setIcon(0, QtGui.QIcon(resourcePath("resources/icons/contents.png")))
         self._treeItemMap[header] = headerItem
         self._treeWidget.setHeaderItem(headerItem)
         for label in labels:
             item = QtWidgets.QTreeWidgetItem()
             item.setText(0, label)
             key = "-".join(label.lower().split(" "))
-            item.setIcon(0, QtGui.QIcon(resourcePath(f"icons/{key}.png")))
+            item.setIcon(0, QtGui.QIcon(resourcePath(f"resources/icons/{key}.png")))
             self._treeItemMap[key] = item
             self._treeWidget.addTopLevelItem(item)
 

@@ -27,7 +27,7 @@ class StatusButton(QtWidgets.QPushButton):
 
 class HideButton(QtWidgets.QPushButton):
     def __init__(
-            self, parent: QtWidgets.QWidget | None = None, icon: QtGui.QIcon = None
+        self, parent: QtWidgets.QWidget | None = None, icon: QtGui.QIcon = None
     ):
         super().__init__(parent)
         super().setIcon(icon)
@@ -47,7 +47,7 @@ class ConditionComboBox(QtWidgets.QComboBox):
         values = list(
             map(
                 lambda i: "" if np.isnan(i) else f"Condition {int(i)}",
-                getDataframe("Lines")["condition_id"].unique().tolist()
+                getDataframe("Lines")["condition_id"].unique().tolist(),
             )
         )
         values.sort()
@@ -73,22 +73,27 @@ class PeakSearchTableWidget(DataframeTableWidget):
     rowChanged = QtCore.pyqtSignal(int, str)
 
     def __init__(
-            self, parent: QtWidgets.QWidget | None = None, dataframe: DataFrame | None = None, autofill: bool = False
+        self,
+        parent: QtWidgets.QWidget | None = None,
+        dataframe: DataFrame | None = None,
+        autofill: bool = False,
     ) -> None:
         super(PeakSearchTableWidget, self).__init__(parent, dataframe, autofill)
         self.setObjectName("peak-lines-table")
-        self.setHeaders([
-            "",
-            "Element",
-            "Type",
-            "KeV",
-            "Low KeV",
-            "High KeV",
-            "Intensity",
-            "Condition",
-            "Status",
-            "",
-        ])
+        self.setHeaders(
+            [
+                "",
+                "Element",
+                "Type",
+                "KeV",
+                "Low KeV",
+                "High KeV",
+                "Intensity",
+                "Condition",
+                "Status",
+                "",
+            ]
+        )
 
     def updateRow(self, rowIndex: int, values: list) -> None:
         self.blockSignals(True)
@@ -109,7 +114,9 @@ class PeakSearchWidget(QtWidgets.QWidget):
     analyseRadiationChanged = QtCore.pyqtSignal()
 
     def __init__(
-            self, parent: QtWidgets.QWidget | None = None, calibration: datatypes.Calibration | None = None
+        self,
+        parent: QtWidgets.QWidget | None = None,
+        calibration: datatypes.Calibration | None = None,
     ):
         super(PeakSearchWidget, self).__init__(parent)
         self._calibration = calibration
@@ -156,8 +163,12 @@ class PeakSearchWidget(QtWidgets.QWidget):
             plotData.region.sigRegionChangeFinished.connect(
                 partial(self._emitPlotDataChanged, plotData.rowId, "region")
             )
-            plotData.peakLine.sigClicked.connect(partial(self._selectPlotData, plotData))
-            plotData.spectrumLine.sigClicked.connect(partial(self._selectPlotData, plotData))
+            plotData.peakLine.sigClicked.connect(
+                partial(self._selectPlotData, plotData)
+            )
+            plotData.spectrumLine.sigClicked.connect(
+                partial(self._selectPlotData, plotData)
+            )
         self._undoAction.triggered.connect(self._undo)
         self._regionAction.triggered.connect(self._toggleRegions)
         self._searchLineEdit.editingFinished.connect(self._search)
@@ -174,15 +185,18 @@ class PeakSearchWidget(QtWidgets.QWidget):
         self._df = self._calibration.lines
         self._kev = [calculation.pxToEv(i) for i in self._analyse.data[0].x]
         self._plotDataList = [
-            datatypes.PlotData.fromSeries(rowId, s)
-            for rowId, s in self._df.iterrows()
+            datatypes.PlotData.fromSeries(rowId, s) for rowId, s in self._df.iterrows()
         ]
         for plotData in self._plotDataList:
             plotData.region.sigRegionChangeFinished.connect(
                 partial(self._emitPlotDataChanged, plotData.rowId, "region")
             )
-            plotData.peakLine.sigClicked.connect(partial(self._selectPlotData, plotData))
-            plotData.spectrumLine.sigClicked.connect(partial(self._selectPlotData, plotData))
+            plotData.peakLine.sigClicked.connect(
+                partial(self._selectPlotData, plotData)
+            )
+            plotData.spectrumLine.sigClicked.connect(
+                partial(self._selectPlotData, plotData)
+            )
         self._undoStack = deque()
         self._redoStack = deque()
         self._flag = False
@@ -197,11 +211,11 @@ class PeakSearchWidget(QtWidgets.QWidget):
 
     def _fillToolBarWithActions(self, toolBar: QtWidgets.QToolBar) -> None:
         self._undoAction = QtGui.QAction(
-            icon=QtGui.QIcon(resourcePath("icons/undo.png"))
+            icon=QtGui.QIcon(resourcePath("resources/icons/undo.png"))
         )
-        # self._redoAction = QtGui.QAction(icon=QtGui.QIcon(resource_path("icons/redo.png")))
+        # self._redoAction = QtGui.QAction(icon=QtGui.QIcon(resource_path("resources/icons/redo.png")))
         self._regionAction = QtGui.QAction(
-            icon=QtGui.QIcon(resourcePath("icons/brackets.png"))
+            icon=QtGui.QIcon(resourcePath("resources/icons/brackets.png"))
         )
         self._regionAction.setCheckable(True)
         self._undoAction.setDisabled(True)
@@ -310,12 +324,17 @@ class PeakSearchWidget(QtWidgets.QWidget):
 
     def _createTableRow(self, plotData: datatypes.PlotData) -> dict:
         row = self._df.iloc[plotData.rowId]
-        if plotData.conditionId and plotData.conditionId in [analyseData.conditionId for analyseData in
-                                                             self._analyse.data]:
+        if plotData.conditionId and plotData.conditionId in [
+            analyseData.conditionId for analyseData in self._analyse.data
+        ]:
             minX, maxX = plotData.region.getRegion()
-            analyseData = list(filter(lambda d: d.conditionId == plotData.conditionId, self._analyse.data))[0]
+            analyseData = list(
+                filter(
+                    lambda d: d.conditionId == plotData.conditionId, self._analyse.data
+                )
+            )[0]
             y = analyseData.y
-            intensity = y[round(minX): round(maxX)].sum()
+            intensity = y[round(minX) : round(maxX)].sum()
         else:
             intensity = 0
         tableRow = {
@@ -328,10 +347,14 @@ class PeakSearchWidget(QtWidgets.QWidget):
             "high_kiloelectron_volt": TableItem(str(row["high_kiloelectron_volt"])),
             "intensity": TableItem(str(intensity)),
             "condition-combo-box": self._createConditionComboBox(plotData),
-            "status": TableItem("Activated") if row["active"] == 1 else TableItem("Deactivated"),
-            "status-button": self._createStatusButton(plotData)
+            "status": (
+                TableItem("Activated")
+                if row["active"] == 1
+                else TableItem("Deactivated")
+            ),
+            "status-button": self._createStatusButton(plotData),
         }
-        if tableRow['status'].text() == "Activated":
+        if tableRow["status"].text() == "Activated":
             tableRow["status"].setForeground(QtCore.Qt.GlobalColor.darkGreen)
         else:
             tableRow["status"].setForeground(QtCore.Qt.GlobalColor.red)
@@ -339,19 +362,29 @@ class PeakSearchWidget(QtWidgets.QWidget):
 
     def _createHideWidget(self, plotData: datatypes.PlotData) -> HideButton:
         if plotData.visible:
-            widget = HideButton(icon=QtGui.QIcon(resourcePath("icons/show.png")))
+            widget = HideButton(
+                icon=QtGui.QIcon(resourcePath("resources/icons/show.png"))
+            )
         else:
-            widget = HideButton(icon=QtGui.QIcon(resourcePath("icons/hide.png")))
-        widget.clicked.connect(partial(self._emitPlotDataChanged, plotData.rowId, "hide"))
+            widget = HideButton(
+                icon=QtGui.QIcon(resourcePath("resources/icons/hide.png"))
+            )
+        widget.clicked.connect(
+            partial(self._emitPlotDataChanged, plotData.rowId, "hide")
+        )
         return widget
 
-    def _createConditionComboBox(self, plotData: datatypes.PlotData) -> ConditionComboBox:
+    def _createConditionComboBox(
+        self, plotData: datatypes.PlotData
+    ) -> ConditionComboBox:
         widget = ConditionComboBox()
         if plotData.active:
             widget.setDisabled(True)
         if plotData.conditionId is not None:
             widget.setCurrentText(f"Condition {plotData.conditionId}")
-        widget.currentTextChanged.connect(partial(self._emitPlotDataChanged, plotData.rowId, "condition"))
+        widget.currentTextChanged.connect(
+            partial(self._emitPlotDataChanged, plotData.rowId, "condition")
+        )
         return widget
 
     def _createStatusButton(self, plotData: datatypes.PlotData) -> StatusButton:
@@ -359,7 +392,9 @@ class PeakSearchWidget(QtWidgets.QWidget):
             widget = StatusButton("Activate")
         else:
             widget = StatusButton("Deactivate")
-        widget.clicked.connect(partial(self._emitPlotDataChanged, plotData.rowId, "status"))
+        widget.clicked.connect(
+            partial(self._emitPlotDataChanged, plotData.rowId, "status")
+        )
         return widget
 
     def _emitPlotDataChanged(self, rowId: int, action: str) -> None:
@@ -457,11 +492,11 @@ class PeakSearchWidget(QtWidgets.QWidget):
         hideButton = tableRow.get("hide-button")
         if plotData.visible:
             self._erasePlotData(plotData)
-            hideButton.setIcon(QtGui.QIcon(resourcePath("icons/hide.png")))
+            hideButton.setIcon(QtGui.QIcon(resourcePath("resources/icons/hide.png")))
         else:
             self._selectPlotData(plotData)
             self._drawPlotData(plotData)
-            hideButton.setIcon(QtGui.QIcon(resourcePath("icons/show.png")))
+            hideButton.setIcon(QtGui.QIcon(resourcePath("resources/icons/show.png")))
         plotData.visible = not plotData.visible
         return True
 
@@ -473,12 +508,20 @@ class PeakSearchWidget(QtWidgets.QWidget):
             conditionId = int(conditionId.split(" ")[-1])
             plotData.conditionId = conditionId
             self._df.at[plotData.rowId, "condition_id"] = conditionId
-            if plotData.conditionId and plotData.conditionId in [d.conditionId for d in self._analyse.data]:
-                analyseData = list(filter(lambda d: d.conditionId == plotData.conditionId, self._analyse.data))[0]
+            if plotData.conditionId and plotData.conditionId in [
+                d.conditionId for d in self._analyse.data
+            ]:
+                analyseData = list(
+                    filter(
+                        lambda d: d.conditionId == plotData.conditionId,
+                        self._analyse.data,
+                    )
+                )[0]
                 y = analyseData.y
-                intensity = y[round(minX): round(maxX)].sum()
-                analyseData.calculateIntensities(self._df)[tableRow.get("symbol").text()][
-                    tableRow.get("radiation-type").text()] = intensity
+                intensity = y[round(minX) : round(maxX)].sum()
+                analyseData.calculateIntensities(self._df)[
+                    tableRow.get("symbol").text()
+                ][tableRow.get("radiation-type").text()] = intensity
             else:
                 intensity = 0
         else:
@@ -496,7 +539,10 @@ class PeakSearchWidget(QtWidgets.QWidget):
             changed = True
             plotData.deactivate()
             self._df.at[plotData.rowId, "active"] = 0
-            if self._df.at[plotData.rowId, "symbol"] == self._calibration.analyse.filename:
+            if (
+                self._df.at[plotData.rowId, "symbol"]
+                == self._calibration.analyse.filename
+            ):
                 self.analyseRadiationChanged.emit()
             statusItem.setText("Deactivated")
             statusItem.setForeground(QtCore.Qt.GlobalColor.red)
@@ -506,7 +552,10 @@ class PeakSearchWidget(QtWidgets.QWidget):
             changed = True
             plotData.activate()
             self._df.at[plotData.rowId, "active"] = 1
-            if self._df.at[plotData.rowId, "symbol"] == self._calibration.analyse.filename:
+            if (
+                self._df.at[plotData.rowId, "symbol"]
+                == self._calibration.analyse.filename
+            ):
                 self.analyseRadiationChanged.emit()
             statusItem.setText("Activated")
             statusItem.setForeground(QtCore.Qt.GlobalColor.darkGreen)
@@ -539,13 +588,19 @@ class PeakSearchWidget(QtWidgets.QWidget):
         except IndexError:
             maxKev = self._kev[-1]
         tableRow = self._tableWidget.getRowById(plotData.rowId)
-        if plotData.conditionId and plotData.conditionId in [analyseData.conditionId for analyseData in
-                                                             self._analyse.data]:
-            analyseData = list(filter(lambda d: d.conditionId == plotData.conditionId, self._analyse.data))[0]
+        if plotData.conditionId and plotData.conditionId in [
+            analyseData.conditionId for analyseData in self._analyse.data
+        ]:
+            analyseData = list(
+                filter(
+                    lambda d: d.conditionId == plotData.conditionId, self._analyse.data
+                )
+            )[0]
             y = analyseData.y
-            intensity = y[round(minX): round(maxX)].sum()
+            intensity = y[round(minX) : round(maxX)].sum()
             analyseData.calculateIntensities(self._df)[tableRow.get("symbol").text()][
-                tableRow.get("radiation-type").text()] = intensity
+                tableRow.get("radiation-type").text()
+            ] = intensity
         else:
             intensity = 0
         self._df.at[plotData.rowId, "low_kiloelectron_volt"] = minKev
@@ -655,7 +710,7 @@ class PeakSearchWidget(QtWidgets.QWidget):
                     menu = self._peakPlot.vb.menu.addMenu(radiationType)
                     menu.triggered.connect(self._actionClicked)
                     for symbol in self._elementsInRange.query(
-                            f"radiation_type == '{radiationType}'"
+                        f"radiation_type == '{radiationType}'"
                     )["symbol"]:
                         menu.addAction(symbol)
             showAllAction = self._peakPlot.vb.menu.addAction("Show All")
@@ -708,8 +763,8 @@ class PeakSearchWidget(QtWidgets.QWidget):
 
     def mousePressEvent(self, a0):
         if (
-                not self._searchLineEdit.geometry().contains(a0.pos())
-                and self._searchLineEdit.hasFocus()
+            not self._searchLineEdit.geometry().contains(a0.pos())
+            and self._searchLineEdit.hasFocus()
         ):
             self._searchLineEdit.clearFocus()
         return super().mousePressEvent(a0)

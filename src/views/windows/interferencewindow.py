@@ -34,7 +34,7 @@
 #                 border-bottom-right-radius: 3px;
 #             }
 #             QComboBox::down-arrow {
-#                 image: url(icons/down-arrow-resized.png)
+#                 image: url(resources/icons/down-arrow-resized.png)
 #             }
 #             QComboBox QAbstractItemView {
 #                 border-radius: 3px;
@@ -134,9 +134,9 @@
 #         for rowIndex in range(1, self._tableWidget.rowCount()):
 #             symbol = self._symbols[rowIndex - 1]
 #             query = f"""
-#                 SELECT coefficient 
-#                 FROM Interferences 
-#                 WHERE line1_id = (SELECT line_id FROM Lines WHERE symbol = '{symbol}' AND active = 1) 
+#                 SELECT coefficient
+#                 FROM Interferences
+#                 WHERE line1_id = (SELECT line_id FROM Lines WHERE symbol = '{symbol}' AND active = 1)
 #                 AND line2_id = {interfererLineId}
 #             """
 #             if tmp := self._db.executeQuery(query).fetchone():

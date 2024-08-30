@@ -9,7 +9,11 @@ from src.views.widgets.peaksearchwidget import PeakSearchWidget
 
 
 class CalibrationExplorer(Explorer):
-    def __init__(self, parent: QtWidgets.QWidget | None = None, calibration: datatypes.Calibration | None = None):
+    def __init__(
+        self,
+        parent: QtWidgets.QWidget | None = None,
+        calibration: datatypes.Calibration | None = None,
+    ):
         super(CalibrationExplorer, self).__init__(parent)
         self._calibration = calibration
         self._initCalibration = None
@@ -20,7 +24,7 @@ class CalibrationExplorer(Explorer):
             self._widgets = {
                 "General Data": GeneralDataWidget(calibration=calibration),
                 "Condition": PeakSearchWidget(calibration=self._calibration),
-                "Coefficient": CoefficientWidget(calibration=self._calibration)
+                "Coefficient": CoefficientWidget(calibration=self._calibration),
             }
             self._implementAnalyse()
             self._connectSignalsAndSlots()
@@ -84,13 +88,13 @@ class CalibrationExplorer(Explorer):
         if selectedItems:
             selectedItem = selectedItems[0]
             label = selectedItem.text(0)
-            if label == 'Peak Search':
+            if label == "Peak Search":
                 return
             oldWidget = self.mainLayout.itemAt(1).widget()
             oldWidget.hide()
             if "Condition" in label:
                 newWidget = self._widgets["Condition"]
-                newWidget.displayAnalyseData(int(label.split(' ')[-1]))
+                newWidget.displayAnalyseData(int(label.split(" ")[-1]))
             else:
                 newWidget = self._widgets[label]
             self.mainLayout.replaceWidget(oldWidget, newWidget)
@@ -104,9 +108,9 @@ class CalibrationExplorer(Explorer):
         for data in self._calibration.analyse.data:
             child = QtWidgets.QTreeWidgetItem()
             child.setText(0, f"Condition {data.conditionId}")
-            child.setIcon(0, QtGui.QIcon(resourcePath("icons/condition.png")))
-            self._treeItemMap['peak-search'].addChild(child)
-            self._treeWidget.expandItem(self._treeItemMap['peak-search'])
+            child.setIcon(0, QtGui.QIcon(resourcePath("resources/icons/condition.png")))
+            self._treeItemMap["peak-search"].addChild(child)
+            self._treeWidget.expandItem(self._treeItemMap["peak-search"])
 
     def reinitialize(self, calibration: datatypes.Calibration):
         self.blockSignals(True)

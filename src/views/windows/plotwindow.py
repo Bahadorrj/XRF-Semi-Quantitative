@@ -44,8 +44,7 @@ class ConditionForm(QtWidgets.QListView):
         self.setMaximumHeight(360)
         self.setMinimumHeight(150)
         self.setSizePolicy(
-            QtWidgets.QSizePolicy.Policy.Expanding,
-            QtWidgets.QSizePolicy.Policy.Maximum
+            QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Maximum
         )
 
     def _createComboBox(self):
@@ -57,7 +56,9 @@ class ConditionForm(QtWidgets.QListView):
         self._tableWidget = QtWidgets.QTableWidget(self)
         self._tableWidget.setColumnCount(1)
         self._tableWidget.setRowCount(len(self._df.columns[1:-1]))
-        self._tableWidget.setVerticalHeaderLabels([label.title() for label in self._df.columns[1:-1]])
+        self._tableWidget.setVerticalHeaderLabels(
+            [label.title() for label in self._df.columns[1:-1]]
+        )
         self._tableWidget.horizontalHeader().setSectionResizeMode(
             QtWidgets.QHeaderView.ResizeMode.Stretch
         )
@@ -72,7 +73,9 @@ class ConditionForm(QtWidgets.QListView):
         self._showConditionInList(1)
 
     def _showConditionInList(self, conditionId: int):
-        conditionDf = self._df[self._df["condition_id"] == conditionId].drop(["condition_id", "active"], axis=1)
+        conditionDf = self._df[self._df["condition_id"] == conditionId].drop(
+            ["condition_id", "active"], axis=1
+        )
         for index in range(conditionDf.size):
             value = conditionDf.iat[0, index]
             item = QtWidgets.QTableWidgetItem()
@@ -114,13 +117,20 @@ class PlotWindow(QtWidgets.QMainWindow):
             "Standards Tray List",
             "Defaults",
             "Calibrate",
-            "Methods Tray List"
+            "Methods Tray List",
         )
-        self._blockedActionsNames = ["save-as", "save", "new", "print", "print-preview", "print-setup"]
+        self._blockedActionsNames = [
+            "save-as",
+            "save",
+            "new",
+            "print",
+            "print-preview",
+            "print-setup",
+        ]
         for label in actions:
             action = QtGui.QAction(label)
             key = "-".join(label.lower().split(" "))
-            action.setIcon(QtGui.QIcon(resourcePath(f"icons/{key}.png")))
+            action.setIcon(QtGui.QIcon(resourcePath(f"resources/icons/{key}.png")))
             if key in self._blockedActionsNames:
                 action.setDisabled(True)
             self._actionsMap[key] = action
@@ -158,7 +168,15 @@ class PlotWindow(QtWidgets.QMainWindow):
     def _createMenus(self) -> None:
         self._menusMap = {}
         menuBar = self.menuBar()
-        menus = ["&File", "&Edit", "&View", "&Calibration", "&Method", "&Window", "&Help"]
+        menus = [
+            "&File",
+            "&Edit",
+            "&View",
+            "&Calibration",
+            "&Method",
+            "&Window",
+            "&Help",
+        ]
         for label in menus:
             menu = menuBar.addMenu(label)
             key = label.lower()[1:]
@@ -215,9 +233,7 @@ class PlotWindow(QtWidgets.QMainWindow):
             self._setCoordinate(mousePoint.x(), mousePoint.y())
 
     def _setCoordinate(self, x: float, y: float) -> None:
-        self._coordinateLabel.setText(
-            f"x = {round(x, 2)} y = {round(y, 2)}"
-        )
+        self._coordinateLabel.setText(f"x = {round(x, 2)} y = {round(y, 2)}")
 
     def _createTreeWidget(self) -> None:
         self._treeWidget = QtWidgets.QTreeWidget()
@@ -341,7 +357,9 @@ class PlotWindow(QtWidgets.QMainWindow):
             self._plotWidget.clear()
 
     def _openCalibrationTrayListWidget(self):
-        calibrationTrayWidget = CalibrationTrayWidget(dataframe=getDataframe("Calibrations"))
+        calibrationTrayWidget = CalibrationTrayWidget(
+            dataframe=getDataframe("Calibrations")
+        )
         calibrationTrayWidget.show()
 
     def _findActivePlotAttrs(self) -> list:
@@ -375,13 +393,13 @@ class PlotWindow(QtWidgets.QMainWindow):
 
     @cache
     def _getDataFromIndex(
-            self, extensionIndex: int, analyseIndex: int, dataIndex: int
+        self, extensionIndex: int, analyseIndex: int, dataIndex: int
     ) -> datatypes.AnalyseData:
         return self._getAnalyseFromIndex(extensionIndex, analyseIndex).data[dataIndex]
 
     @cache
     def _getAnalyseFromIndex(
-            self, extensionIndex: int, analyseIndex: int
+        self, extensionIndex: int, analyseIndex: int
     ) -> datatypes.Analyse:
         mapper = {0: "txt", 1: "atx"}
         analyse = list(
