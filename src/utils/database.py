@@ -12,7 +12,10 @@ class Database:
             self.conn = sqlite3.connect(path)
             self.path = os.path.abspath(path)
         except sqlite3.Error as e:
-            print(e)
+            self.conn = None
+            self.path = None
+            print(f"Database initialization failed for path: {path}")
+            print(f"Error: {e}")
 
     def executeQuery(self, query: str, values: list | tuple | None = None):
         try:
@@ -24,7 +27,8 @@ class Database:
             self.conn.commit()
             return cursor
         except sqlite3.Error as e:
-            print(e)
+            print(f"Executing query failed with query: {query} and values: {values}")
+            print(f"Error: {e}")
 
     def fetchData(self, query: str, values: list | tuple | None = None) -> list:
         try:
@@ -33,18 +37,17 @@ class Database:
                 cursor.execute(query)
             else:
                 cursor.execute(query, values)
-            rows = cursor.fetchall()
-            return rows
+            return cursor.fetchall()
         except sqlite3.Error as e:
-            print(e)
+            print(f"Fetching data failed with query: {query} and values: {values}")
+            print(f"Error: {e}")
 
     def closeConnection(self):
         if self.conn is not None:
             self.conn.close()
 
     def dataframe(self, query: str) -> pd.DataFrame:
-        df = pd.read_sql_query(query, self.conn)
-        return df
+        return pd.read_sql_query(query, self.conn)
 
 
 _db = Database(resourcePath("fundamentals.db"))
