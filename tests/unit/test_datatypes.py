@@ -4,33 +4,39 @@ import json
 import threading
 
 import numpy as np
-import pandas as pd
 
 from src.utils import datatypes
 
 
 @pytest.fixture
 def encryption_patches(mocker):
-    yield {
-        "mock_encryptText": mocker.patch("src.utils.encryption.encryptText", return_value=b"encrypted_text"),
-        "mock_loadKey": mocker.patch("src.utils.encryption.loadKey", return_value=b"key"),
-        "mock_open": mocker.patch("builtins.open", new_callable=mocker.MagicMock)
+    return {
+        "mock_encryptText": mocker.patch(
+            "src.utils.encryption.encryptText", return_value=b"encrypted_text"
+        ),
+        "mock_loadKey": mocker.patch(
+            "src.utils.encryption.loadKey", return_value=b"key"
+        ),
+        "mock_open": mocker.patch("builtins.open", new_callable=mocker.MagicMock),
     }
+
 
 @pytest.fixture
 def calibration_patches(mocker):
     yield {
         "mock_calculateCoefficients": mocker.patch(
             "src.utils.datatypes.Calibration.calculateCoefficients", return_value=None
-            ),
+        ),
         "mock_calculateInterferences": mocker.patch(
             "src.utils.datatypes.Calibration.calculateInterferences", return_value=None
-            ),
+        ),
     }
+
 
 @pytest.fixture
 def mock_analyse_data():
     return datatypes.AnalyseData(1, np.arange(0, 2048, 1), np.full(2048, 1))
+
 
 @pytest.fixture
 def mock_analyse(mock_analyse_data):
@@ -40,6 +46,7 @@ def mock_analyse(mock_analyse_data):
         [mock_analyse_data],
         {},
     )
+
 
 @pytest.fixture
 def mock_socket():
@@ -61,70 +68,6 @@ def mock_socket():
     server_conn.close()
     client_socket.close()
     server_socket.close()
-
-@pytest.fixture
-def mock_lines():
-    # Create a sample dataframe similar to what getDataframe("Lines") would return
-    return pd.DataFrame(
-        {
-            "line_id": [1, 2],
-            "element_id": [1, 2],
-            "atomic_number": [3, 4],
-            "symbol": ["Li", "Be"],
-            "name": ["Lithium", "Beryllium"],
-            "radiationType": ["Ka", "Ka"],
-            "kiloelectron_volt": [0.0543, 0.1085],
-            "low_kiloelectron_volt": [-0.2457, 10.1915],
-            "high_kiloelectron_volt": [0.3543, 0.4085],
-            "active": [1, 1],
-            "condition_id": [1, 1],
-        }
-    )
-
-@pytest.fixture
-def mock_calibrations():
-    # Create a sample dataframe similar to what getDataframe("Calibrations") would return
-    return pd.DataFrame(
-        {
-            "calibration_id": [1, 2],
-            "filename": ["Cal01", "Cal02"],
-            "element": ["Fe", "Cu"],
-            "concentration": [10.0, 20.0],
-            "state": [0, 1],
-        }
-    )
-
-@pytest.fixture
-def mock_conditions():
-    # Create a sample dataframe similar to what getDataframe("Conditions") would return
-    return pd.DataFrame(
-        {
-            "condition_id": [1, 2], 
-            "name": ["Condition 1", "Condition 2"],
-            "kilovolt": [8, 10],
-            "milliampere": [0.2, 0.3],
-            "time": [120, 120],
-            "rotation": [1, 1],
-            "environment": ["Vacuum", "Vacuum"],
-            "filter": [1, 1],
-            "mask": [3, 3],
-            "active": [1, 1]
-        }
-    )
-
-@pytest.fixture
-def mock_elements():
-    # Create a sample dataframe similar to what getDataframe("Elements") would return
-    return pd.DataFrame(
-        {
-            "element_id": [1, 2], 
-            "atomic_number": [3, 4],
-            "symbol": ["Li", "Be"],
-            "name": ["Lithium", "Beryllium"],
-            "active": [1, 1],
-            "condition_id": [7, 8],
-        }
-    )
 
 
 # testing AnalyseData
@@ -421,6 +364,10 @@ class TestMethod:
         method.save()
 
         # Assert
-        encryption_patches["mock_open"].assert_called_once_with(f'methods/{filename}.atxm', "wb")
-        mock_file_handle = encryption_patches["mock_open"].return_value.__enter__.return_value
+        encryption_patches["mock_open"].assert_called_once_with(
+            f"methods/{filename}.atxm", "wb"
+        )
+        mock_file_handle = encryption_patches[
+            "mock_open"
+        ].return_value.__enter__.return_value
         mock_file_handle.write.assert_called_once_with(b"encrypted_text\n")
