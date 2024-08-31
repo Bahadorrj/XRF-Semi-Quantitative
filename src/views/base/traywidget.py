@@ -10,12 +10,14 @@ class TrayWidget(QtWidgets.QWidget):
     def __init__(self, parent: QtWidgets.QWidget | None = None) -> None:
         super().__init__(parent)
         self.setFixedSize(1000, 800)
+        
+        self._menusMap = {}
+        self._actionsMap = {}
 
     def _connectSignalsAndSlots(self) -> None:
         self._tableWidget.currentCellChanged.connect(self._currentCellChanged)
 
     def _createActions(self, labels: dict) -> None:
-        self._actionsMap = {}
         for label, disabled in labels.items():
             action = QtGui.QAction(label)
             key = "-".join(label.lower().split(" "))
@@ -29,7 +31,6 @@ class TrayWidget(QtWidgets.QWidget):
         pass
 
     def _createMenus(self, labels: list | tuple) -> None:
-        self._menusMap = {}
         self._menuBar = QtWidgets.QMenuBar()
         self._menuBar.setSizePolicy(
             QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Fixed
@@ -83,3 +84,11 @@ class TrayWidget(QtWidgets.QWidget):
         self.mainLayout.addWidget(self._tabWidget)
         vLayout.addLayout(self.mainLayout)
         self.setLayout(vLayout)
+        
+    @property
+    def actionsMap(self):
+        return self._actionsMap
+    
+    @property
+    def menusMap(self):
+        return self._menusMap
