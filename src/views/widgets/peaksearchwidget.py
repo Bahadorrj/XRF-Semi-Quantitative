@@ -1,4 +1,5 @@
 from collections import deque
+import contextlib
 from functools import partial
 
 import numpy as np
@@ -9,7 +10,7 @@ from pandas import DataFrame
 from src.utils import calculation, datatypes
 from src.utils.database import getDataframe
 from src.utils.paths import resourcePath
-from src.views.base.tablewidget import DataframeTableWidget, TableItem, TableWidget
+from src.views.base.tablewidget import DataframeTableWidget, TableItem
 
 
 class StatusButton(QtWidgets.QPushButton):
@@ -44,13 +45,12 @@ class HideButton(QtWidgets.QPushButton):
 class ConditionComboBox(QtWidgets.QComboBox):
     def __init__(self, parent: QtWidgets.QWidget | None = None):
         super().__init__(parent)
-        values = list(
+        values = sorted(
             map(
                 lambda i: "" if np.isnan(i) else f"Condition {int(i)}",
                 getDataframe("Lines")["condition_id"].unique().tolist(),
             )
         )
-        values.sort()
         self.addItems(values)
         self.setCurrentIndex(0)
         self.currentText_ = super().currentText()
@@ -119,7 +119,7 @@ class PeakSearchWidget(QtWidgets.QWidget):
         calibration: datatypes.Calibration | None = None,
     ):
         super(PeakSearchWidget, self).__init__(parent)
-        self._calibration = calibration
+        self._calibration = None
         self._df = None
         self._kev = None
         self._plotDataList = None
@@ -128,27 +128,8 @@ class PeakSearchWidget(QtWidgets.QWidget):
         self._flag = None
         self._regionActive = None
         self._initializeUi()
-        if self._calibration is not None:
-            self._analyse = self._calibration.analyse
-            self._df = getDataframe("Lines").copy()
-            items = self._df["radiation_type"].unique().tolist()
-            items.insert(0, "")
-            self._searchComboBox.addItems(items)
-            self._kev = [calculation.pxToEv(i) for i in self._analyse.data[0].x]
-            self._plotDataList = [
-                datatypes.PlotData.fromSeries(rowId, s)
-                for rowId, s in self._df.iterrows()
-            ]
-            self._undoStack = deque()
-            self._redoStack = deque()
-            self._flag = False
-            self._regionActive = False
-            tableWidget = PeakSearchTableWidget(self, self._df)
-            self.mainLayout.replaceWidget(self._tableWidget, tableWidget)
-            self._tableWidget.deleteLater()
-            self._tableWidget = tableWidget
-            self._fillTable()
-            self._connectSignalsAndSlots()
+        if calibration is not None:
+            self.supply(calibration)
 
     def _initializeUi(self) -> None:
         self._createToolBar()
@@ -157,50 +138,6 @@ class PeakSearchWidget(QtWidgets.QWidget):
         self._createTableWidget()
         self._createPlotViewBox()
         self._setUpView()
-
-    def _connectSignalsAndSlots(self) -> None:
-        for plotData in self._plotDataList:
-            plotData.region.sigRegionChangeFinished.connect(
-                partial(self._emitPlotDataChanged, plotData.rowId, "region")
-            )
-            plotData.peakLine.sigClicked.connect(
-                partial(self._selectPlotData, plotData)
-            )
-            plotData.spectrumLine.sigClicked.connect(
-                partial(self._selectPlotData, plotData)
-            )
-        self._undoAction.triggered.connect(self._undo)
-        self._regionAction.triggered.connect(self._toggleRegions)
-        self._searchLineEdit.editingFinished.connect(self._search)
-        self._searchComboBox.currentTextChanged.connect(self._search)
-        self._tableWidget.cellClicked.connect(self._cellClicked)
-        self._peakPlot.sigRangeChanged.connect(self._adjustZoom)
-        self._peakPlot.scene().sigMouseMoved.connect(self._mouseMoved)
-        self._peakPlot.scene().sigMouseClicked.connect(self._openPopUp)
-        self._zoomRegion.sigRegionChanged.connect(self._showZoomedRegion)
-
-    def _resetClassVariables(self, calibration: datatypes.Calibration) -> None:
-        self._calibration = calibration
-        self._analyse = self._calibration.analyse
-        self._df = self._calibration.lines
-        self._kev = [calculation.pxToEv(i) for i in self._analyse.data[0].x]
-        self._plotDataList = [
-            datatypes.PlotData.fromSeries(rowId, s) for rowId, s in self._df.iterrows()
-        ]
-        for plotData in self._plotDataList:
-            plotData.region.sigRegionChangeFinished.connect(
-                partial(self._emitPlotDataChanged, plotData.rowId, "region")
-            )
-            plotData.peakLine.sigClicked.connect(
-                partial(self._selectPlotData, plotData)
-            )
-            plotData.spectrumLine.sigClicked.connect(
-                partial(self._selectPlotData, plotData)
-            )
-        self._undoStack = deque()
-        self._redoStack = deque()
-        self._flag = False
-        self._regionActive = False
 
     def _createToolBar(self) -> None:
         self._toolBar = QtWidgets.QToolBar(self)
@@ -225,24 +162,20 @@ class PeakSearchWidget(QtWidgets.QWidget):
         toolBar.addAction(self._undoAction)
         # toolBar.addAction(self._redoAction)
         toolBar.addAction(self._regionAction)
-        # self._redoAction.triggered.connect(self._redo)
 
     def _undo(self) -> None:
         if self._undoStack:
             temp = self._undoStack.pop()
-            if isinstance(temp, list):
-                for package in temp:
-                    rowId, values, action = package
-                    self._tableWidget.updateRow(rowId, values)
-                    self._plotDataChanged(rowId, action)
-            else:
-                rowId, values, action = temp
-                self._tableWidget.updateRow(rowId, values)
-                if not self._undoStack:
-                    self._undoAction.setDisabled(True)
-                self._plotDataChanged(rowId, action)
             if not self._undoStack:
                 self._undoAction.setDisabled(True)
+            if isinstance(temp, list):
+                items = temp
+            else:
+                items = [temp]
+            for package in items:
+                rowId, values, action = package
+                self._tableWidget.updateRow(rowId, values)
+                self._plotDataChanged(rowId, action)
 
     # def _redo(self) -> None:
     #     if self._redoStack:
@@ -305,8 +238,9 @@ class PeakSearchWidget(QtWidgets.QWidget):
                 self._tableWidget.addRow(self._createTableRow(plotData))
 
     def _createTableWidget(self) -> None:
-        self._tableWidget = TableWidget()
+        self._tableWidget = PeakSearchTableWidget()
         self._tableWidget.setMaximumHeight(200)
+        self._tableWidget.cellClicked.connect(self._cellClicked)
 
     @QtCore.pyqtSlot(int, int)
     def _cellClicked(self, row: int, column: int) -> None:
@@ -317,7 +251,7 @@ class PeakSearchWidget(QtWidgets.QWidget):
 
     def _fillTable(self) -> None:
         self._statusLabel.setText("Adding lines...")
-        self._tableWidget.resetTable()
+        self._tableWidget.supply(self._calibration.lines)
         for plotData in self._plotDataList:
             self._tableWidget.addRow(self._createTableRow(plotData))
         self._statusLabel.setText(None)
@@ -475,6 +409,7 @@ class PeakSearchWidget(QtWidgets.QWidget):
     #             values.insert(index, component.currentText)
     #     self._redoStack.append((rowId, values, action))
     #     print(f"added to redo stack:{values}")
+
     def _plotDataChanged(self, rowId: int, action: str) -> bool:
         plotData = self._plotDataList[rowId]
         if action == "hide":
@@ -511,17 +446,14 @@ class PeakSearchWidget(QtWidgets.QWidget):
             if plotData.conditionId and plotData.conditionId in [
                 d.conditionId for d in self._analyse.data
             ]:
-                analyseData = list(
+                analyseData = next(
                     filter(
                         lambda d: d.conditionId == plotData.conditionId,
                         self._analyse.data,
                     )
-                )[0]
+                )
                 y = analyseData.y
                 intensity = y[round(minX) : round(maxX)].sum()
-                analyseData.calculateIntensities(self._df)[
-                    tableRow.get("symbol").text()
-                ][tableRow.get("radiation-type").text()] = intensity
             else:
                 intensity = 0
         else:
@@ -632,7 +564,7 @@ class PeakSearchWidget(QtWidgets.QWidget):
         #     self._redoStack.clear()
         #     self._redoAction.setDisabled(True)
         tableRow = self._tableWidget.getRowById(rowId)
-        values = list()
+        values = []
         for index, component in enumerate(tableRow.values()):
             if isinstance(component, HideButton):
                 if action == "hide":
@@ -671,11 +603,9 @@ class PeakSearchWidget(QtWidgets.QWidget):
             self._peakPlot.removeItem(plotData.region)
 
     def _setCoordinate(self, x: float, y: float) -> None:
-        try:
+        with contextlib.suppress(IndexError):
             kev = self._kev[int(x)]
             self._coordinateLabel.setText(f"x= {x} y= {y} KeV= {kev}")
-        except IndexError:
-            pass
 
     def _adjustZoom(self, window, viewRange):
         rng = viewRange[0]
@@ -706,12 +636,11 @@ class PeakSearchWidget(QtWidgets.QWidget):
                 f"kiloelectron_volt <= {maxKev} and high_kiloelectron_volt >= {minKev}"
             )
             if not self._elementsInRange.empty:
-                for radiationType in self._elementsInRange["radiation_type"].unique():
+                grouped = self._elementsInRange.groupby("radiation_type")
+                for radiationType, group in grouped:
                     menu = self._peakPlot.vb.menu.addMenu(radiationType)
                     menu.triggered.connect(self._actionClicked)
-                    for symbol in self._elementsInRange.query(
-                        f"radiation_type == '{radiationType}'"
-                    )["symbol"]:
+                    for symbol in group["symbol"]:
                         menu.addAction(symbol)
             showAllAction = self._peakPlot.vb.menu.addAction("Show All")
             showAllAction.triggered.connect(self._showAll)
@@ -730,9 +659,7 @@ class PeakSearchWidget(QtWidgets.QWidget):
         for rowId in self._elementsInRange.index:
             if self._plotDataList[rowId].visible is False:
                 self._tableWidget.rowChanged.emit(rowId, "hide")
-        stack = []
-        for i in range(len(temp), len(self._undoStack)):
-            stack.append(self._undoStack[i])
+        stack = [self._undoStack[i] for i in range(len(temp), len(self._undoStack))]
         temp.append(stack)
         self._undoStack = temp.copy()
 
@@ -760,6 +687,15 @@ class PeakSearchWidget(QtWidgets.QWidget):
         self._setCoordinate(0, 0)
         self._searchLineEdit.setDisabled(False)
         self._searchComboBox.setDisabled(False)
+        self._searchLineEdit.editingFinished.connect(self._search)
+        self._searchComboBox.currentTextChanged.connect(self._search)
+        self._undoAction.triggered.connect(self._undo)
+        # self._redoAction.triggered.connect(self._redo)
+        self._regionAction.triggered.connect(self._toggleRegions)
+        self._peakPlot.sigRangeChanged.connect(self._adjustZoom)
+        self._peakPlot.scene().sigMouseMoved.connect(self._mouseMoved)
+        self._peakPlot.scene().sigMouseClicked.connect(self._openPopUp)
+        self._zoomRegion.sigRegionChanged.connect(self._showZoomedRegion)
 
     def mousePressEvent(self, a0):
         if (
@@ -769,12 +705,45 @@ class PeakSearchWidget(QtWidgets.QWidget):
             self._searchLineEdit.clearFocus()
         return super().mousePressEvent(a0)
 
-    def reinitialize(self, calibration: datatypes.Calibration) -> None:
+    def supply(self, calibration: datatypes.Calibration) -> None:
+        """Updates the widget with the specified calibration data.
+
+        This method assigns the calibration to the widget, processes the associated data,
+        and prepares the necessary elements for plotting and interaction. It also populates
+        the search combo box with available radiation types and resets the table display.
+
+        Args:
+            calibration (datatypes.Calibration): The calibration data to be supplied to the widget.
+
+        Returns:
+            None
+        """
         self.blockSignals(True)
-        self._resetClassVariables(calibration)
-        self._connectSignalsAndSlots()
+        self._calibration = calibration
+        self._analyse = self._calibration.analyse
+        self._df = self._calibration.lines
+        self._df.reset_index(drop=True, inplace=True)
+        self._kev = [calculation.pxToEv(i) for i in self._analyse.data[0].x]
+        self._plotDataList = [
+            datatypes.PlotData.fromSeries(rowId, s) for rowId, s in self._df.iterrows()
+        ]
+        for plotData in self._plotDataList:
+            plotData.region.sigRegionChangeFinished.connect(
+                partial(self._emitPlotDataChanged, plotData.rowId, "region")
+            )
+            plotData.peakLine.sigClicked.connect(
+                partial(self._selectPlotData, plotData)
+            )
+            plotData.spectrumLine.sigClicked.connect(
+                partial(self._selectPlotData, plotData)
+            )
+        self._undoStack = deque()
+        self._redoStack = deque()
+        self._flag = False
+        self._regionActive = False
+        items = self._df["radiation_type"].unique().tolist()
+        items.insert(0, "")
+        self._searchComboBox.addItems(items)
+        self._searchLineEdit.clear()
         self._fillTable()
-        self._peakPlot.clear()
-        self._spectrumPlot.clear()
-        self._showCoordinate(0, 0)
         self.blockSignals(False)

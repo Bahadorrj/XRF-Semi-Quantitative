@@ -1,5 +1,4 @@
 import os
-from pathlib import Path
 
 import pandas
 from PyQt6 import QtCore, QtWidgets
@@ -14,7 +13,19 @@ from src.views.widgets.coefficientwidget import CoefficientWidget
 from src.views.widgets.generaldatawidget import GeneralDataWidget
 from src.views.widgets.linestablewidget import LinesTableWidget
 
+
 class AcquisitionWidget(QtWidgets.QWidget):
+    """Widget for acquiring data from various sources.
+
+    This widget provides buttons for users to either open files from local storage or retrieve data from a connected XRF analyzer. It emits a signal when the user chooses to open a file, facilitating interaction with other components of the application.
+
+    Args:
+        parent (QtWidgets.QWidget | None): An optional parent widget.
+
+    Attributes:
+        getAnalyseFile (QtCore.pyqtSignal): Signal emitted to request an analysis file.
+    """
+
     getAnalyseFile = QtCore.pyqtSignal()
 
     def __init__(self, parent: QtWidgets.QWidget | None = None) -> None:
@@ -23,26 +34,38 @@ class AcquisitionWidget(QtWidgets.QWidget):
 
     def _initializeUi(self) -> None:
         layout = QtWidgets.QVBoxLayout()
-        hLayout = QtWidgets.QHBoxLayout()
-        hLayout.addStretch()
+        self.mainLayout = QtWidgets.QHBoxLayout()
+        self.mainLayout.addStretch()
         openFromLocalButton = QtWidgets.QPushButton("Open from local storage")
         openFromLocalButton.clicked.connect(lambda: self.getAnalyseFile.emit())
-        hLayout.addWidget(openFromLocalButton)
-        hLayout.addStretch()
+        self.mainLayout.addWidget(openFromLocalButton)
+        self.mainLayout.addStretch()
         getFromSocketButton = QtWidgets.QPushButton("Get from connected XRF analyser")
-        hLayout.addWidget(getFromSocketButton)
-        hLayout.addStretch()
+        self.mainLayout.addWidget(getFromSocketButton)
+        self.mainLayout.addStretch()
         layout.addStretch()
-        layout.addLayout(hLayout)
+        layout.addLayout(self.mainLayout)
         layout.addStretch()
         self.setLayout(layout)
 
 
 class CalibrationFormDialog(FormDialog):
-    def __init__(self,
-                 parent: QtWidgets.QWidget | None = None,
-                 inputs: list | tuple | None = None,
-                 values: list | tuple | None = None) -> None:
+    """Dialog for entering calibration data.
+
+    This dialog allows users to input calibration details, including filename, element, and concentration. It validates the inputs to ensure that the filename does not already exist, the element is valid, and the concentration is within an acceptable range.
+
+    Args:
+        parent (QtWidgets.QWidget | None): An optional parent widget.
+        inputs (list | tuple | None): Optional list or tuple of input field names.
+        values (list | tuple | None): Optional list or tuple of default values for the input fields.
+    """
+
+    def __init__(
+        self,
+        parent: QtWidgets.QWidget | None = None,
+        inputs: list | tuple | None = None,
+        values: list | tuple | None = None,
+    ) -> None:
         super(CalibrationFormDialog, self).__init__(parent, inputs, values)
 
     def _fill(self, lineEdit: QtWidgets.QLineEdit, key: str) -> None:
@@ -66,232 +89,240 @@ class CalibrationFormDialog(FormDialog):
 
 
 class CalibrationTrayWidget(TrayWidget):
-    def __init__(self, parent: QtWidgets.QWidget | None = None, dataframe: pandas.DataFrame | None = None) -> None:
+    def __init__(
+        self,
+        parent: QtWidgets.QWidget | None = None,
+        dataframe: pandas.DataFrame | None = None,
+    ) -> None:
         super().__init__(parent)
-        self._df = dataframe
+        self._df = None
         self._calibration = None
-        self._widgets = None
+        self._widgets = {
+            "General Data": GeneralDataWidget(),
+            "Coefficient": CoefficientWidget(),
+            "Lines": LinesTableWidget(),
+        }
+        self._acquisitionWidget = AcquisitionWidget()
+        self._acquisitionWidget.getAnalyseFile.connect(self._getAnalyseFile)
         self._initializeUi()
-        if self._df is not None:
-            self._tableWidget.reinitialize(self._df)
-            self._widgets = {
-                "General Data": GeneralDataWidget(calibration=self._calibration),
-                "Coefficient": CoefficientWidget(calibration=self._calibration),
-                "Lines": LinesTableWidget(calibration=self._calibration),
-                "Acquisition": AcquisitionWidget()
-            }
-            self._connectSignalsAndSlots()
-            if self._df.empty is False:
-                df = self._df.drop("calibration_id", axis=1)
-                status = list(map(Calibration.convertStateToStatus, df["state"].tolist()))
-                df["state"] = status
-                self._tableWidget.reinitialize(df)
-                self._tableWidget.setCurrentCell(0, 0)
-
-    def _resetClassVariables(self, dataframe: pandas.DataFrame):
-        self._df = dataframe
+        if dataframe is not None:
+            self.supply(dataframe)
 
     def _initializeUi(self) -> None:
+        super()._initializeUi()
         self.setWindowTitle("Calibration Tray List")
-        self.setObjectName("tray-list")
-        self._createActions({
-            "Add": False,
-            "Remove": True,
-            "Close": False,
-            "Print": True,
-            "Print Preview": True,
-            "Print Setup": True,
-            "Edit": True,
-            "Import": False
-        })
-        self._createMenus(("&File", "&Edit", "&View", "&Window", "&Help"))
-        self._fillMenusWithActions()
-        self._createToolBar()
-        self._fillToolBarWithActions()
-        self._createTableWidget()
-        self._createTabWidget()
-        self._setUpView()
 
     @QtCore.pyqtSlot(str)
     def _actionTriggered(self, action: str) -> None:
         if action == "add":
-            self._addCalibration()
+            self.addCalibration()
         elif action == "edit":
             if self._calibration.state == 0:
-                self._editCalibration()
+                self.editCurrentCalibration()
             else:
                 self._openCalibrationExplorer()
         elif action == "remove":
-            self._removeCalibration()
+            self.removeCurrentCalibration()
         elif action == "import":
-            self._importCalibration()
+            self.importCalibration()
 
-    def _addCalibration(self) -> None:
-        # Ask the user for the filename, element, concentration and create a new calibration
+    def addCalibration(self) -> None:
+        """Add a new calibration entry to the application.
+
+        This function prompts the user to input details for a new calibration, including the filename, element, and concentration. Upon confirmation, it saves the calibration data to the database and updates the internal data structures accordingly.
+
+        Args:
+            self: The instance of the class.
+
+        Returns:
+            None
+        """
         addDialog = CalibrationFormDialog(inputs=self._df.columns[1:-1])
         addDialog.setWindowTitle("Add calibration")
         if addDialog.exec():
             filename = addDialog.fields["filename"]
             element = addDialog.fields["element"]
             concentration = float(addDialog.fields["concentration"])
-            # Find the default radiation type for the element
-            if not getDataframe("Lines").query(f"symbol == '{element}' and active == 1").empty:
-                self._calibration = Calibration(filename, element, concentration)
-                self._calibration.save()
-                # Insert the calibration into the database
-                self._insertCalibration()
+            getDatabase().executeQuery(
+                "INSERT INTO Calibrations (filename, element, concentration, state) VALUES (?, ?, ?, ?)",
+                (filename, element, concentration, 0),
+            )
+            reloadDataframes()
+            self._df = getDataframe("Calibrations")
+            calibrationId = int(self._df.iloc[-1].values[0]) + 1
+            self._calibration = Calibration(
+                calibrationId, filename, element, concentration
+            )
+            self._calibration.save()
+            self._insertCalibration()
 
     def _insertCalibration(self) -> None:
         filename = self._calibration.filename
         element = self._calibration.element
         concentration = self._calibration.concentration
-        state = self._calibration.state
         status = self._calibration.status()
-        getDatabase().executeQuery(
-            "INSERT INTO Calibrations (filename, element, concentration, state) VALUES (?, ?, ?, ?)",
-            (filename, element, concentration, state)
-        )
-        reloadDataframes()
-        self._resetClassVariables(getDataframe("Calibrations"))
         items = {
             "filename": TableItem(filename),
             "element": TableItem(element),
             "concentration": TableItem(f"{concentration:.1f}"),
-            "status": TableItem(status)
+            "state": TableItem(status),
         }
         self._tableWidget.addRow(items)
         self._tableWidget.setCurrentCell(self._tableWidget.rowCount() - 1, 0)
 
-    def _editCalibration(self) -> None:
-        previousFilename = self._tableWidget.getCurrentRow()["filename"].text()
-        previousElement = self._tableWidget.getCurrentRow()["element"].text()
-        previousConcentration = self._tableWidget.getCurrentRow()["concentration"].text()
+    def editCurrentCalibration(self) -> None:
+        if self._calibration.state == 0:
+            self._editBeforeAcquisition()
+        else:
+            self._openCalibrationExplorer()
+
+    def _editBeforeAcquisition(self):
+        currentRow = self._tableWidget.getCurrentRow()
+        previousFilename = currentRow["filename"].text()
+        previousElement = currentRow["element"].text()
+        previousConcentration = currentRow["concentration"].text()
         editDialog = CalibrationFormDialog(
             inputs=self._df.columns[1:-1],
-            values=(previousFilename, previousElement, previousConcentration)
+            values=(previousFilename, previousElement, previousConcentration),
         )
         editDialog.setWindowTitle("Edit calibration")
         if editDialog.exec():
+            os.remove(f"calibrations/{previousFilename}.atxc")
             filename = editDialog.fields["filename"]
             element = editDialog.fields["element"]
             concentration = float(editDialog.fields["concentration"])
-            # Find the default radiation type for the element
-            if not getDataframe("Lines").query(f"symbol == '{element}' and active == 1").empty:
-                self._calibration.filename = filename
-                self._calibration.element = element
-                self._calibration.concentration = concentration
-                self._calibration.save()
-                self._tableWidget.getCurrentRow()["filename"].setText(filename)
-                self._tableWidget.getCurrentRow()["element"].setText(element)
-                self._tableWidget.getCurrentRow()["concentration"].setText(f"{concentration:.1f}")
-                getDatabase().executeQuery(
-                    f"UPDATE Calibrations "
-                    f"SET filename = '{filename}', element = '{element}', concentration = {concentration} "
-                    f"WHERE filename = '{previousFilename}'"
-                )
-                reloadDataframes()
-                self._resetClassVariables(getDataframe("Calibrations"))
+            self._calibration.filename = filename
+            self._calibration.element = element
+            self._calibration.concentration = concentration
+            self._calibration.save()
+            currentRow["filename"].setText(filename)
+            currentRow["element"].setText(element)
+            currentRow["concentration"].setText(f"{concentration:.1f}")
+            getDatabase().executeQuery(
+                "UPDATE Calibrations "
+                f"SET filename = '{filename}', element = '{element}', concentration = {concentration} "
+                f"WHERE filename = '{previousFilename}'"
+            )
+            reloadDataframes()
+            self._df = getDataframe("Calibrations")
 
     def _openCalibrationExplorer(self) -> None:
         if self._calibration is not None:
-            CalibrationExplorer(calibration=self._calibration).show()
+            calibrationExplorer = CalibrationExplorer(calibration=self._calibration)
+            calibrationExplorer.show()
 
-    def _removeCalibration(self) -> None:
+    def removeCurrentCalibration(self) -> None:
+        """Remove the currently selected calibration from the application.
+
+        This function prompts the user for confirmation before deleting the selected calibration. If confirmed, it removes the calibration file from the filesystem and updates the database and the user interface accordingly.
+
+        Args:
+            self: The instance of the class.
+
+        Raises:
+            ValueError: If no calibration is currently selected.
+
+        Returns:
+            None
+        """
+        if not self._calibration:
+            raise ValueError("No calibration selected")
         # Ask the user if they are sure to remove the calibration
         messageBox = QtWidgets.QMessageBox()
         messageBox.setIcon(QtWidgets.QMessageBox.Icon.Warning)
         messageBox.setText("Are you sure you want to remove the selected calibration?")
         messageBox.setWindowTitle("Remove Calibration")
         messageBox.setStandardButtons(
-            QtWidgets.QMessageBox.StandardButton.Yes | QtWidgets.QMessageBox.StandardButton.No
+            QtWidgets.QMessageBox.StandardButton.Yes
+            | QtWidgets.QMessageBox.StandardButton.No
         )
         messageBox.setDefaultButton(QtWidgets.QMessageBox.StandardButton.No)
         if messageBox.exec() == QtWidgets.QMessageBox.StandardButton.Yes:
-            filename = self._tableWidget.getRow(self._tableWidget.currentRow())["filename"].text()
+            filename = self._calibration.filename
             os.remove(f"calibrations/{filename}.atxc")
-            self._calibration = None
-            getDatabase().executeQuery("DELETE FROM Calibrations WHERE filename = ?", (filename,))
+            getDatabase().executeQuery(
+                "DELETE FROM Calibrations WHERE filename = ?", (filename,)
+            )
             reloadDataframes()
-            self._resetClassVariables(getDataframe("Calibrations"))
+            self._df = getDataframe("Calibrations")
+            currentRow = self._tableWidget.currentRow()
             self._tableWidget.removeRow(self._tableWidget.currentRow())
+            self._currentCellChanged(currentRow, 0, -1, -1)
 
-    def _importCalibration(self) -> None:
+    def importCalibration(self) -> None:
+        """Import a calibration from an ATXC file into the application.
+
+        This function allows the user to select an ATXC file and imports the calibration data contained within it. If the calibration does not already exist in the database, it is added; otherwise, a warning message is displayed to the user.
+
+        Args:
+            self: The instance of the class.
+
+        Returns:
+            None
+        """
         filePath, _ = QtWidgets.QFileDialog.getOpenFileName(
-            self,
-            "Open Calibration",
-            "./",
-            "Antique'X calibration (*.atxc)"
+            self, "Open Calibration", "./", "Antique'X calibration (*.atxc)"
         )
         if filePath:
             self._calibration = Calibration.fromATXCFile(filePath)
-            filename = Path(filePath).stem
-            if self._df.query(f"filename == '{filename}'").empty:
+            if self._df.query(f"filename == '{self._calibration.filename}'").empty:
+                getDatabase().executeQuery(
+                    "INSERT INTO Calibrations (filename, element, concentration, state) VALUES (?, ?, ?, ?)",
+                    (
+                        self._calibration.filename,
+                        self._calibration.element,
+                        self._calibration.concentration,
+                        0,
+                    ),
+                )
+                reloadDataframes()
                 self._insertCalibration()
             else:
                 messageBox = QtWidgets.QMessageBox()
                 messageBox.setIcon(QtWidgets.QMessageBox.Icon.Warning)
-                messageBox.setText("The selected calibration already exists in the database.")
+                messageBox.setText(
+                    "The selected calibration already exists in the database."
+                )
                 messageBox.setWindowTitle("Import Calibration Failed")
                 messageBox.setStandardButtons(QtWidgets.QMessageBox.StandardButton.Ok)
                 messageBox.exec()
 
-    def _fillMenusWithActions(self) -> None:
-        self._menusMap["file"].addAction(self._actionsMap["import"])
-        self._menusMap["file"].addSeparator()
-        self._menusMap["file"].addAction(self._actionsMap["print"])
-        self._menusMap["file"].addAction(self._actionsMap["print-preview"])
-        self._menusMap["file"].addAction(self._actionsMap["print-setup"])
-        self._menusMap["file"].addSeparator()
-        self._menusMap["file"].addAction(self._actionsMap["close"])
-
-        self._menusMap["edit"].addAction(self._actionsMap["add"])
-        self._menusMap["edit"].addAction(self._actionsMap["edit"])
-        self._menusMap["edit"].addAction(self._actionsMap["remove"])
-
-    def _createToolBar(self) -> None:
-        self._toolBar = QtWidgets.QToolBar()
-        self._toolBar.setIconSize(QtCore.QSize(16, 16))
-        self._toolBar.setToolButtonStyle(QtCore.Qt.ToolButtonStyle.ToolButtonTextUnderIcon)
-        self._toolBar.setMovable(False)
-        self._fillToolBarWithActions()
-
-    def _fillToolBarWithActions(self) -> None:
-        self._toolBar.addAction(self._actionsMap["import"])
-        self._toolBar.addAction(self._actionsMap["add"])
-        self._toolBar.addSeparator()
-        self._toolBar.addAction(self._actionsMap["edit"])
-        self._toolBar.addSeparator()
-        self._toolBar.addAction(self._actionsMap["remove"])
-
-    def _currentCellChanged(self, currentRow: int, currentColumn: int, previousRow: int, previousColumn: int):
-        """Called when the current cell in the table changes."""
-        if currentRow != previousRow and currentRow != -1:
-            if self._tabWidget.count() > 0:
-                self._tabWidget.clear()
-            tableRow = self._tableWidget.getRow(currentRow)
+    def _currentCellChanged(
+        self, currentRow: int, currentColumn: int, previousRow: int, previousColumn: int
+    ) -> None:
+        super()._currentCellChanged(
+            currentRow, currentColumn, previousRow, previousColumn
+        )
+        if currentRow not in [previousRow, -1]:
+            tableRow = self._tableWidget.getCurrentRow()
             filename = tableRow.get("filename").text()
-            path = f"./calibrations/{filename}.atxc"
+            path = f"calibrations/{filename}.atxc"
             self._calibration = Calibration.fromATXCFile(path)
-            if "edit" in self._actionsMap:
-                self._actionsMap["edit"].setDisabled(False)
-            self._actionsMap["remove"].setDisabled(False)
-            if self._calibration.state == 0:
-                self._addWidgets({"Acquisition": self._widgets["Acquisition"]})
-            else:
-                self._addWidgets({k: w for k, w in self._widgets.items() if k != "Acquisition"})
+            self._supplyWidgets()
         elif currentRow == -1:
-            self._tabWidget.clear()
             self._calibration = None
 
+    def _supplyWidgets(self) -> None:
+        if self._calibration.state != 0:
+            self._addWidgets(self._widgets)
+            for widget in self._widgets.values():
+                widget.supply(self._calibration)
+        else:
+            self._addWidgets({"Acquisition": self._acquisitionWidget})
+
     def _getAnalyseFile(self):
-        path, filters = QtWidgets.QFileDialog.getOpenFileName(
+        path, _ = QtWidgets.QFileDialog.getOpenFileName(
             self,
             "Open File",
             "./",
             "Antique'X Spectrum (*.atx);;Text Spectrum (*.txt)",
         )
         if path:
-            analyse = Analyse.fromTXTFile(path) if path.endswith(".txt") else Analyse.fromATXFile(path)
+            analyse = (
+                Analyse.fromTXTFile(path)
+                if path.endswith(".txt")
+                else Analyse.fromATXFile(path)
+            )
             self._calibration.analyse = analyse
             self._calibration.state = 1
             self._calibration.save()
@@ -299,15 +330,31 @@ class CalibrationTrayWidget(TrayWidget):
                 f"UPDATE Calibrations SET state = 1 WHERE filename = '{self._calibration.filename}'"
             )
             reloadDataframes()
-            self._resetClassVariables(getDataframe("Calibrations"))
-            tableRow = self._tableWidget.getCurrentRow()
-            tableRow.get("status").setText(self._calibration.status())
-            self._addWidgets({k: w for k, w in self._widgets.items() if k != "Acquisition"})
+            self._df = getDataframe("Calibrations")
+            self._tableWidget.getCurrentRow().get("state").setText(
+                self._calibration.status()
+            )
+            self._supplyWidgets()
 
-    def reinitialize(self, dataframe: pandas.DataFrame) -> None:
-        self.blockSignals(True)
-        self._df = dataframe
-        self._tabWidget.clear()
-        self._tableWidget.reinitialize(dataframe)
-        self._connectSignalsAndSlots()
-        self.blockSignals(False)
+    def supply(self, dataframe: pandas.DataFrame) -> None:
+        """Supply data to the table widget from a given DataFrame.
+
+        This function processes the provided DataFrame by removing the 'calibration_id' column and converting the 'state' values to a more user-friendly format. It then updates the table widget with the modified DataFrame and sets the current cell to the first row if the DataFrame is not empty.
+
+        Args:
+            self: The instance of the class.
+            dataframe (pandas.DataFrame): The DataFrame containing the data to supply.
+
+        Returns:
+            None
+        """
+        super().supply(dataframe)
+        df = self._df.drop("calibration_id", axis=1)
+        df["state"] = df["state"].apply(Calibration.convertStateToStatus)
+        self._tableWidget.supply(df)
+        if self._df.empty is False:
+            self._tableWidget.setCurrentCell(0, 0)
+
+    @property
+    def calibration(self):
+        return self._calibration

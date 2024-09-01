@@ -8,6 +8,16 @@ from src.views.base.tablewidget import DataframeTableWidget
 
 
 class AnalytesAndConditionsWidget(QtWidgets.QWidget):
+    """Widget for displaying analytes and their associated conditions.
+
+    This class provides a user interface for selecting analytes and managing their conditions through a periodic table layout and a condition table. It allows for interaction with the analytes, enabling users to add or modify conditions based on the selected elements.
+
+    Args:
+        parent (QtWidgets.QWidget | None): An optional parent widget.
+        method (datatypes.Method | None): An optional method to initialize the widget with.
+        editable (bool): A flag indicating whether the widget is editable.
+    """
+
     def __init__(
         self,
         parent: QtWidgets.QWidget | None = None,
@@ -15,36 +25,18 @@ class AnalytesAndConditionsWidget(QtWidgets.QWidget):
         editable: bool = False,
     ):
         super(AnalytesAndConditionsWidget, self).__init__(parent)
-        self._method = method
+        self._method = None
         self._editable = editable
-        self.buttonsMap = {}
+        self._buttonsMap = {}
         self._initializeUi()
-        if self._method is not None:
-            self._conditionTable.reinitialize(self._method.conditions)
-            self._connectSignalsAndSlots()
-            self._conditionTable.setCurrentCell(0, 0)
-
-    def _resetClassVariables(self, method: datatypes.Method):
-        self._method = method
+        if method is not None:
+            self.supply(method)
 
     def _initializeUi(self) -> None:
         self.setObjectName("analyte-widget")
         self._createPeriodicLayout()
         self._createConditionTable()
         self._setUpView()
-
-    def _setUpView(self) -> None:
-        self.mainLayout = QtWidgets.QVBoxLayout()
-        self.mainLayout.setContentsMargins(30, 30, 30, 30)
-        self.mainLayout.setSpacing(30)
-        self.mainLayout.addLayout(self._periodicTableLayout)
-        self.mainLayout.addWidget(self._conditionTable)
-        self.setLayout(self.mainLayout)
-
-    def _connectSignalsAndSlots(self) -> None:
-        for symbol, button in self.buttonsMap.items():
-            button.toggled.connect(partial(self._addElementToCondition, symbol))
-        self._conditionTable.currentCellChanged.connect(self._currentCellChanged)
 
     def _createPeriodicLayout(self) -> None:
         vLayout = QtWidgets.QVBoxLayout()
@@ -72,13 +64,17 @@ class AnalytesAndConditionsWidget(QtWidgets.QWidget):
                     button.setCheckable(True)
                     if self._editable is False:
                         button.setDisabled(True)
+                    else:
+                        button.toggled.connect(
+                            partial(self._addElementToCondition, symbol)
+                        )
                     button.setSizePolicy(
                         QtWidgets.QSizePolicy.Policy.Fixed,
                         QtWidgets.QSizePolicy.Policy.Fixed,
                     )
                     layout.addWidget(button)
                     if symbol not in ["L", "A"]:
-                        self.buttonsMap[symbol] = button
+                        self._buttonsMap[symbol] = button
                     else:
                         button.setDisabled(True)
                         button.setStyleSheet(
@@ -114,6 +110,7 @@ class AnalytesAndConditionsWidget(QtWidgets.QWidget):
             QtWidgets.QHeaderView.ResizeMode.Stretch
         )
         self._conditionTable.verticalHeader().setVisible(False)
+        self._conditionTable.currentCellChanged.connect(self._currentCellChanged)
 
     @QtCore.pyqtSlot(int, int, int, int)
     def _currentCellChanged(
@@ -128,18 +125,44 @@ class AnalytesAndConditionsWidget(QtWidgets.QWidget):
         symbols = self._method.elements.query(
             f"condition_id == {conditionId} and active == 1"
         )["symbol"].values
-        for symbol, button in self.buttonsMap.items():
+        for symbol, button in self._buttonsMap.items():
             button.blockSignals(True)
             button.setChecked(symbol in symbols)
             button.blockSignals(False)
 
+    def _setUpView(self) -> None:
+        self.mainLayout = QtWidgets.QVBoxLayout()
+        self.mainLayout.setContentsMargins(30, 30, 30, 30)
+        self.mainLayout.setSpacing(30)
+        self.mainLayout.addLayout(self._periodicTableLayout)
+        self.mainLayout.addWidget(self._conditionTable)
+        self.setLayout(self.mainLayout)
+
     def setFocus(self):
         self._conditionTable.setFocus()
 
-    def reinitialize(self, method: datatypes.Method) -> None:
+    def supply(self, method: datatypes.Method) -> None:
+        """Supply data to the widget from a given method.
+
+        This function updates the internal method reference and populates the condition table with the method's conditions. It temporarily blocks signals to prevent unnecessary updates during the data supply process and sets the current cell of the condition table to the first row.
+
+        Args:
+            self: The instance of the class.
+            method (datatypes.Method): The method containing conditions to supply.
+
+        Returns:
+            None
+        """
         self.blockSignals(True)
-        self._resetClassVariables(method)
-        self._conditionTable.reinitialize(method.conditions)
-        self._connectSignalsAndSlots()
+        self._method = method
+        self._conditionTable.supply(method.conditions)
         self.blockSignals(False)
         self._conditionTable.setCurrentCell(0, 0)
+
+    @property
+    def buttonsMap(self):
+        return self._buttonsMap
+
+    @property
+    def editable(self):
+        return self._editable

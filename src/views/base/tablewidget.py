@@ -18,18 +18,56 @@ class TableItem(QtWidgets.QTableWidgetItem):
 
 
 class TableWidget(QtWidgets.QTableWidget):
+    """
+    TableWidget is a custom QTableWidget that manages rows of data, allowing for dynamic updates and selections. It provides methods to add, remove, and manipulate rows while maintaining a clear structure for the data.
+
+    Attributes:
+        rowChanged (pyqtSignal): Signal emitted when a row is changed.
+
+    Args:
+        parent (QWidget | None): Optional parent widget for the table.
+
+    Methods(Beside the original class methods):
+        setHeaders(headers: list | tuple) -> None:
+            Sets the headers for the table columns.
+
+        setHorizontalHeaderLabels(labels: list | tuple) -> None:
+            Configures the horizontal header labels and their resize modes.
+
+        addRow(row: dict) -> None:
+            Adds a new row to the table with the specified data.
+
+        removeRow(rowIndex: int) -> None:
+            Removes the row at the specified index from the table.
+
+        getRow(rowIndex: int) -> dict:
+            Retrieves the data of the row at the specified index.
+
+        getRowById(rowId: int) -> dict:
+            Finds and returns the row data associated with the given row ID.
+
+        getCurrentRow() -> dict:
+            Returns the data of the currently selected row.
+
+        selectRowByID(rowId: int) -> None:
+            Selects the row that matches the specified row ID.
+
+        resetTable() -> None:
+            Clears all rows from the table and resets its state.
+
+        updateRow(rowIndex: int, row: dict) -> None:
+            Updates the data of the specified row with new values.
+    """
+
     rowChanged = QtCore.pyqtSignal(int, str)
 
     def __init__(self, parent: QtWidgets.QWidget | None = None):
         super(TableWidget, self).__init__(parent)
-        self.rows = dict()
+        self.rows = {}
         self.setAlternatingRowColors(True)
         self.setFrameShape(QtWidgets.QFrame.Shape.NoFrame)
         self.setSelectionMode(QtWidgets.QTableWidget.SelectionMode.SingleSelection)
         self.setSelectionBehavior(QtWidgets.QTableWidget.SelectionBehavior.SelectRows)
-
-    def _resetClassVariables(self, rows: dict):
-        self.rows = rows
 
     def setHeaders(self, headers: list | tuple):
         self.setColumnCount(len(headers))
@@ -49,6 +87,7 @@ class TableWidget(QtWidgets.QTableWidget):
             self.setHorizontalHeaderItem(column, item)
 
     def addRow(self, row: dict) -> None:
+        self.blockSignals(True)
         self.setRowCount(self.rowCount() + 1)
         rowIndex, columnIndex = self.rowCount() - 1, 0
         for component in row.values():
@@ -59,6 +98,14 @@ class TableWidget(QtWidgets.QTableWidget):
                 self.setItem(rowIndex, columnIndex, component)
                 columnIndex += 1
         self.rows[rowIndex] = row
+        self.blockSignals(False)
+
+    def removeRow(self, rowIndex: int) -> None:
+        self.blockSignals(True)
+        self.rows.pop(rowIndex)
+        self.rows = dict(zip(range(self.rowCount()), self.rows.values()))
+        super().removeRow(rowIndex)
+        self.blockSignals(False)
 
     def getRow(self, rowIndex: int) -> dict:
         return self.rows[rowIndex]
@@ -77,6 +124,7 @@ class TableWidget(QtWidgets.QTableWidget):
 
     def resetTable(self) -> None:
         self.setRowCount(0)
+        self.rows.clear()
 
     def updateRow(self, rowIndex: int, row: dict) -> None:
         rowIndex = self.rows[rowIndex]
@@ -90,20 +138,33 @@ class TableWidget(QtWidgets.QTableWidget):
 
 
 class DataframeTableWidget(TableWidget):
+    """
+    DataframeTableWidget is a specialized TableWidget designed to display and manage data from a pandas DataFrame. It allows for automatic filling of the table based on the DataFrame's content and provides a clear interface for updating the displayed data.
+
+    Args:
+        parent (QWidget | None): Optional parent widget for the table.
+        dataframe (DataFrame | None): Optional pandas DataFrame to initialize the table with.
+        autofill (bool): If True, the table will be automatically filled with data from the DataFrame upon initialization.
+
+    Methods:
+        _fillTable() -> None:
+            Populates the table with data from the DataFrame, formatting specific columns for better readability.
+
+        supply(dataframe: DataFrame) -> None:
+            Updates the table with a new DataFrame, resetting the current content and optionally refilling the table.
+    """
+
     def __init__(
-            self, parent: QtWidgets.QWidget | None = None, dataframe: pandas.DataFrame | None = None,
-            autofill: bool = False
+        self,
+        parent: QtWidgets.QWidget | None = None,
+        dataframe: pandas.DataFrame | None = None,
+        autofill: bool = False,
     ) -> None:
         super(DataframeTableWidget, self).__init__(parent)
-        self._df = dataframe
+        self._df = None
         self._autofill = autofill
         if self._df is not None:
-            self.setHeaders([" ".join(column.split("_")).title() for column in self._df.columns])
-            if self._autofill:
-                self._fillTable()
-
-    def _resetClassVariables(self, dataframe: pandas.DataFrame):
-        self._df = dataframe
+            self.supply(dataframe)
 
     def _fillTable(self) -> None:
         if self._df.empty:
@@ -116,7 +177,7 @@ class DataframeTableWidget(TableWidget):
             self.addRow(items)
         if "active" in self.rows[0]:
             for row in self.rows.values():
-                if int(row['active'].text()) == 1:
+                if int(row["active"].text()) == 1:
                     row["active"].setForeground(QtCore.Qt.GlobalColor.darkGreen)
                     row["active"].setText("True")
                 else:
@@ -129,11 +190,13 @@ class DataframeTableWidget(TableWidget):
                 else:
                     row["condition_id"].setText(None)
 
-    def reinitialize(self, dataframe: pandas.DataFrame):
+    def supply(self, dataframe: pandas.DataFrame):
         self.blockSignals(True)
-        self._resetClassVariables(dataframe)
+        self._df = dataframe
         self.resetTable()
-        self.setHeaders([" ".join(column.split("_")).title() for column in self._df.columns])
         if self._autofill:
+            self.setHeaders(
+                [" ".join(column.split("_")).title() for column in self._df.columns]
+            )
             self._fillTable()
         self.blockSignals(False)
