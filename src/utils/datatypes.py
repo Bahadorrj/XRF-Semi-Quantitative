@@ -20,20 +20,25 @@ class AnalyseData:
     conditionId: int
     x: np.ndarray
     y: np.ndarray
-    
+
     def __eq__(self, others) -> bool:
         assert isinstance(others, AnalyseData), "Comparison Error"
-        return (np.all(np.equal(self.x, others.x)) and 
-                np.all(np.equal(self.y, others.y)))
+        return np.all(np.equal(self.x, others.x)) and np.all(np.equal(self.y, others.y))
 
     def calculateIntensities(self, lines: pandas.DataFrame) -> dict:
         intensities = defaultdict(dict)
         for row in lines.itertuples():
-            intensity = int(self.y[
-                int(calculation.evToPx(row.low_kiloelectron_volt)) : 
-                int(calculation.evToPx(row.high_kiloelectron_volt))
-            ].sum())
-            intensities[row.symbol][row.radiation_type] = intensity
+            try:
+                intensity = int(
+                    self.y[
+                        int(calculation.evToPx(row.low_kiloelectron_volt)) : int(
+                            calculation.evToPx(row.high_kiloelectron_volt)
+                        )
+                    ].sum()
+                )
+                intensities[row.symbol][row.radiation_type] = intensity
+            except ValueError:
+                print(row)
         return intensities
 
     def toHashableDict(self) -> dict:
@@ -69,10 +74,13 @@ class Analyse:
     def __post_init__(self) -> None:
         self.filename = Path(self.filePath).stem
         self.extension = self.filePath.split(".")[-1]
-        
+
     def __eq__(self, other) -> bool:
         assert isinstance(other, Analyse), "Comparison Error"
-        return all(self.data[i] == other.data[i] for i in range(len(self.data))) and self.generalData == other.generalData
+        return (
+            all(self.data[i] == other.data[i] for i in range(len(self.data)))
+            and self.generalData == other.generalData
+        )
 
     def getDataByConditionId(self, conditionId: int) -> AnalyseData:
         return next(d for d in self.data if d.conditionId == conditionId)
@@ -166,14 +174,16 @@ class Calibration:
     def __post_init__(self):
         self.calculateCoefficients()
         self.calculateInterferences()
-        
+
     def __eq__(self, other) -> bool:
-        return (self.filename == other.filename
-                and self.element == other.element
-                and self.concentration == other.concentration
-                and self.state == other.state
-                and self.analyse == other.analyse
-                and self.lines.equals(other.lines))
+        return (
+            self.filename == other.filename
+            and self.element == other.element
+            and self.concentration == other.concentration
+            and self.state == other.state
+            and self.analyse == other.analyse
+            and self.lines.equals(other.lines)
+        )
 
     @property
     def analyse(self) -> Analyse:
@@ -268,6 +278,7 @@ class Calibration:
             analyse = Analyse.fromHashableDict(calibrationDict["_analyse"])
             calibrationDict["_analyse"] = analyse
         calibrationDict["_lines"] = pandas.DataFrame(calibrationDict["_lines"])
+        calibrationDict["_lines"].reset_index(drop=True, inplace=True)
         return cls(**calibrationDict)
 
     @classmethod
@@ -306,7 +317,7 @@ class Method:
     elements: pandas.DataFrame = field(
         default_factory=lambda: getDataframe("Elements").copy()
     )
-    
+
     def __eq__(self, other: "Method"):
         assert isinstance(other, Method), "Comparison Error"
         return (
@@ -354,8 +365,11 @@ class Method:
     @classmethod
     def fromHashableDict(cls, kwargs: dict):
         kwargs["conditions"] = pandas.DataFrame(kwargs["conditions"])
+        kwargs["conditions"].reset_index(drop=True, inplace=True)
         kwargs["elements"] = pandas.DataFrame(kwargs["elements"])
+        kwargs["elements"].reset_index(drop=True, inplace=True)
         kwargs["calibrations"] = pandas.DataFrame(kwargs["calibrations"])
+        kwargs["calibrations"].reset_index(drop=True, inplace=True)
         return cls(**kwargs)
 
     @classmethod
