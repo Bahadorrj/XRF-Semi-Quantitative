@@ -1,6 +1,7 @@
 import os
-
 import pandas
+
+from pathlib import Path
 from PyQt6 import QtCore, QtWidgets
 
 from src.utils.database import getDataframe, getDatabase, reloadDataframes
@@ -10,7 +11,7 @@ from src.views.base.tablewidget import TableItem
 from src.views.base.traywidget import TrayWidget
 from src.views.explorers.calibrationexplorer import CalibrationExplorer
 from src.views.widgets.coefficientwidget import CoefficientWidget
-from src.views.widgets.generaldatawidget import GeneralDataWidget
+from src.views.widgets.calibrationgeneraldatawidget import CalibrationGeneralDataWidget
 from src.views.widgets.linestablewidget import LinesTableWidget
 
 
@@ -94,11 +95,11 @@ class CalibrationTrayWidget(TrayWidget):
         parent: QtWidgets.QWidget | None = None,
         dataframe: pandas.DataFrame | None = None,
     ) -> None:
-        super().__init__(parent)
+        super(CalibrationTrayWidget, self).__init__(parent)
         self._df = None
         self._calibration = None
         self._widgets = {
-            "General Data": GeneralDataWidget(),
+            "General Data": CalibrationGeneralDataWidget(),
             "Coefficient": CoefficientWidget(),
             "Lines": LinesTableWidget(),
         }
@@ -245,9 +246,8 @@ class CalibrationTrayWidget(TrayWidget):
             )
             reloadDataframes()
             self._df = getDataframe("Calibrations")
-            currentRow = self._tableWidget.currentRow()
             self._tableWidget.removeRow(self._tableWidget.currentRow())
-            self._currentCellChanged(currentRow, 0, -1, -1)
+            self._currentCellChanged(self._tableWidget.currentRow(), 0, -1, -1)
 
     def importCalibration(self) -> None:
         """Import a calibration from an ATXC file into the application.
@@ -264,8 +264,8 @@ class CalibrationTrayWidget(TrayWidget):
             self, "Open Calibration", "./", "Antique'X calibration (*.atxc)"
         )
         if filePath:
-            self._calibration = Calibration.fromATXCFile(filePath)
-            if self._df.query(f"filename == '{self._calibration.filename}'").empty:
+            if self._df.query(f"filename == '{Path(filePath).stem}'").empty:
+                self._calibration = Calibration.fromATXCFile(filePath)
                 getDatabase().executeQuery(
                     "INSERT INTO Calibrations (filename, element, concentration, state) VALUES (?, ?, ?, ?)",
                     (

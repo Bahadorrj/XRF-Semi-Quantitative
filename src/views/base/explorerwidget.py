@@ -8,10 +8,18 @@ from src.utils.paths import resourcePath
 class Explorer(QtWidgets.QWidget):
     def __init__(self, parent: QtWidgets.QWidget | None = None):
         super(Explorer, self).__init__(parent)
-        self.setFixedSize(1200, 800)
+        # self.setFixedSize(1150, 980)
+        self._widgets = {}
 
-    def _connectSignalsAndSlots(self):
-        self._treeWidget.itemSelectionChanged.connect(self._changeWidget)
+    def _initializeUi(self) -> None:
+        self._createActions(("New", "Open", "Save", "Close", "What's this"))
+        self._createMenus(("&File", "&Edit", "&Window", "&Help"))
+        self._fillMenusWithActions()
+        self._createToolBar()
+        self._fillToolBarWithActions()
+        self._createTreeWidget()
+        self._fillTreeWithItems("Contents", self._widgets.keys())
+        self._setUpView()
 
     def _createActions(self, labels: list | tuple) -> None:
         self._actionsMap = {}
@@ -35,7 +43,11 @@ class Explorer(QtWidgets.QWidget):
             self._menusMap[key] = menu
 
     def _fillMenusWithActions(self) -> None:
-        pass
+        self._menusMap["file"].addAction(self._actionsMap["new"])
+        self._menusMap["file"].addAction(self._actionsMap["open"])
+        self._menusMap["file"].addAction(self._actionsMap["save"])
+        self._menusMap["file"].addAction(self._actionsMap["close"])
+        self._menusMap["help"].addAction(self._actionsMap["what's-this"])
 
     def _createToolBar(self) -> None:
         self._toolBar = QtWidgets.QToolBar()
@@ -44,11 +56,18 @@ class Explorer(QtWidgets.QWidget):
         self._toolBar.setMovable(False)
 
     def _fillToolBarWithActions(self) -> None:
-        pass
+        self._toolBar.addAction(self._actionsMap["new"])
+        self._toolBar.addAction(self._actionsMap["open"])
+        self._toolBar.addAction(self._actionsMap["save"])
 
     def _createTreeWidget(self) -> None:
         self._treeWidget = QtWidgets.QTreeWidget()
+        # self._treeWidget.setSizePolicy(
+        #     QtWidgets.QSizePolicy.Policy.Preferred,
+        #     QtWidgets.QSizePolicy.Policy.Expanding,
+        # )
         self._treeWidget.setFixedWidth(200)
+        self._treeWidget.itemSelectionChanged.connect(self._changeWidget)
 
     def _fillTreeWithItems(self, header: str, labels: list | tuple) -> None:
         self._treeItemMap = {}

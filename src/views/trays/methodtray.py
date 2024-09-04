@@ -1,6 +1,7 @@
 import os
-
 import pandas
+
+from pathlib import Path
 from PyQt6 import QtCore, QtWidgets
 
 from src.utils import datatypes
@@ -10,7 +11,7 @@ from src.views.base.formdialog import FormDialog
 from src.views.base.tablewidget import TableItem, DataframeTableWidget
 from src.views.base.traywidget import TrayWidget
 from src.views.explorers.methodexplorer import MethodExplorer
-from src.views.widgets.analytewidget import AnalytesAndConditionsWidget
+from src.views.widgets.analytesandconditionswidget import AnalytesAndConditionsWidget
 
 
 class CalibrationsWidget(QtWidgets.QWidget):
@@ -87,12 +88,15 @@ class MethodFormDialog(FormDialog):
         values: list | tuple | None = None,
     ) -> None:
         super(MethodFormDialog, self).__init__(parent, inputs, values)
+        self._lineEdits["filename"].setPlaceholderText("method_01, MET-1, ...")
+        self._lineEdits["description"].setPlaceholderText("Cement, Metallic, ...")
 
     def _fill(self, lineEdit: QtWidgets.QLineEdit, key: str) -> None:
         if key == "filename":
             methodPath = f"methods/{lineEdit.text()}.atxm"
             if os.path.exists(methodPath):
                 self._errorLabel.setText("This filename already exists!")
+                lineEdit.setStyleSheet("color: red;")
                 return
         lineEdit.setStyleSheet("color: black;")
         self._errorLabel.setText(None)
@@ -131,7 +135,7 @@ class MethodTrayWidget(TrayWidget):
         if action in actions:
             actions[action]()
 
-    def addMethod(self) -> None:
+    def addMethod(self) -> datatypes.Method:
         """Add a new method to the application.
 
         This function opens a dialog for the user to input the method's filename and description. Upon confirmation, it saves the new method to the database and updates the internal data structures accordingly.
@@ -159,6 +163,7 @@ class MethodTrayWidget(TrayWidget):
             self._method = Method(methodId, filename, description)
             self._method.save()
             self._insertMethod()
+            return self._method
 
     def _insertMethod(self) -> None:
         filename = self._method.filename
@@ -172,11 +177,17 @@ class MethodTrayWidget(TrayWidget):
         self._tableWidget.addRow(items)
         self._tableWidget.setCurrentCell(self._tableWidget.rowCount() - 1, 0)
 
-    def editCurrentMethod(self) -> None:
+    def editCurrentMethod(self) -> datatypes.Method:
         if self._method is not None:
             methodExplorer = MethodExplorer(method=self._method)
             methodExplorer.show()
             methodExplorer.saved.connect(self._supplyWidgets)
+            methodExplorer.requestNewMethod.connect(self._requestNewMethod)
+        return self._method
+
+    def _requestNewMethod(self):
+        self.addMethod()
+        self.editCurrentMethod()
 
     def removeCurrentMethod(self) -> None:
         """Remove the currently selected method from the application.
@@ -211,6 +222,7 @@ class MethodTrayWidget(TrayWidget):
             reloadDataframes()
             self._df = getDataframe("Methods")
             self._tableWidget.removeRow(self._tableWidget.currentRow())
+            self._tableWidget.setCurrentCell(self._tableWidget.currentRow(), 0, -1, -1)
 
     def importMethod(self) -> None:
         """Import a method from an ATXM file into the application.
@@ -228,8 +240,8 @@ class MethodTrayWidget(TrayWidget):
             self, "Open Method", "./", "Antique'X method (*.atxm)"
         )
         if filePath:
-            self._method = Method.fromATXMFile(filePath)
-            if self._df.query(f"filename == '{self._method.filename}'").empty:
+            if self._df.query(f"filename == '{Path(filePath).stem}'").empty:
+                self._method = Method.fromATXMFile(filePath)
                 getDatabase().executeQuery(
                     "INSERT INTO Methods (filename, description, state) VALUES (?, ?, ?)",
                     (

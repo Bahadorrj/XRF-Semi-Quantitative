@@ -4,13 +4,16 @@ from PyQt6 import QtGui, QtWidgets
 
 
 class FormDialog(QtWidgets.QDialog):
-    def __init__(self,
-                 parent: QtWidgets.QWidget | None = None,
-                 inputs: list | tuple | None = None,
-                 values: list | tuple | None = None) -> None:
+    def __init__(
+        self,
+        parent: QtWidgets.QWidget | None = None,
+        inputs: list | tuple | None = None,
+        values: list | tuple | None = None,
+    ) -> None:
         super(FormDialog, self).__init__(parent)
-        self.setFixedSize(250, 200)
         self.setModal(True)
+        self._fields = {}
+        self._lineEdits = {}
         if inputs is not None:
             self._fields = {key: "" for key in inputs}
             if values is not None:
@@ -25,8 +28,9 @@ class FormDialog(QtWidgets.QDialog):
             lineEdit = QtWidgets.QLineEdit(value)
             if key == "concentration":
                 lineEdit.setValidator(QtGui.QDoubleValidator())
-            lineEdit.setFixedWidth(100)
+            lineEdit.setFixedWidth(150)
             lineEdit.editingFinished.connect(partial(self._fill, lineEdit, key))
+            self._lineEdits[key] = lineEdit
             layout = QtWidgets.QHBoxLayout()
             layout.addWidget(label)
             layout.addWidget(lineEdit)
@@ -37,7 +41,8 @@ class FormDialog(QtWidgets.QDialog):
         self._mainLayout.addWidget(self._errorLabel)
         buttonBox = QtWidgets.QDialogButtonBox()
         buttonBox.setStandardButtons(
-            QtWidgets.QDialogButtonBox.StandardButton.Cancel | QtWidgets.QDialogButtonBox.StandardButton.Ok
+            QtWidgets.QDialogButtonBox.StandardButton.Cancel
+            | QtWidgets.QDialogButtonBox.StandardButton.Ok
         )
         buttonBox.accepted.connect(self._check)
         buttonBox.rejected.connect(self.reject)
@@ -51,8 +56,17 @@ class FormDialog(QtWidgets.QDialog):
         if all(value != "" for value in self._fields.values()):
             self.accept()
         else:
+            if self._errorLabel.text() == "":
+                self._errorLabel.setText("All fields must be filled with values!")
             QtWidgets.QApplication.beep()
+
+    def errorMessage(self) -> str:
+        return self._errorLabel.text()
 
     @property
     def fields(self):
         return self._fields
+
+    @property
+    def lineEdits(self) -> dict:
+        return self._linesEdits

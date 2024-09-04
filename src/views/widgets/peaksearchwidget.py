@@ -110,9 +110,6 @@ class PeakSearchTableWidget(DataframeTableWidget):
 
 
 class PeakSearchWidget(QtWidgets.QWidget):
-    dataframeChanged = QtCore.pyqtSignal()
-    analyseRadiationChanged = QtCore.pyqtSignal()
-
     def __init__(
         self,
         parent: QtWidgets.QWidget | None = None,
@@ -246,8 +243,7 @@ class PeakSearchWidget(QtWidgets.QWidget):
     def _cellClicked(self, row: int, column: int) -> None:
         tableRow = self._tableWidget.rows[row]
         plotData = self._plotDataList[tableRow.get("rowId")]
-        if plotData.visible:
-            self._hoverOverPlotData(plotData)
+        self._hoverOverPlotData(plotData)
 
     def _fillTable(self) -> None:
         self._statusLabel.setText("Adding lines...")
@@ -333,10 +329,8 @@ class PeakSearchWidget(QtWidgets.QWidget):
 
     def _emitPlotDataChanged(self, rowId: int, action: str) -> None:
         self._tableWidget.selectRowByID(rowId)
-        self._hoverOverPlotData(self._plotDataList[rowId])
         if self._plotDataChanged(rowId, action):
-            if action != "hide":
-                self.dataframeChanged.emit()
+            self._hoverOverPlotData(self._plotDataList[rowId])
             self._addPlotDataToUndoStack(rowId, action)
 
     def _createStatusLayout(self) -> None:
@@ -471,11 +465,6 @@ class PeakSearchWidget(QtWidgets.QWidget):
             changed = True
             plotData.deactivate()
             self._df.at[plotData.rowId, "active"] = 0
-            if (
-                self._df.at[plotData.rowId, "symbol"]
-                == self._calibration.analyse.filename
-            ):
-                self.analyseRadiationChanged.emit()
             statusItem.setText("Deactivated")
             statusItem.setForeground(QtCore.Qt.GlobalColor.red)
             statusButton.setText("Activate")
@@ -484,11 +473,6 @@ class PeakSearchWidget(QtWidgets.QWidget):
             changed = True
             plotData.activate()
             self._df.at[plotData.rowId, "active"] = 1
-            if (
-                self._df.at[plotData.rowId, "symbol"]
-                == self._calibration.analyse.filename
-            ):
-                self.analyseRadiationChanged.emit()
             statusItem.setText("Activated")
             statusItem.setForeground(QtCore.Qt.GlobalColor.darkGreen)
             statusButton.setText("Deactivate")
@@ -549,6 +533,8 @@ class PeakSearchWidget(QtWidgets.QWidget):
             self._hoverOverPlotData(plotData)
 
     def _hoverOverPlotData(self, plotData: datatypes.PlotData):
+        if plotData.visible is False:
+            return
         minX, maxX = plotData.region.getRegion()
         viewMinX, viewMaxX = self._peakPlot.viewRange()[0]
         if viewMinX > minX or viewMaxX < maxX:
@@ -627,23 +613,24 @@ class PeakSearchWidget(QtWidgets.QWidget):
         self._peakPlot.setXRange(minX, maxX, padding=0)
 
     def _openPopUp(self, event):
-        if event.button() == QtCore.Qt.MouseButton.RightButton:
-            minX, maxX = self._zoomRegion.getRegion()
-            minKev = calculation.pxToEv(minX)
-            maxKev = calculation.pxToEv(maxX)
-            self._peakPlot.vb.menu.clear()
-            self._elementsInRange = self._df.query(
-                f"kiloelectron_volt <= {maxKev} and high_kiloelectron_volt >= {minKev}"
-            )
-            if not self._elementsInRange.empty:
-                grouped = self._elementsInRange.groupby("radiation_type")
-                for radiationType, group in grouped:
-                    menu = self._peakPlot.vb.menu.addMenu(radiationType)
-                    menu.triggered.connect(self._actionClicked)
-                    for symbol in group["symbol"]:
-                        menu.addAction(symbol)
-            showAllAction = self._peakPlot.vb.menu.addAction("Show All")
-            showAllAction.triggered.connect(self._showAll)
+        if event.button() != QtCore.Qt.MouseButton.RightButton:
+            return
+        minX, maxX = self._zoomRegion.getRegion()
+        minKev = calculation.pxToEv(minX)
+        maxKev = calculation.pxToEv(maxX)
+        self._peakPlot.vb.menu.clear()
+        self._elementsInRange = self._df.query(
+            f"kiloelectron_volt <= {maxKev} and high_kiloelectron_volt >= {minKev}"
+        )
+        if not self._elementsInRange.empty:
+            grouped = self._elementsInRange.groupby("radiation_type")
+            for radiationType, group in grouped:
+                menu = self._peakPlot.vb.menu.addMenu(radiationType)
+                menu.triggered.connect(self._actionClicked)
+                for symbol in group["symbol"]:
+                    menu.addAction(symbol)
+        showAllAction = self._peakPlot.vb.menu.addAction("Show All")
+        showAllAction.triggered.connect(self._showAll)
 
     def _actionClicked(self, action: QtGui.QAction):
         elementSymbol = action.text()

@@ -82,6 +82,7 @@ class CoefficientWidget(QtWidgets.QWidget):
 
     def _drawCanvas(self) -> None:
         self._plotWidget.clear()
+        self._calibration.calculateCoefficients()
         if currentRadiationType := self._searchComboBox.currentText():
             conditionId = self._calibration.lines.query(
                 f"symbol == '{self._calibration.element}' and radiation_type == '{currentRadiationType}'"

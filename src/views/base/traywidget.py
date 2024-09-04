@@ -24,8 +24,8 @@ class TrayWidget(QtWidgets.QWidget):
     """
 
     def __init__(self, parent: QtWidgets.QWidget | None = None) -> None:
-        super().__init__(parent)
-        self.setFixedSize(1000, 800)
+        super(TrayWidget, self).__init__(parent)
+        # self.setFixedSize(900, 900)
 
         self._widgets = {}
         self._menusMap = {}
