@@ -10,7 +10,9 @@ from src.utils import datatypes
 from src.utils import encryption
 from src.utils.database import getDataframe
 from src.utils.paths import resourcePath
+from src.views.explorers.methodexplorer import MethodsCalibrationTrayWidget
 from src.views.trays.calibrationtray import CalibrationTrayWidget
+from src.views.trays.methodtray import MethodTrayWidget
 
 COLORS = [
     "#FF0000",
@@ -33,19 +35,25 @@ COLORS = [
 class ConditionForm(QtWidgets.QListView):
     def __init__(self, parent=None):
         super(ConditionForm, self).__init__(parent)
-        self.setObjectName("condition-form")
-        self.setFrameShape(QtWidgets.QFrame.Shape.NoFrame)
         self._df = getDataframe("Conditions")
-        self._createComboBox()
-        self._createTable()
-        mainLayout = QtWidgets.QVBoxLayout(self)
-        mainLayout.addWidget(self._selectorComboBox)
-        mainLayout.addWidget(self._tableWidget)
+        self._initializeUi()
+
+    def _initializeUi(self) -> None:
+        self.setObjectName("condition-form")
         self.setMaximumHeight(360)
         self.setMinimumHeight(150)
         self.setSizePolicy(
             QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Maximum
         )
+        self.setFrameShape(QtWidgets.QFrame.Shape.NoFrame)
+        self._createComboBox()
+        self._createTable()
+        self._setUpView()
+
+    def _setUpView(self) -> None:
+        self.mainLayout = QtWidgets.QVBoxLayout(self)
+        self.mainLayout.addWidget(self._selectorComboBox)
+        self.mainLayout.addWidget(self._tableWidget)
 
     def _createComboBox(self):
         self._selectorComboBox = QtWidgets.QComboBox(self)
@@ -88,7 +96,7 @@ class PlotWindow(QtWidgets.QMainWindow):
     def __init__(self):
         super(PlotWindow, self).__init__()
         self._indexOfFile = None
-        self._analyseFiles = list()
+        self._analyseFiles = []
         self._initializeUi()
 
     def _initializeUi(self) -> None:
@@ -105,65 +113,41 @@ class PlotWindow(QtWidgets.QMainWindow):
 
     def _createActions(self) -> None:
         self._actionsMap = {}
-        actions = (
-            "New",
-            "Open",
-            "Save",
-            "Save as",
-            "Close",
-            "Print",
-            "Print Preview",
-            "Print Setup",
-            "Standards Tray List",
-            "Defaults",
-            "Calibrate",
-            "Methods Tray List",
-        )
-        self._blockedActionsNames = [
-            "save-as",
-            "save",
-            "new",
-            "print",
-            "print-preview",
-            "print-setup",
-        ]
-        for label in actions:
+        actions = {
+            "New": False,
+            "Open": False,
+            "Save": True,
+            "Save as": True,
+            "Close": False,
+            "Print": True,
+            "Print Preview": True,
+            "Print Setup": True,
+            "Standards Tray List": False,
+            "Defaults": True,
+            "Calibrate": True,
+            "Methods Tray List": False,
+        }
+        for label, disabled in actions.items():
             action = QtGui.QAction(label)
             key = "-".join(label.lower().split(" "))
             action.setIcon(QtGui.QIcon(resourcePath(f"resources/icons/{key}.png")))
-            if key in self._blockedActionsNames:
-                action.setDisabled(True)
+            action.setDisabled(disabled)
             self._actionsMap[key] = action
             action.triggered.connect(partial(self._actionTriggered, key))
 
     @QtCore.pyqtSlot()
     def _actionTriggered(self, key: str) -> None:
-        if key == "open":
-            fileNames, filters = QtWidgets.QFileDialog.getOpenFileNames(
-                self,
-                "Open File",
-                "./",
-                "Antique'X Spectrum (*.atx);;Text Spectrum (*.txt)",
-            )
-            if fileNames:
-                for fileName in fileNames:
-                    self._addAnalyseFromFileName(fileName)
-                mapper = {"Text Spectrum (*.txt)": 0, "Antique'X Spectrum (*.atx)": 1}
-                topLevelItem = self._treeWidget.topLevelItem(mapper[filters])
-                if not topLevelItem.isExpanded():
-                    self._treeWidget.expandItem(topLevelItem)
-        elif key == "save":
-            # TODO
-            pass
-        elif key == "save-as":
-            # TODO
-            pass
+        if key == "close":
+            self.close()
         elif key == "new":
             self.resetWindow()
+        elif key == "open":
+            self._openAnalyse()
+        elif key == "methods-tray-list":
+            methodTray = MethodTrayWidget(dataframe=getDataframe("Methods"))
+            methodTray.show()
         elif key == "standards-tray-list":
             self._openCalibrationTrayListWidget()
-        elif key == "close":
-            self.close()
 
     def _createMenus(self) -> None:
         self._menusMap = {}
@@ -183,20 +167,23 @@ class PlotWindow(QtWidgets.QMainWindow):
             self._menusMap[key] = menu
 
     def _fillMenusWithActions(self) -> None:
-        self._menusMap["file"].addAction(self._actionsMap["new"])
-        self._menusMap["file"].addSeparator()
-        self._menusMap["file"].addAction(self._actionsMap["open"])
-        self._menusMap["file"].addAction(self._actionsMap["save-as"])
-        self._menusMap["file"].addSeparator()
-        self._menusMap["file"].addAction(self._actionsMap["print"])
-        self._menusMap["file"].addAction(self._actionsMap["print-preview"])
-        self._menusMap["file"].addAction(self._actionsMap["print-setup"])
-        self._menusMap["file"].addSeparator()
-        self._menusMap["file"].addAction(self._actionsMap["close"])
+        fileActions = [
+            "new",
+            "open",
+            "save-as",
+            "print",
+            "print-preview",
+            "print-setup",
+            "close",
+        ]
+        for action in fileActions:
+            self._menusMap["file"].addAction(self._actionsMap[action])
+            if action in ["new", "save-as", "print-setup"]:
+                self._menusMap["file"].addSeparator()
 
-        self._menusMap["calibration"].addAction(self._actionsMap["standards-tray-list"])
-        self._menusMap["calibration"].addAction(self._actionsMap["defaults"])
-        self._menusMap["calibration"].addAction(self._actionsMap["calibrate"])
+        calibrationActions = ["standards-tray-list", "defaults", "calibrate"]
+        for action in calibrationActions:
+            self._menusMap["calibration"].addAction(self._actionsMap[action])
 
         self._menusMap["method"].addAction(self._actionsMap["methods-tray-list"])
 
@@ -220,7 +207,9 @@ class PlotWindow(QtWidgets.QMainWindow):
     def _createPlotWidget(self) -> None:
         self._plotWidget = pg.PlotWidget()
         self._plotWidget.setObjectName("plot-widget")
-        self._plotWidget.setBackground("#fff")
+        self._plotWidget.setBackground("#FFFFFF")
+        plotItem = self._plotWidget.getPlotItem()
+        plotItem.setContentsMargins(10, 10, 10, 10)
         self._plotWidget.showGrid(x=True, y=True)
         self._plotWidget.setFrameShape(QtWidgets.QFrame.Shape.NoFrame)
         self._plotWidget.setMinimumWidth(500)
@@ -312,9 +301,6 @@ class PlotWindow(QtWidgets.QMainWindow):
     def addAnalyse(self, analyse: datatypes.Analyse) -> None:
         self._analyseFiles.append(analyse)
         self._addAnalyseToTree(analyse)
-        if not self._actionsMap["save-as"].isEnabled():
-            for actionName in self._blockedActionsNames:
-                self._actionsMap[actionName].setDisabled(False)
 
     def _addAnalyseToTree(self, analyse: datatypes.Analyse) -> None:
         item = QtWidgets.QTreeWidgetItem()
@@ -337,6 +323,21 @@ class PlotWindow(QtWidgets.QMainWindow):
             self._treeWidget.setItemWidget(child, 1, colorButton)
         mapper = {"txt": 0, "atx": 1}
         self._treeWidget.topLevelItem(mapper[analyse.extension]).addChild(item)
+
+    def _openAnalyse(self) -> None:
+        fileNames, filters = QtWidgets.QFileDialog.getOpenFileNames(
+            self,
+            "Open File",
+            "./",
+            "Antique'X Spectrum (*.atx);;Text Spectrum (*.txt)",
+        )
+        if fileNames:
+            for fileName in fileNames:
+                self._addAnalyseFromFileName(fileName)
+            mapper = {"Text Spectrum (*.txt)": 0, "Antique'X Spectrum (*.atx)": 1}
+            topLevelItem = self._treeWidget.topLevelItem(mapper[filters])
+            if not topLevelItem.isExpanded():
+                self._treeWidget.expandItem(topLevelItem)
 
     def resetWindow(self) -> None:
         messageBox = QtWidgets.QMessageBox(self)
@@ -402,10 +403,9 @@ class PlotWindow(QtWidgets.QMainWindow):
         self, extensionIndex: int, analyseIndex: int
     ) -> datatypes.Analyse:
         mapper = {0: "txt", 1: "atx"}
-        analyse = list(
+        return list(
             filter(lambda a: a.extension == mapper[extensionIndex], self._analyseFiles)
         )[analyseIndex]
-        return analyse
 
     def _setPlotLimits(self, maxIntensity: int) -> None:
         xMin = -100
