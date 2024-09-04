@@ -155,7 +155,7 @@ class AnalytesAndConditionsWidget(QtWidgets.QWidget):
         """
         self.blockSignals(True)
         self._method = method
-        self._conditionTable.supply(method.conditions)
+        self._conditionTable.supply(method.conditions.drop("condition_id", axis=1))
         self.blockSignals(False)
         self._conditionTable.setCurrentCell(0, 0)
 
