@@ -56,7 +56,7 @@ _dataframes = {
     "Elements": _db.dataframe("SELECT * FROM Elements"),
     "Conditions": _db.dataframe("SELECT * FROM Conditions"),
     "Calibrations": _db.dataframe("SELECT * FROM Calibrations"),
-    "Methods": _db.dataframe("SELECT * FROM Methods")
+    "Methods": _db.dataframe("SELECT * FROM Methods"),
 }
 
 
@@ -67,7 +67,7 @@ def reloadDataframes():
         "Elements": _db.dataframe("SELECT * FROM Elements"),
         "Conditions": _db.dataframe("SELECT * FROM Conditions"),
         "Calibrations": _db.dataframe("SELECT * FROM Calibrations"),
-        "Methods": _db.dataframe("SELECT * FROM Methods")
+        "Methods": _db.dataframe("SELECT * FROM Methods"),
     }
 
 
