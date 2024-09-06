@@ -1,3 +1,4 @@
+from PyQt6.QtGui import QCloseEvent
 import pandas
 
 from pathlib import Path
@@ -217,3 +218,20 @@ class MethodExplorer(Explorer):
             widget.supply(method)
         self.blockSignals(False)
         self._treeWidget.setCurrentItem(self._treeWidget.topLevelItem(0))
+
+    def closeEvent(self, a0: QCloseEvent | None) -> None:
+        if self._method != self._initMethod:
+            messageBox = QtWidgets.QMessageBox()
+            messageBox.setIcon(QtWidgets.QMessageBox.Icon.Question)
+            messageBox.setText(
+                "Do you want to save the changes before closing the method edit?"
+            )
+            messageBox.setWindowTitle("Close method edit")
+            messageBox.setStandardButtons(
+                QtWidgets.QMessageBox.StandardButton.Yes
+                | QtWidgets.QMessageBox.StandardButton.No
+            )
+            messageBox.setDefaultButton(QtWidgets.QMessageBox.StandardButton.Yes)
+            if messageBox.exec() == QtWidgets.QMessageBox.StandardButton.Yes:
+                self.saveMethod()
+        return super().closeEvent(a0)

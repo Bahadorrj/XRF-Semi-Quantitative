@@ -146,3 +146,20 @@ class CalibrationExplorer(Explorer):
         self._supplyWidgets()
         self.blockSignals(False)
         self._treeWidget.setCurrentItem(self._treeWidget.topLevelItem(0))
+
+    def closeEvent(self, a0: QtGui.QCloseEvent | None) -> None:
+        if self._calibration != self._initCalibration:
+            messageBox = QtWidgets.QMessageBox()
+            messageBox.setIcon(QtWidgets.QMessageBox.Icon.Question)
+            messageBox.setText(
+                "Do you want to save the changes before closing the calibration edit?"
+            )
+            messageBox.setWindowTitle("Close calibration edit")
+            messageBox.setStandardButtons(
+                QtWidgets.QMessageBox.StandardButton.Yes
+                | QtWidgets.QMessageBox.StandardButton.No
+            )
+            messageBox.setDefaultButton(QtWidgets.QMessageBox.StandardButton.Yes)
+            if messageBox.exec() == QtWidgets.QMessageBox.StandardButton.Yes:
+                self.saveCalibration()
+        return super().closeEvent(a0)

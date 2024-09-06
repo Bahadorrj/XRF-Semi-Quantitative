@@ -8,7 +8,7 @@ from src.utils.paths import resourcePath
 class Explorer(QtWidgets.QWidget):
     def __init__(self, parent: QtWidgets.QWidget | None = None):
         super(Explorer, self).__init__(parent)
-        # self.setFixedSize(1150, 980)
+        self.setMinimumSize(1600, 900)
         self._widgets = {}
 
     def _initializeUi(self) -> None:

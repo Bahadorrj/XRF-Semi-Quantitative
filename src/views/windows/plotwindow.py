@@ -40,8 +40,8 @@ class ConditionForm(QtWidgets.QListView):
 
     def _initializeUi(self) -> None:
         self.setObjectName("condition-form")
-        self.setMaximumHeight(360)
         self.setMinimumHeight(150)
+        self.setMaximumHeight(300)
         self.setSizePolicy(
             QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Maximum
         )
@@ -100,7 +100,7 @@ class PlotWindow(QtWidgets.QMainWindow):
         self._initializeUi()
 
     def _initializeUi(self) -> None:
-        self.resize(1200, 800)
+        self.setMinimumSize(1600, 900)
         self.setWindowTitle("XRF Semi Quantitative")
         self._createActions()
         self._createMenuBar()
@@ -238,7 +238,7 @@ class PlotWindow(QtWidgets.QMainWindow):
             QtWidgets.QTreeWidget.EditTrigger.NoEditTriggers
         )
         self._treeWidget.setTabKeyNavigation(True)
-        self._treeWidget.setFixedWidth(int(self.size().width() / 3))
+        self._treeWidget.setFixedWidth(400)
         self._treeWidget.setColumnWidth(0, int(self._treeWidget.size().width() * 0.7))
         self._fillTreeWidget()
         self._treeWidget.itemChanged.connect(self._drawCanvas)
