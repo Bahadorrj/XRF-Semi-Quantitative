@@ -1,6 +1,6 @@
 from functools import partial
 
-from PyQt6 import QtGui, QtWidgets
+from PyQt6 import QtGui, QtWidgets, QtCore
 
 
 class FormDialog(QtWidgets.QDialog):
@@ -12,60 +12,69 @@ class FormDialog(QtWidgets.QDialog):
     ) -> None:
         super(FormDialog, self).__init__(parent)
         self.setModal(True)
+        self._inputs = inputs
+        self._values = values
         self._fields = {}
-        self._lineEdits = {}
-        if inputs is not None:
-            self._fields = {key: "" for key in inputs}
-            if values is not None:
-                for key, value in zip(inputs, values):
-                    self._fields[key] = value
-            self._initializeUi()
+        self._initializeUi()
 
     def _initializeUi(self) -> None:
-        self._mainLayout = QtWidgets.QVBoxLayout()
-        for key, value in self._fields.items():
-            label = QtWidgets.QLabel(f"{key}:")
-            lineEdit = QtWidgets.QLineEdit(value)
-            if key == "concentration":
+        self._createFields()
+        self._createErrorLabel()
+        self._createButtonBox()
+        self._setUpView()
+
+    def _createFields(self) -> None:
+        if self._values is None:
+            self._values = ["" for _ in self._inputs]
+        for i, v in zip(self._inputs, self._values):
+            label = QtWidgets.QLabel(i)
+            lineEdit = QtWidgets.QLineEdit(v)
+            if i == "concentration":
                 lineEdit.setValidator(QtGui.QDoubleValidator())
             lineEdit.setFixedWidth(150)
-            lineEdit.editingFinished.connect(partial(self._fill, lineEdit, key))
-            self._lineEdits[key] = lineEdit
-            layout = QtWidgets.QHBoxLayout()
-            layout.addWidget(label)
-            layout.addWidget(lineEdit)
-            self._mainLayout.addLayout(layout)
-        self._mainLayout.addStretch()
+            self._fields[i] = (label, lineEdit)
+
+    def _createErrorLabel(self) -> None:
         self._errorLabel = QtWidgets.QLabel()
         self._errorLabel.setStyleSheet("color: red;")
-        self._mainLayout.addWidget(self._errorLabel)
-        buttonBox = QtWidgets.QDialogButtonBox()
-        buttonBox.setStandardButtons(
+
+    def _createButtonBox(self) -> None:
+        self._buttonBox = QtWidgets.QDialogButtonBox()
+        self._buttonBox.setStandardButtons(
             QtWidgets.QDialogButtonBox.StandardButton.Cancel
             | QtWidgets.QDialogButtonBox.StandardButton.Ok
         )
-        buttonBox.accepted.connect(self._check)
-        buttonBox.rejected.connect(self.reject)
-        self._mainLayout.addWidget(buttonBox)
-        self.setLayout(self._mainLayout)
+        self._buttonBox.accepted.connect(self._check)
+        self._buttonBox.rejected.connect(self.reject)
 
-    def _fill(self, lineEdit: QtWidgets.QLineEdit, key: str) -> None:
-        self._fields[key] = lineEdit.text()
+    def _setUpView(self) -> None:
+        self.mainLayout = QtWidgets.QFormLayout()
+        for widgets in self._fields.values():
+            qLabel, qLineEdit = widgets
+            self.mainLayout.addRow(qLabel, qLineEdit)
+        self.mainLayout.addWidget(self._errorLabel)
+        self.mainLayout.addWidget(self._buttonBox)
+        self.setLayout(self.mainLayout)
+
+    def _fill(self) -> None:
+        for index, widgets in enumerate(self._fields.values()):
+            _, qLineEdit = widgets
+            self._values[index] = qLineEdit.text()
 
     def _check(self) -> None:
-        if all(value != "" for value in self._fields.values()):
+        self._fill()
+        if all(value != "" for value in self._values):
             self.accept()
         else:
-            if self._errorLabel.text() == "":
-                self._errorLabel.setText("All fields must be filled with values!")
             QtWidgets.QApplication.beep()
+            self.setFocusPolicy(QtCore.Qt.FocusPolicy.StrongFocus)
 
     def errorMessage(self) -> str:
         return self._errorLabel.text()
 
     @property
     def fields(self):
-        return self._fields
+        return dict((self._inputs, self._values))
 
     @property
     def lineEdits(self) -> dict:

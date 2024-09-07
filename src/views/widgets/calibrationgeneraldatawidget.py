@@ -65,7 +65,7 @@ class CalibrationGeneralDataWidget(GeneralDataWidget):
             if isinstance(widget, QtWidgets.QComboBox):
                 widget.currentTextChanged.connect(partial(self._addToGeneralData, key, widget))
             elif isinstance(widget, QtWidgets.QLineEdit):
-                widget.editingFinished.connect(partial(self._addToGeneralData, key, widget))
+                widget.textEdited.connect(partial(self._addToGeneralData, key, widget))
         self._calibration = None
         self._element = None
         if calibration is not None:
@@ -122,7 +122,13 @@ class CalibrationGeneralDataWidget(GeneralDataWidget):
     def _addToGeneralData(
         self, key: str, widget: QtWidgets.QLineEdit | QtWidgets.QComboBox
     ) -> None:
-        self._calibration.generalData[key] = (
+        if key == "element":
+            self._calibration.element = widget.text()
+            return
+        if key == "concentration":
+            self._calibration.concentration = float(widget.text())
+            return
+        self._calibration.analyse.generalData[key] = (
             widget.text()
             if isinstance(widget, QtWidgets.QLineEdit)
             else widget.currentText()

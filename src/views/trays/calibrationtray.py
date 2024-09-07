@@ -6,6 +6,7 @@ from PyQt6 import QtCore, QtWidgets
 
 from src.utils.database import getDataframe, getDatabase, reloadDataframes
 from src.utils.datatypes import Calibration, Analyse
+from src.utils.paths import isValidFilename
 from src.views.base.formdialog import FormDialog
 from src.views.base.tablewidget import TableItem
 from src.views.base.traywidget import TrayWidget
@@ -69,24 +70,62 @@ class CalibrationFormDialog(FormDialog):
     ) -> None:
         super(CalibrationFormDialog, self).__init__(parent, inputs, values)
 
-    def _fill(self, lineEdit: QtWidgets.QLineEdit, key: str) -> None:
-        if key == "filename":
-            calibrationPath = f"calibrations/{lineEdit.text()}.atxc"
-            if os.path.exists(calibrationPath):
-                self._errorLabel.setText("This filename already exists!")
-        if key == "element":
-            if not lineEdit.text() in getDataframe("Lines")["symbol"].values:
-                lineEdit.setStyleSheet("color: red;")
-                self._errorLabel.setText("Invalid element!")
-                return
-        elif key == "concentration":
-            if not 0 <= float(lineEdit.text()) <= 100:
-                lineEdit.setStyleSheet("color: red;")
-                self._errorLabel.setText("Concentration must be between 0 and 100!")
-                return
-        lineEdit.setStyleSheet("color: black;")
-        self._errorLabel.setText(None)
-        return super()._fill(lineEdit, key)
+    def _check(self) -> None:
+        if not any(
+            (
+                self._isFilenameValid(),
+                self._isElementValid(),
+                self._isConcentrationValid(),
+            )
+        ):
+            QtWidgets.QApplication.beep()
+            return
+        return super()._check()
+
+    def _addError(self, message: str) -> None:
+        self._errorLabel.setText(self._errorLabel.text() + message)
+
+    def _isFilenameValid(self) -> bool:
+        filenameLineEdit = self._fields["filename"][-1]
+        filename = filenameLineEdit.text()
+        filenameLineEdit.setStyleSheet("color: red;")
+        if not isValidFilename(filename):
+            self._addError("This filename is not allowed!\n")
+            return False
+        if os.path.exists(f"calibrations/{filename}.atxm"):
+            self._addError("This filename already exists!\n")
+            return False
+        if filename == "":
+            self._addError("Please enter a filename!\n")
+            return False
+        filenameLineEdit.setStyleSheet("color: black;")
+        return True
+
+    def _isElementValid(self) -> bool:
+        elementLineEdit = self._fields["element"][-1]
+        element = elementLineEdit.text()
+        elementLineEdit.setStyleSheet("color: red;")
+        if element not in getDataframe("Elements")["symbol"]:
+            self._addError("This element is not valid!\n")
+            return False
+        if element == "":
+            self._addError("Please enter an element!\n")
+            return False
+        elementLineEdit.setStyleSheet("color: black;")
+        return True
+
+    def _isConcentrationValid(self) -> bool:
+        concentrationLineEdit = self._fields["concentration"][-1]
+        concentration = concentrationLineEdit.text()
+        concentrationLineEdit.setStyleSheet("color: red;")
+        if not 0 < float(concentration) < 100:
+            self._addError("This concentration is not valid!\n")
+            return False
+        if concentration == "":
+            self._addError("Please enter a concentration!\n")
+            return False
+        concentrationLineEdit.setStyleSheet("color: black;")
+        return True
 
 
 class CalibrationTrayWidget(TrayWidget):
@@ -211,6 +250,26 @@ class CalibrationTrayWidget(TrayWidget):
         if self._calibration is not None:
             calibrationExplorer = CalibrationExplorer(calibration=self._calibration)
             calibrationExplorer.show()
+            calibrationExplorer.saved.connect(self._supplyWidgets)
+            calibrationExplorer.saved.connect(self._updateRow)
+            # calibrationExplorer.requestNewCalibration.connect(self.addCalibration)
+
+    def _updateRow(self) -> None:
+        tableRow = self._tableWidget.getCurrentRow()
+        previousFilename = tableRow.get("filename").text()
+        tableRow.get("filename").setText(self._calibration.filename)
+        tableRow.get("element").setText(self._calibration.element)
+        tableRow.get("concentration").setText(f"{self._calibration.concentration:.1f}")
+        tableRow.get("state").setText(self._calibration.status())
+        getDatabase().executeQuery(
+            "UPDATE Calibrations "
+            f"SET filename = '{self._calibration.filename}', element = '{self._calibration.element}', concentration = {self._calibration.concentration} "
+            f"WHERE filename = '{previousFilename}'"
+        )
+        reloadDataframes()
+        self._df = getDataframe("Calibrations")
+        if previousFilename != self._calibration.filename:
+            os.remove(f"calibrations/{previousFilename}.atxc")
 
     def removeCurrentCalibration(self) -> None:
         """Remove the currently selected calibration from the application.

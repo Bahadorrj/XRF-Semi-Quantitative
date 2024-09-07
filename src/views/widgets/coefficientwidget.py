@@ -87,19 +87,19 @@ class CoefficientWidget(QtWidgets.QWidget):
             conditionId = self._calibration.lines.query(
                 f"symbol == '{self._calibration.element}' and radiation_type == '{currentRadiationType}'"
             )["condition_id"].values[0]
-            data = self._calibration.analyse.getDataByConditionId(conditionId)
-            intensity = data.calculateIntensities(self._calibration.lines)[
-                self._calibration.element
-            ][currentRadiationType]
+            if data := self._calibration.analyse.getDataByConditionId(conditionId):
+                intensity = data.calculateIntensities(self._calibration.lines)[
+                    self._calibration.element
+                ][currentRadiationType]
 
-            # Calculate the line points
-            x = np.arange(0, intensity, 1)
-            y = np.arange(0, 100, 100 / x.size)
+                # Calculate the line points
+                x = np.arange(0, intensity, 1)
+                y = np.arange(0, 100, 100 / x.size)
 
-            # Plot the line
-            self._plotWidget.plot(x=x, y=y, pen=pg.mkPen(color="r", width=2))
-            slope = self._calibration.coefficients[currentRadiationType]
-            self._slopeLabel.setText(f"Slope: {slope:.5f}")
+                # Plot the line
+                self._plotWidget.plot(x=x, y=y, pen=pg.mkPen(color="r", width=2))
+                slope = self._calibration.coefficients[currentRadiationType]
+                self._slopeLabel.setText(f"Slope: {slope:.5f}")
 
     def _initializeRadiations(self) -> None:
         self._searchComboBox.clear()

@@ -1,3 +1,4 @@
+from ctypes import Union
 import socket
 import pandas
 import numpy as np
@@ -7,7 +8,7 @@ from collections import defaultdict
 from dataclasses import dataclass, field
 from json import loads, dumps
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional, Sequence
 from PyQt6.QtCore import Qt
 
 from src.utils import calculation
@@ -83,7 +84,7 @@ class Analyse:
         )
 
     def getDataByConditionId(self, conditionId: int) -> AnalyseData:
-        return next(d for d in self.data if d.conditionId == conditionId)
+        return next((d for d in self.data if d.conditionId == conditionId), None)
 
     def isEmpty(self) -> bool:
         return len(self.data) == 0
@@ -387,6 +388,22 @@ class Method:
             return "Initial state"
         elif state == 1:
             return "Edited"
+
+
+@dataclass(order=True)
+class BackgroundProfile:
+    backgroundId: int
+    name: str
+    description: str
+    smoothness: float = field(default=1.0)
+    height: Any | None = field(default=None)
+    threshold: Any | None = field(default=None)
+    distance: Any | None = field(default=None)
+    prominence: Any | None = field(default=None)
+    width: Any | None = field(default=None)
+    wlen: Any | None = field(default=None)
+    rel_height: float = field(default=0.5)
+    plateau_size: Any | None = field(default=None)
 
 
 @dataclass(order=True)

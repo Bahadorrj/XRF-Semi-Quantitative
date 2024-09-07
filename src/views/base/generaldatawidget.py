@@ -82,9 +82,7 @@ class GeneralDataWidget(QtWidgets.QWidget):
         hLayout.addWidget(widget)
         self._generalDataLayout.addLayout(hLayout)
         if isinstance(widget, QtWidgets.QLineEdit):
-            widget.editingFinished.connect(
-                partial(self._addToGeneralData, key, widget)
-            )
+            widget.editingFinished.connect(partial(self._addToGeneralData, key, widget))
         elif isinstance(widget, QtWidgets.QComboBox):
             widget.currentTextChanged.connect(
                 partial(self._addToGeneralData, key, widget)
