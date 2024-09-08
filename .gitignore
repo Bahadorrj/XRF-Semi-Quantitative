@@ -354,12 +354,8 @@ fabric.properties
 .ionide
 
 # End of https://www.toptal.com/developers/gitignore/api/visualstudiocode
-
-/Exe
-/Additional
-/VB
-/UML
 *.ui
 *.sql
-*.atxc
-*.atxm
+/calibrations
+/methods
+/analsis
