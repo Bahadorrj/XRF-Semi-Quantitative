@@ -1,7 +1,7 @@
 import os
-import pandas
-
 from pathlib import Path
+
+import pandas
 from PyQt6 import QtCore, QtWidgets
 
 from src.utils.database import getDataframe, getDatabase, reloadDataframes
@@ -10,8 +10,8 @@ from src.views.base.formdialog import FormDialog
 from src.views.base.tablewidget import TableItem
 from src.views.base.traywidget import TrayWidget
 from src.views.explorers.calibrationexplorer import CalibrationExplorer
-from src.views.widgets.coefficientwidget import CoefficientWidget
 from src.views.widgets.calibrationgeneraldatawidget import CalibrationGeneralDataWidget
+from src.views.widgets.coefficientwidget import CoefficientWidget
 from src.views.widgets.linestablewidget import LinesTableWidget
 
 
@@ -150,7 +150,7 @@ class CalibrationTrayWidget(TrayWidget):
             )
             reloadDataframes()
             self._df = getDataframe("Calibrations")
-            calibrationId = int(self._df.iloc[-1].values[0]) + 1
+            calibrationId = int(self._df.iloc[-1].values[0])
             self._calibration = Calibration(
                 calibrationId, filename, element, concentration
             )
@@ -211,6 +211,8 @@ class CalibrationTrayWidget(TrayWidget):
         if self._calibration is not None:
             calibrationExplorer = CalibrationExplorer(calibration=self._calibration)
             calibrationExplorer.show()
+            calibrationExplorer.saved.connect(self._supplyWidgets)
+            calibrationExplorer.saved.connect(self._updateCurrentRow)
 
     def removeCurrentCalibration(self) -> None:
         """Remove the currently selected calibration from the application.
@@ -301,6 +303,13 @@ class CalibrationTrayWidget(TrayWidget):
             self._supplyWidgets()
         elif currentRow == -1:
             self._calibration = None
+
+    def _updateCurrentRow(self):
+        tableRow = self._tableWidget.getCurrentRow()
+        tableRow["filename"].setText(self._calibration.filename)
+        tableRow["element"].setText(self._calibration.element)
+        tableRow["concentration"].setText(str(self._calibration.concentration))
+        tableRow["state"].setText(self._calibration.status())
 
     def _supplyWidgets(self) -> None:
         if self._calibration.state != 0:
