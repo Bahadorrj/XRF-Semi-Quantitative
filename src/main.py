@@ -7,12 +7,7 @@ import threading
 from PyQt6 import QtWidgets, QtGui
 
 from src.controllers import GuiHandler, ClientHandler
-from src.utils.database import getDataframe
-from src.utils.datatypes import Method
 from src.utils.paths import resourcePath
-from src.views.explorers.methodexplorer import MethodExplorer
-from src.views.trays.calibrationtray import CalibrationTrayWidget
-from src.views.trays.methodtray import MethodTrayWidget
 from src.views.windows.plotwindow import PlotWindow
 
 
@@ -39,14 +34,11 @@ def main() -> None:
     for root, _, files in os.walk(resourcePath("resources/fonts")):
         for file in files:
             path = os.path.join(root, file)
-            QtGui.QFontDatabase.addApplicationFont(path)
+            QtGui.QFontDatabase.addApplicationFont(resourcePath(path))
     with open(resourcePath("style.qss")) as f:
         _style = f.read()
+        _style = _style.replace("icons/", resourcePath("resources/icons/"))
         app.setStyleSheet(_style)
-    # window = CalibrationTrayWidget(dataframe=getDataframe("Calibrations"))
-    # window = PlotWindow()
-    # method = Method.fromATXMFile(resourcePath("methods/test1.atxm"))
-    # window = MethodExplorer(method=method)
-    window = MethodTrayWidget(dataframe=getDataframe("Methods"))
+    window = PlotWindow()
     window.show()
     sys.exit(app.exec())

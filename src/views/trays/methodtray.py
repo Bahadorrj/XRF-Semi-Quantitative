@@ -1,7 +1,7 @@
 import os
-import pandas
-
 from pathlib import Path
+
+import pandas
 from PyQt6 import QtCore, QtWidgets
 
 from src.utils import datatypes
@@ -222,7 +222,7 @@ class MethodTrayWidget(TrayWidget):
             reloadDataframes()
             self._df = getDataframe("Methods")
             self._tableWidget.removeRow(self._tableWidget.currentRow())
-            self._tableWidget.setCurrentCell(self._tableWidget.currentRow(), 0, -1, -1)
+            self._currentCellChanged(self._tableWidget.currentRow(), 0, -1, -1)
 
     def importMethod(self) -> None:
         """Import a method from an ATXM file into the application.
