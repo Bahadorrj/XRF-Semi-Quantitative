@@ -57,14 +57,15 @@ class MethodsCalibrationTrayWidget(CalibrationTrayWidget):
         self.setLayout(self.mainLayout)
 
     def importCalibration(self) -> None:
-        filePath, _ = QtWidgets.QFileDialog.getOpenFileName(
+        filePaths, _ = QtWidgets.QFileDialog.getOpenFileNames(
             self, "Open Calibration", "./", "Antique'X calibration (*.atxc)"
         )
-        if filePath:
+        for filePath in filePaths:
             if self._df.query(f"filename == '{Path(filePath).stem}'").empty:
                 self._calibration = datatypes.Calibration.fromATXCFile(filePath)
                 row = pandas.DataFrame(
                     {
+                        "calibration_id": [self._calibration.calibrationId],
                         "filename": [self._calibration.filename],
                         "element": [self._calibration.element],
                         "concentration": [self._calibration.concentration],
@@ -120,10 +121,8 @@ class MethodExplorer(Explorer):
         self._method = None
         self._initMethod = None
         self._widgets = {
-            "Analytes And Conditions": AnalytesAndConditionsWidget(
-                method=self._method, editable=True
-            ),
-            "Calibrations": MethodsCalibrationTrayWidget(method=self._method),
+            "Analytes And Conditions": AnalytesAndConditionsWidget(editable=True),
+            "Calibrations": MethodsCalibrationTrayWidget(),
         }
         self._initializeUi()
         if method is not None:
@@ -209,13 +208,16 @@ class MethodExplorer(Explorer):
             self.mainLayout.replaceWidget(oldWidget, newWidget)
             newWidget.show()
             newWidget.setFocus()
+            
+    def _supplyWidgets(self) -> None:
+        for widget in self._widgets.values():
+            widget.supply(self._method)
 
     def supply(self, method: datatypes.Method) -> None:
         self.blockSignals(True)
         self._method = method
         self._initMethod = self._method.copy()
-        for widget in self._widgets.values():
-            widget.supply(method)
+        self._supplyWidgets()
         self.blockSignals(False)
         self._treeWidget.setCurrentItem(self._treeWidget.topLevelItem(0))
 

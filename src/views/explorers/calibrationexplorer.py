@@ -233,8 +233,7 @@ class CalibrationExplorer(Explorer):
 
     def _supplyWidgets(self) -> None:
         for widget in self._widgets.values():
-            if widget:
-                widget.supply(self._calibration)
+            widget.supply(self._calibration)
 
     def supply(self, calibration: datatypes.Calibration):
         self.blockSignals(True)

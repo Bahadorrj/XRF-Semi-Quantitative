@@ -35,7 +35,7 @@ class AnalytesAndConditionsWidget(QtWidgets.QWidget):
     def _initializeUi(self) -> None:
         self.setObjectName("analyte-widget")
         self._createPeriodicLayout()
-        self._createConditionTable()
+        self._createConditionTableLayout()
         self._setUpView()
 
     def _createPeriodicLayout(self) -> None:
@@ -104,13 +104,20 @@ class AnalytesAndConditionsWidget(QtWidgets.QWidget):
                 else nan
             )
 
-    def _createConditionTable(self) -> None:
+    def _createConditionTableLayout(self) -> None:
         self._conditionTable = DataframeTableWidget(autofill=True)
+        self._conditionTable.setMinimumWidth(900)
+        self._conditionTable.setMaximumWidth(1200)
         self._conditionTable.verticalHeader().setSectionResizeMode(
-            QtWidgets.QHeaderView.ResizeMode.Stretch
+            QtWidgets.QHeaderView.ResizeMode.ResizeToContents
         )
         self._conditionTable.verticalHeader().setVisible(False)
         self._conditionTable.currentCellChanged.connect(self._currentCellChanged)
+        self._conditionTableLayout = QtWidgets.QHBoxLayout()
+        self._conditionTableLayout.setContentsMargins(0, 0, 0, 0)
+        self._conditionTableLayout.addStretch()
+        self._conditionTableLayout.addWidget(self._conditionTable)
+        self._conditionTableLayout.addStretch()
 
     @QtCore.pyqtSlot(int, int, int, int)
     def _currentCellChanged(
@@ -135,7 +142,7 @@ class AnalytesAndConditionsWidget(QtWidgets.QWidget):
         self.mainLayout.setContentsMargins(30, 30, 30, 30)
         self.mainLayout.setSpacing(30)
         self.mainLayout.addLayout(self._periodicTableLayout)
-        self.mainLayout.addWidget(self._conditionTable)
+        self.mainLayout.addLayout(self._conditionTableLayout)
         self.setLayout(self.mainLayout)
 
     def setFocus(self):

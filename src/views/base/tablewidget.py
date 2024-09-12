@@ -108,10 +108,12 @@ class TableWidget(QtWidgets.QTableWidget):
         self.blockSignals(False)
 
     def getRow(self, rowIndex: int) -> dict:
+        if rowIndex < 0 or rowIndex >= self.rowCount():
+            return None
         return self.rows[rowIndex]
 
     def getRowById(self, rowId: int) -> dict:
-        return list(filter(lambda d: d["rowId"] == rowId, self.rows.values()))[0]
+        return next((d for d in self.rows.values() if d["rowId"] == rowId), None)
 
     def getCurrentRow(self) -> dict:
         return self.rows[self.currentRow()]

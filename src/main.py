@@ -30,7 +30,6 @@ def main() -> None:
     arg = sys.argv
     app = QtWidgets.QApplication(arg)
     app.setWindowIcon(QtGui.QIcon(resourcePath("CSAN.ico")))
-    # connectServerAndGUI('127.0.0.1', 16000, window, app)
     for root, _, files in os.walk(resourcePath("resources/fonts")):
         for file in files:
             path = os.path.join(root, file)
@@ -40,5 +39,6 @@ def main() -> None:
         _style = _style.replace("icons/", resourcePath("resources/icons/"))
         app.setStyleSheet(_style)
     window = PlotWindow()
-    window.show()
+    connectServerAndGUI("127.0.0.1", 16000, window, app)
+    # window.showMaximized()
     sys.exit(app.exec())

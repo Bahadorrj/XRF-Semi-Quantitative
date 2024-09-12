@@ -24,6 +24,7 @@ class GeneralDataWidget(QtWidgets.QWidget):
     def _createPlotWidget(self) -> None:
         self._plotWidget = pg.PlotWidget()
         self._plotWidget.setObjectName("plot-widget")
+        self._plotWidget.getPlotItem().setMouseEnabled(x=False, y=False)
         self._plotWidget.setBackground("#FFFFFF")
         self._plotWidget.setFrameShape(QtWidgets.QFrame.Shape.NoFrame)
         plotItem = self._plotWidget.getPlotItem()
@@ -54,6 +55,7 @@ class GeneralDataWidget(QtWidgets.QWidget):
 
     def _createGeneralDataGroupBox(self) -> None:
         self._generalDataGroupBox = QtWidgets.QGroupBox()
+        self._generalDataGroupBox.setTitle("General Data")
 
     def _setUpView(self) -> None:
         self.mainLayout = QtWidgets.QGridLayout()

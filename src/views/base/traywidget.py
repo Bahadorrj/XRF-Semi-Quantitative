@@ -54,12 +54,15 @@ class TrayWidget(QtWidgets.QWidget):
         self._setUpView()
 
     def _createActions(self, labels: dict) -> None:
+        shortcuts = {"add": QtGui.QKeySequence("Ctrl+=")}
         for label, disabled in labels.items():
             action = QtGui.QAction(label)
             key = "-".join(label.lower().split(" "))
             action.setIcon(QtGui.QIcon(resourcePath(f"resources/icons/{key}.png")))
             action.setDisabled(disabled)
             self._actionsMap[key] = action
+            if shortcut := shortcuts.get(key, None):
+                action.setShortcut(shortcut)
             action.triggered.connect(partial(self._actionTriggered, key))
 
     @QtCore.pyqtSlot(str)
