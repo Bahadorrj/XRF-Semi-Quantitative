@@ -1,5 +1,4 @@
 from functools import partial, cache
-from json import dumps
 from typing import Optional
 
 import numpy as np
@@ -95,7 +94,7 @@ class ConditionForm(QtWidgets.QListView):
 class PlotWindow(QtWidgets.QMainWindow):
     def __init__(self):
         super(PlotWindow, self).__init__()
-        self._indexOfFile = None
+        self._analyse = None
         self._analyseFiles = []
         self._initializeUi()
 
@@ -143,9 +142,10 @@ class PlotWindow(QtWidgets.QMainWindow):
             self.resetWindow()
         elif key == "open":
             self._openAnalyse()
+        elif key == "save-as":
+            self.saveFile()
         elif key == "methods-tray-list":
-            methodTray = MethodTrayWidget(dataframe=getDataframe("Methods"))
-            methodTray.show()
+            self._openMethodTrayListWidget()
         elif key == "standards-tray-list":
             self._openCalibrationTrayListWidget()
 
@@ -241,6 +241,7 @@ class PlotWindow(QtWidgets.QMainWindow):
         self._treeWidget.setFixedWidth(400)
         self._treeWidget.setColumnWidth(0, int(self._treeWidget.size().width() * 0.7))
         self._fillTreeWidget()
+        self._treeWidget.itemClicked.connect(self._itemClicked)
         self._treeWidget.itemChanged.connect(self._drawCanvas)
 
     def _fillTreeWidget(self) -> None:
@@ -357,11 +358,15 @@ class PlotWindow(QtWidgets.QMainWindow):
                     item.takeChild(0)
             self._plotWidget.clear()
 
+    def _openMethodTrayListWidget(self) -> None:
+        methodTray = MethodTrayWidget(dataframe=getDataframe("Methods"))
+        methodTray.showMaximized()
+
     def _openCalibrationTrayListWidget(self):
         calibrationTrayWidget = CalibrationTrayWidget(
             dataframe=getDataframe("Calibrations")
         )
-        calibrationTrayWidget.show()
+        calibrationTrayWidget.showMaximized()
 
     def _findActivePlotAttrs(self) -> list:
         activePlotAttrs = []
@@ -377,6 +382,13 @@ class PlotWindow(QtWidgets.QMainWindow):
                             (extensionIndex, analyseIndex, dataIndex, color)
                         )
         return activePlotAttrs
+
+    def _itemClicked(self, item: QtWidgets.QTreeWidgetItem, column: int) -> None:
+        self._analyse = next(
+            a for a in self._analyseFiles if a.filename == item.text(0)
+        )
+        if self._analyse:
+            self._actionsMap["save-as"].setDisabled(False)
 
     def _drawCanvas(self) -> None:
         self._plotWidget.clear()
@@ -417,30 +429,22 @@ class PlotWindow(QtWidgets.QMainWindow):
     def _plot(self, x: np.ndarray, y: np.ndarray, pen=pg.mkPen("red", width=2)) -> None:
         self._plotWidget.plot(x, y, pen=pen)
 
-    def saveFile(self, filename: str) -> None:
-        analyse = self._analyseFiles[self._indexOfFile]
-        if filename.endswith(".atx"):
-            key = encryption.loadKey()
-            with open(filename, "wb") as f:
-                jsonText = dumps(analyse.toDict())
-                encryptedText = encryption.encryptText(jsonText, key)
-                f.write(encryptedText + b"\n")
-        elif filename.endswith(".txt"):
-            with open(filename, "w") as f:
-                for data in analyse.data:
-                    f.write("<<Data>>\n")
-                    f.write("*****\n")
-                    f.write(f"Condition {data.condition}\n")
-                    for i in data.y:
-                        f.write(str(i) + "\n")
+    def saveFile(self) -> None:
+        filepath, _ = QtWidgets.QFileDialog.getSaveFileName(
+            self,
+            "Save File",
+            "./",
+            "Antique'X Spectrum (*.atx);;Text Spectrum (*.txt)",
+        )
+        self._analyse.saveTo(filepath)
 
-    # def closeEvent(self, event):
-    #     # Intercept the close event
-    #     # Check if the close is initiated by the close button
-    #     if event.spontaneous():
-    #         # Hide the window instead of closing
-    #         self.hide()
-    #         event.ignore()
-    #     else:
-    #         # Handle the close event normally
-    #         event.accept()
+    def closeEvent(self, event):
+        # Intercept the close event
+        # Check if the close is initiated by the close button
+        if event.spontaneous():
+            # Hide the window instead of closing
+            self.hide()
+            event.ignore()
+        else:
+            # Handle the close event normally
+            event.accept()
