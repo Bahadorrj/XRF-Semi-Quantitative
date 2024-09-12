@@ -1,11 +1,14 @@
 import os
 from pathlib import Path
+from typing import Sequence
 
 import pandas
 from PyQt6 import QtCore, QtWidgets
 
+from src.utils import datatypes
 from src.utils.database import getDataframe, getDatabase, reloadDataframes
 from src.utils.datatypes import Calibration, Analyse
+from src.utils.paths import isValidFilename, resourcePath
 from src.views.base.formdialog import FormDialog
 from src.views.base.tablewidget import TableItem
 from src.views.base.traywidget import TrayWidget
@@ -51,42 +54,68 @@ class AcquisitionWidget(QtWidgets.QWidget):
 
 
 class CalibrationFormDialog(FormDialog):
-    """Dialog for entering calibration data.
-
-    This dialog allows users to input calibration details, including filename, element, and concentration. It validates the inputs to ensure that the filename does not already exist, the element is valid, and the concentration is within an acceptable range.
-
-    Args:
-        parent (QtWidgets.QWidget | None): An optional parent widget.
-        inputs (list | tuple | None): Optional list or tuple of input field names.
-        values (list | tuple | None): Optional list or tuple of default values for the input fields.
-    """
-
     def __init__(
         self,
         parent: QtWidgets.QWidget | None = None,
-        inputs: list | tuple | None = None,
-        values: list | tuple | None = None,
+        inputs: Sequence | None = None,
+        values: Sequence | None = None,
     ) -> None:
         super(CalibrationFormDialog, self).__init__(parent, inputs, values)
 
-    def _fill(self, lineEdit: QtWidgets.QLineEdit, key: str) -> None:
-        if key == "filename":
-            calibrationPath = f"calibrations/{lineEdit.text()}.atxc"
-            if os.path.exists(calibrationPath):
-                self._errorLabel.setText("This filename already exists!")
-        if key == "element":
-            if not lineEdit.text() in getDataframe("Lines")["symbol"].values:
-                lineEdit.setStyleSheet("color: red;")
-                self._errorLabel.setText("Invalid element!")
-                return
-        elif key == "concentration":
-            if not 0 <= float(lineEdit.text()) <= 100:
-                lineEdit.setStyleSheet("color: red;")
-                self._errorLabel.setText("Concentration must be between 0 and 100!")
-                return
-        lineEdit.setStyleSheet("color: black;")
-        self._errorLabel.setText(None)
-        return super()._fill(lineEdit, key)
+    def _check(self) -> None:
+        self._errorLabel.clear()
+        if not all(
+            (
+                self._isFilenameValid(),
+                self._isElementValid(),
+                self._isConcentrationValid(),
+            )
+        ):
+            QtWidgets.QApplication.beep()
+            return
+        return super()._check()
+
+    def _isFilenameValid(self) -> bool:
+        filenameLineEdit = self._fields["filename"][-1]
+        filename = filenameLineEdit.text()
+        filenameLineEdit.setStyleSheet("color: red;")
+        if not isValidFilename(filename):
+            self._addError("This filename is not allowed!\n")
+            return False
+        if os.path.exists(resourcePath(f"calibrations/{filename}.atxc")):
+            self._addError("This filename already exists!\n")
+            return False
+        if filename == "":
+            self._addError("Please enter a filename!\n")
+            return False
+        filenameLineEdit.setStyleSheet("color: black;")
+        return True
+
+    def _isElementValid(self) -> bool:
+        elementLineEdit = self._fields["element"][-1]
+        element = elementLineEdit.text()
+        elementLineEdit.setStyleSheet("color: red;")
+        if element not in getDataframe("Elements")["symbol"].values:
+            self._addError("This element is not valid!\n")
+            return False
+        if element == "":
+            self._addError("Please enter an element!\n")
+            return False
+        elementLineEdit.setStyleSheet("color: black;")
+        return True
+
+    def _isConcentrationValid(self) -> bool:
+        concentrationLineEdit = self._fields["concentration"][-1]
+        concentration = concentrationLineEdit.text()
+        concentrationLineEdit.setStyleSheet("color: red;")
+        if concentration == "":
+            self._addError("Please enter a concentration!\n")
+            return False
+        if not 0 <= float(concentration) <= 100:
+            self._addError("This concentration is not valid!\n")
+            return False
+        concentrationLineEdit.setStyleSheet("color: black;")
+        return True
 
 
 class CalibrationTrayWidget(TrayWidget):
@@ -115,28 +144,34 @@ class CalibrationTrayWidget(TrayWidget):
 
     @QtCore.pyqtSlot(str)
     def _actionTriggered(self, action: str) -> None:
-        if action == "add":
-            self.addCalibration()
-        elif action == "edit":
-            if self._calibration.state == 0:
+        actions = {
+            "add": self.addCalibration,
+            "remove": self.removeCurrentCalibration,
+            "import": self.importCalibration,
+            "edit": lambda: (
                 self.editCurrentCalibration()
-            else:
-                self._openCalibrationExplorer()
-        elif action == "remove":
-            self.removeCurrentCalibration()
-        elif action == "import":
-            self.importCalibration()
+                if self._calibration.state == 0
+                else self._openCalibrationExplorer()
+            ),
+        }
+        if action in actions:
+            actions[action]()
 
-    def addCalibration(self) -> None:
-        """Add a new calibration entry to the application.
+    def addCalibration(self) -> datatypes.Calibration:
+        """Add a new calibration entry.
 
-        This function prompts the user to input details for a new calibration, including the filename, element, and concentration. Upon confirmation, it saves the calibration data to the database and updates the internal data structures accordingly.
+        This function opens a dialog for the user to input calibration details,
+        and if confirmed, it saves the new calibration to the database and updates
+        the internal data structures.
 
         Args:
             self: The instance of the class.
 
         Returns:
-            None
+            datatypes.Calibration: The newly created Calibration object.
+
+        Raises:
+            ValueError: If the concentration cannot be converted to a float.
         """
         addDialog = CalibrationFormDialog(inputs=self._df.columns[1:-1])
         addDialog.setWindowTitle("Add calibration")
@@ -156,6 +191,7 @@ class CalibrationTrayWidget(TrayWidget):
             )
             self._calibration.save()
             self._insertCalibration()
+            return self._calibration
 
     def _insertCalibration(self) -> None:
         filename = self._calibration.filename
@@ -169,13 +205,16 @@ class CalibrationTrayWidget(TrayWidget):
             "state": TableItem(status),
         }
         self._tableWidget.addRow(items)
-        self._tableWidget.setCurrentCell(self._tableWidget.rowCount() - 1, 0)
+        # self._tableWidget.setCurrentCell(self._tableWidget.rowCount() - 1, 0)
 
     def editCurrentCalibration(self) -> None:
-        if self._calibration.state == 0:
+        if self._calibration is None:
+            return
+        (
             self._editBeforeAcquisition()
-        else:
-            self._openCalibrationExplorer()
+            if self._calibration.state == 0
+            else self._openCalibrationExplorer()
+        )
 
     def _editBeforeAcquisition(self):
         currentRow = self._tableWidget.getCurrentRow()
@@ -188,7 +227,7 @@ class CalibrationTrayWidget(TrayWidget):
         )
         editDialog.setWindowTitle("Edit calibration")
         if editDialog.exec():
-            os.remove(f"calibrations/{previousFilename}.atxc")
+            os.remove(resourcePath(f"calibrations/{previousFilename}.atxc"))
             filename = editDialog.fields["filename"]
             element = editDialog.fields["element"]
             concentration = float(editDialog.fields["concentration"])
@@ -210,7 +249,7 @@ class CalibrationTrayWidget(TrayWidget):
     def _openCalibrationExplorer(self) -> None:
         if self._calibration is not None:
             calibrationExplorer = CalibrationExplorer(calibration=self._calibration)
-            calibrationExplorer.show()
+            calibrationExplorer.showMaximized()
             calibrationExplorer.saved.connect(self._supplyWidgets)
             calibrationExplorer.saved.connect(self._updateCurrentRow)
 
@@ -242,7 +281,7 @@ class CalibrationTrayWidget(TrayWidget):
         messageBox.setDefaultButton(QtWidgets.QMessageBox.StandardButton.No)
         if messageBox.exec() == QtWidgets.QMessageBox.StandardButton.Yes:
             filename = self._calibration.filename
-            os.remove(f"calibrations/{filename}.atxc")
+            os.remove(resourcePath(f"calibrations/{filename}.atxc"))
             getDatabase().executeQuery(
                 "DELETE FROM Calibrations WHERE filename = ?", (filename,)
             )
@@ -298,19 +337,21 @@ class CalibrationTrayWidget(TrayWidget):
         if currentRow not in [previousRow, -1]:
             tableRow = self._tableWidget.getCurrentRow()
             filename = tableRow.get("filename").text()
-            path = f"calibrations/{filename}.atxc"
+            path = resourcePath(f"calibrations/{filename}.atxc")
             self._calibration = Calibration.fromATXCFile(path)
             self._supplyWidgets()
         elif currentRow == -1:
             self._calibration = None
 
-    def _updateCurrentRow(self):
+    @QtCore.pyqtSlot()
+    def _updateCurrentRow(self) -> None:
         tableRow = self._tableWidget.getCurrentRow()
         tableRow["filename"].setText(self._calibration.filename)
         tableRow["element"].setText(self._calibration.element)
         tableRow["concentration"].setText(str(self._calibration.concentration))
         tableRow["state"].setText(self._calibration.status())
 
+    @QtCore.pyqtSlot()
     def _supplyWidgets(self) -> None:
         if self._calibration.state != 0:
             self._addWidgets(self._widgets)
@@ -319,10 +360,11 @@ class CalibrationTrayWidget(TrayWidget):
         else:
             self._addWidgets({"Acquisition": self._acquisitionWidget})
 
+    @QtCore.pyqtSlot()
     def _getAnalyseFile(self):
         path, _ = QtWidgets.QFileDialog.getOpenFileName(
             self,
-            "Open File",
+            "Open Analyse File",
             "./",
             "Antique'X Spectrum (*.atx);;Text Spectrum (*.txt)",
         )
@@ -344,6 +386,12 @@ class CalibrationTrayWidget(TrayWidget):
                 self._calibration.status()
             )
             self._supplyWidgets()
+
+    @QtCore.pyqtSlot()
+    def _requestNewCalibration(self) -> None:
+        self.addCalibration()
+        self._getAnalyseFile()
+        self._openCalibrationExplorer()
 
     def supply(self, dataframe: pandas.DataFrame) -> None:
         """Supply data to the table widget from a given DataFrame.

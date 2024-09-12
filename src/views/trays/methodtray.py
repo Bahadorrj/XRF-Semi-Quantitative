@@ -6,7 +6,8 @@ from PyQt6 import QtCore, QtWidgets
 
 from src.utils import datatypes
 from src.utils.database import getDataframe, getDatabase, reloadDataframes
-from src.utils.datatypes import Method
+from src.utils.datatypes import Calibration, Method
+from src.utils.paths import isValidFilename, resourcePath
 from src.views.base.formdialog import FormDialog
 from src.views.base.tablewidget import TableItem, DataframeTableWidget
 from src.views.base.traywidget import TrayWidget
@@ -56,7 +57,9 @@ class CalibrationsWidget(QtWidgets.QWidget):
     def supply(self, method: datatypes.Method) -> None:
         self.blockSignals(True)
         self._method = method
-        self._tableWidget.supply(method.calibrations.drop("calibration_id", axis=1))
+        df = method.calibrations.drop("calibration_id", axis=1)
+        df["state"] = df["state"].apply(Calibration.convertStateToStatus)
+        self._tableWidget.supply(df)
         self.blockSignals(False)
 
     @property
@@ -65,22 +68,6 @@ class CalibrationsWidget(QtWidgets.QWidget):
 
 
 class MethodFormDialog(FormDialog):
-    """Dialog for managing method form inputs.
-
-    This class extends the FormDialog to provide a user interface for inputting method details,
-    including validation for filename uniqueness.
-
-    Args:
-        parent (QtWidgets.QWidget | None): The parent widget for the dialog.
-        inputs (list | tuple | None): The input fields to be displayed in the dialog.
-        values (list | tuple | None): The initial values for the input fields.
-
-    Methods:
-        _fill(lineEdit: QtWidgets.QLineEdit, key: str) -> None:
-            Fills the line edit with the provided key and validates the filename.
-            If the filename already exists, an error message is displayed.
-    """
-
     def __init__(
         self,
         parent: QtWidgets.QWidget | None = None,
@@ -88,19 +75,29 @@ class MethodFormDialog(FormDialog):
         values: list | tuple | None = None,
     ) -> None:
         super(MethodFormDialog, self).__init__(parent, inputs, values)
-        self._lineEdits["filename"].setPlaceholderText("method_01, MET-1, ...")
-        self._lineEdits["description"].setPlaceholderText("Cement, Metallic, ...")
 
-    def _fill(self, lineEdit: QtWidgets.QLineEdit, key: str) -> None:
-        if key == "filename":
-            methodPath = f"methods/{lineEdit.text()}.atxm"
-            if os.path.exists(methodPath):
-                self._errorLabel.setText("This filename already exists!")
-                lineEdit.setStyleSheet("color: red;")
-                return
-        lineEdit.setStyleSheet("color: black;")
-        self._errorLabel.setText(None)
-        super()._fill(lineEdit, key)
+    def _check(self) -> None:
+        self._errorLabel.clear()
+        if not self._isFilenameValid():
+            QtWidgets.QApplication.beep()
+            return
+        return super()._check()
+
+    def _isFilenameValid(self) -> bool:
+        filenameLineEdit = self._fields["filename"][-1]
+        filename = filenameLineEdit.text()
+        filenameLineEdit.setStyleSheet("color: red;")
+        if not isValidFilename(filename):
+            self._addError("This filename is not allowed!\n")
+            return False
+        if os.path.exists(resourcePath(f"methods/{filename}.atxm")):
+            self._addError("This filename already exists!\n")
+            return False
+        if filename == "":
+            self._addError("Please enter a filename!\n")
+            return False
+        filenameLineEdit.setStyleSheet("color: black;")
+        return True
 
 
 class MethodTrayWidget(TrayWidget):
@@ -136,30 +133,33 @@ class MethodTrayWidget(TrayWidget):
             actions[action]()
 
     def addMethod(self) -> datatypes.Method:
-        """Add a new method to the application.
+        """Add a new method entry.
 
-        This function opens a dialog for the user to input the method's filename and description. Upon confirmation, it saves the new method to the database and updates the internal data structures accordingly.
+        This function opens a dialog for the user to input method details,
+        and if confirmed, it saves the new method to the database and updates
+        the internal data structures.
 
         Args:
             self: The instance of the class.
 
         Returns:
-            None
-        """
+            datatypes.Method: The newly created Method object.
 
+        Raises:
+            ValueError: If the method details are invalid or cannot be processed.
+        """
         addDialog = MethodFormDialog(inputs=self._df.columns[1:-1])
         addDialog.setWindowTitle("Add method")
         if addDialog.exec():
             filename = addDialog.fields["filename"]
             description = addDialog.fields["description"]
-            db = getDatabase()
-            db.executeQuery(
+            getDatabase().executeQuery(
                 "INSERT INTO Methods (filename, description, state) VALUES (?, ?, ?)",
                 (filename, description, 0),
             )
             reloadDataframes()
             self._df = getDataframe("Methods")
-            methodId = int(self._df.iloc[-1].values[0]) + 1
+            methodId = int(self._df.iloc[-1].values[0])
             self._method = Method(methodId, filename, description)
             self._method.save()
             self._insertMethod()
@@ -175,19 +175,15 @@ class MethodTrayWidget(TrayWidget):
             "status": TableItem(status),
         }
         self._tableWidget.addRow(items)
-        self._tableWidget.setCurrentCell(self._tableWidget.rowCount() - 1, 0)
+        # self._tableWidget.setCurrentCell(self._tableWidget.rowCount() - 1, 0)
 
-    def editCurrentMethod(self) -> datatypes.Method:
+    def editCurrentMethod(self) -> None:
         if self._method is not None:
             methodExplorer = MethodExplorer(method=self._method)
-            methodExplorer.show()
+            methodExplorer.showMaximized()
             methodExplorer.saved.connect(self._supplyWidgets)
+            methodExplorer.saved.connect(self._updateCurrentRow)
             methodExplorer.requestNewMethod.connect(self._requestNewMethod)
-        return self._method
-
-    def _requestNewMethod(self):
-        self.addMethod()
-        self.editCurrentMethod()
 
     def removeCurrentMethod(self) -> None:
         """Remove the currently selected method from the application.
@@ -215,7 +211,7 @@ class MethodTrayWidget(TrayWidget):
         messageBox.setDefaultButton(QtWidgets.QMessageBox.StandardButton.No)
         if messageBox.exec() == QtWidgets.QMessageBox.StandardButton.Yes:
             filename = self._method.filename
-            os.remove(f"methods/{filename}.atxm")
+            os.remove(resourcePath(f"methods/{filename}.atxm"))
             getDatabase().executeQuery(
                 "DELETE FROM Methods WHERE filename = ?", (filename,)
             )
@@ -272,15 +268,28 @@ class MethodTrayWidget(TrayWidget):
         if currentRow not in [previousRow, -1]:
             tableRow = self._tableWidget.getRow(currentRow)
             filename = tableRow.get("filename").text()
-            path = f"methods/{filename}.atxm"
+            path = resourcePath(f"methods/{filename}.atxm")
             self._method = Method.fromATXMFile(path)
             self._supplyWidgets()
         elif currentRow == -1:
             self._method = None
 
-    def _supplyWidgets(self):
+    @QtCore.pyqtSlot()
+    def _updateCurrentRow(self) -> None:
+        tableRow = self._tableWidget.getCurrentRow()
+        tableRow["filename"].setText(self._method.filename)
+        tableRow["description"].setText(self._method.description)
+        tableRow["state"].setText(self._method.status())
+
+    @QtCore.pyqtSlot()
+    def _supplyWidgets(self) -> None:
         for widget in self._widgets.values():
             widget.supply(self._method)
+
+    @QtCore.pyqtSlot()
+    def _requestNewMethod(self) -> None:
+        self.addMethod()
+        self.editCurrentMethod()
 
     def supply(self, dataframe: pandas.DataFrame) -> None:
         """Supply data to the table widget from a given DataFrame.

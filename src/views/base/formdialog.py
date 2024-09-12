@@ -1,4 +1,4 @@
-from functools import partial
+from typing import Sequence
 
 from PyQt6 import QtGui, QtWidgets, QtCore
 
@@ -7,8 +7,8 @@ class FormDialog(QtWidgets.QDialog):
     def __init__(
         self,
         parent: QtWidgets.QWidget | None = None,
-        inputs: list | tuple | None = None,
-        values: list | tuple | None = None,
+        inputs: Sequence | None = None,
+        values: Sequence | None = None,
     ) -> None:
         super(FormDialog, self).__init__(parent)
         self.setModal(True)
@@ -18,6 +18,7 @@ class FormDialog(QtWidgets.QDialog):
         self._initializeUi()
 
     def _initializeUi(self) -> None:
+        self.setFocusPolicy(QtCore.Qt.FocusPolicy.StrongFocus)
         self._createFields()
         self._createErrorLabel()
         self._createButtonBox()
@@ -37,6 +38,9 @@ class FormDialog(QtWidgets.QDialog):
     def _createErrorLabel(self) -> None:
         self._errorLabel = QtWidgets.QLabel()
         self._errorLabel.setStyleSheet("color: red;")
+
+    def _addError(self, message: str) -> None:
+        self._errorLabel.setText(self._errorLabel.text() + message)
 
     def _createButtonBox(self) -> None:
         self._buttonBox = QtWidgets.QDialogButtonBox()
@@ -74,8 +78,4 @@ class FormDialog(QtWidgets.QDialog):
 
     @property
     def fields(self):
-        return dict((self._inputs, self._values))
-
-    @property
-    def lineEdits(self) -> dict:
-        return self._linesEdits
+        return {k: v for k, v in zip(self._inputs, self._values)}
