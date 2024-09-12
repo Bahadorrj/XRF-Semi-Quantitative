@@ -1,4 +1,3 @@
-from ctypes import Union
 import socket
 import pandas
 import numpy as np
@@ -8,19 +7,23 @@ from collections import defaultdict
 from dataclasses import dataclass, field
 from json import loads, dumps
 from pathlib import Path
-from typing import Any, Optional, Sequence
+from typing import Any, Optional
 from PyQt6.QtCore import Qt
 
 from src.utils import calculation
 from src.utils import encryption
 from src.utils.database import getDataframe
+from src.utils.paths import resourcePath
 
 
 @dataclass(order=True)
 class AnalyseData:
     conditionId: int
-    x: np.ndarray
     y: np.ndarray
+    x: np.ndarray = field(init=False)
+
+    def __post_init__(self):
+        self.x = np.arange(0, len(self.y))
 
     def __eq__(self, others) -> bool:
         assert isinstance(others, AnalyseData), "Comparison Error"
@@ -32,7 +35,7 @@ class AnalyseData:
             try:
                 intensity = int(
                     self.y[
-                        int(calculation.evToPx(row.low_kiloelectron_volt)) : int(
+                        round(calculation.evToPx(row.low_kiloelectron_volt)) : round(
                             calculation.evToPx(row.high_kiloelectron_volt)
                         )
                     ].sum()
@@ -51,7 +54,7 @@ class AnalyseData:
 
     @classmethod
     def fromHashableDict(cls, data: dict) -> "AnalyseData":
-        return cls(data["conditionId"], np.array(data["x"]), np.array(data["y"]))
+        return cls(data["conditionId"], np.array(data["y"]))
 
     @classmethod
     def fromList(cls, data: list) -> "AnalyseData":
@@ -60,21 +63,21 @@ class AnalyseData:
             (int(d.split()[-1]) for d in data if "condition" in d.lower()), None
         )
         y = np.array(temp)
-        x = np.arange(0, y.size, 1)
-        return cls(conditionId, x, y) if conditionId is not None else None
+        return cls(conditionId, y) if conditionId is not None else None
 
 
 @dataclass(order=True)
 class Analyse:
-    filePath: str
+    filePath: str | None = field(default=None)
     data: list[AnalyseData] = field(default_factory=list)
     generalData: dict = field(default_factory=dict)
     filename: str = field(init=False)
-    extension: str = field(init=False)
+    extension: str | None = field(init=False)
 
     def __post_init__(self) -> None:
-        self.filename = Path(self.filePath).stem
-        self.extension = self.filePath.split(".")[-1]
+        if self.filePath:
+            self.filename = Path(self.filePath).stem
+            self.extension = self.filePath.split(".")[-1]
 
     def __eq__(self, other) -> bool:
         assert isinstance(other, Analyse), "Comparison Error"
@@ -108,6 +111,17 @@ class Analyse:
                     for i in data.y:
                         f.write(str(i) + "\n")
 
+    def calculateActiveIntensities(self, lines: pandas.DataFrame) -> dict:
+        allIntensities = [d.calculateIntensities(lines) for d in self.data]
+        intensities = defaultdict(dict)
+        for row in lines.query("active == 1").itertuples(index=False):
+            intensities[row.symbol] = {
+                row.radiation_type: allIntensities[int(row.condition_id) - 1][
+                    row.symbol
+                ][row.radiation_type]
+            }
+        return intensities
+
     def toHashableDict(self) -> dict:
         return {
             "filePath": self.filePath,
@@ -120,7 +134,10 @@ class Analyse:
         analyseDict["data"] = [
             AnalyseData.fromHashableDict(dataDict) for dataDict in analyseDict["data"]
         ]
-        return cls(**analyseDict)
+        analyse = cls(**analyseDict)
+        if analyseDict.get("filename"):
+            analyse.filename = analyseDict["filename"]
+        return analyse
 
     @classmethod
     def fromTXTFile(cls, filePath: str) -> "Analyse":
@@ -154,6 +171,8 @@ class Analyse:
             if received[-4:] == "-stp":
                 received = received[:-4]
                 break
+        with open("F:/test.txt", "w") as f:
+            f.write(received)
         analyseDict = loads(received)
         return cls.fromHashableDict(analyseDict)
 
@@ -169,12 +188,21 @@ class Calibration:
     _lines: pandas.DataFrame = field(
         default_factory=lambda: getDataframe("Lines").copy()
     )
+    activeIntensities: dict = field(default_factory=dict)
     coefficients: dict = field(default_factory=dict)
     interferences: dict = field(default_factory=dict)
 
     def __post_init__(self):
-        self.calculateCoefficients()
-        self.calculateInterferences()
+        if self.analyse is None:
+            return
+        if not self.activeIntensities:
+            self.activeIntensities = self.analyse.calculateActiveIntensities(
+                self._lines
+            )
+        if not self.coefficients:
+            self.calculateCoefficients()
+        if not self.interferences:
+            self.calculateInterferences()
 
     def __eq__(self, other) -> bool:
         return (
@@ -193,6 +221,7 @@ class Calibration:
     @analyse.setter
     def analyse(self, value: Analyse) -> None:
         self._analyse = value
+        self.activeIntensities = self.analyse.calculateActiveIntensities(self._lines)
         self.calculateCoefficients()
         self.calculateInterferences()
 
@@ -200,15 +229,8 @@ class Calibration:
     def lines(self) -> pandas.DataFrame:
         return self._lines
 
-    @lines.setter
-    def lines(self, value: pandas.DataFrame) -> None:
-        self._lines = value
-        self.calculateCoefficients()
-        self.calculateInterferences()
-
     def calculateCoefficients(self) -> None:
-        if self.analyse is None:
-            return
+        self.coefficients = defaultdict(dict)
         df = self.lines.query(f"symbol == '{self.element}' and active == 1")
         for row in df.itertuples(index=False):
             data = self.analyse.getDataByConditionId(row.condition_id)
@@ -218,23 +240,15 @@ class Calibration:
             self.coefficients[row.radiation_type] = self.concentration / intensity
 
     def calculateInterferences(self) -> None:
-        if self.analyse is None or self.analyse.isEmpty():
-            return
-        row = self.lines.query(f"symbol == '{self.element}' and active == 1")
-        conditionId = row["condition_id"].values[0]
-        radiationType = row["radiation_type"].values[0]
-        data = self.analyse.getDataByConditionId(conditionId)
-        intensities = data.calculateIntensities(self.lines)
-        intensity = intensities[self.element][radiationType]
-        self.interferences[self.element] = {
-            interfererSymbol: {
-                interfererRadiationType: interfererIntensity / intensity
-                for interfererRadiationType, interfererIntensity in values.items()
-                if interfererRadiationType != radiationType
-            }
-            for interfererSymbol, values in intensities.items()
-            if interfererSymbol != self.element
-        }
+        self.interferences = defaultdict(dict)
+        tmp = self.activeIntensities.copy()
+        mainRadiation = self._lines.query(
+            f"symbol == '{self.element}' and active == 1"
+        )["radiation_type"].values[0]
+        mainIntensity = tmp.pop(self.element)[mainRadiation]
+        for symbol, values in tmp.items():
+            for radiation, intensity in values.items():
+                self.interferences[symbol][radiation] = intensity / mainIntensity
 
     def status(self) -> str:
         return self.convertStateToStatus(self.state)
@@ -248,12 +262,18 @@ class Calibration:
             self.state,
             self.analyse.copy() if self.analyse else None,
             self.lines.copy(),
-            self.coefficients.copy(),
-            self.interferences.copy(),
+            self.coefficients.copy() if self.analyse else None,
+            self.interferences.copy() if self.analyse else None,
         )
 
     def save(self) -> None:
-        filePath = f"calibrations/{self.filename}.atxc"
+        if self.analyse:
+            self.activeIntensities = self.analyse.calculateActiveIntensities(
+                self._lines
+            )
+            self.calculateCoefficients()
+            self.calculateInterferences()
+        filePath = resourcePath(f"calibrations/{self.filename}.atxc")
         key = encryption.loadKey()
         jsonText = dumps(self.toHashableDict())
         encryptedText = encryption.encryptText(jsonText, key)
@@ -345,7 +365,7 @@ class Method:
         )
 
     def save(self) -> None:
-        methodPath = f"methods/{self.filename}.atxm"
+        methodPath = resourcePath(f"methods/{self.filename}.atxm")
         key = encryption.loadKey()
         jsonText = dumps(self.toHashableDict())
         encryptedText = encryption.encryptText(jsonText, key)
@@ -387,7 +407,7 @@ class Method:
         if state == 0:
             return "Initial state"
         elif state == 1:
-            return "Edited"
+            return "Edited by user"
 
 
 @dataclass(order=True)
