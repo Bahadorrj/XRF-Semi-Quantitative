@@ -9,7 +9,7 @@ from src.utils.paths import resourcePath
 class Database:
     def __init__(self, path: str) -> None:
         try:
-            self.conn = sqlite3.connect(path)
+            self.conn = sqlite3.connect(path, check_same_thread=False)
             self.path = os.path.abspath(path)
         except sqlite3.Error as e:
             self.conn = None
