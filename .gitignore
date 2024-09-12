@@ -358,4 +358,4 @@ fabric.properties
 *.sql
 /calibrations
 /methods
-/analsis
+/analysis
