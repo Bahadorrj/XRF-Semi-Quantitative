@@ -65,7 +65,7 @@ class GroupBoxButton(QtWidgets.QPushButton):
 
 class ProfileComboBox(QtWidgets.QComboBox):
     def __init__(self, parent=None):
-        super(ProfileComboBox, self).__init__(parent)
+        super().__init__(parent)
         self.setStyleSheet(
             """
             QComboBox {
@@ -102,7 +102,7 @@ class ProfileComboBox(QtWidgets.QComboBox):
 
 class GroupBox(QtWidgets.QGroupBox):
     def __init__(self, parent=None):
-        super(GroupBox, self).__init__(parent)
+        super().__init__(parent)
         self.setFixedWidth(300)
         self.setStyleSheet(
             """
@@ -136,7 +136,7 @@ class GroupBox(QtWidgets.QGroupBox):
 
 class Label(QtWidgets.QLabel):
     def __init__(self, parent=None) -> None:
-        super(Label, self).__init__(parent)
+        super().__init__(parent)
         self.setStyleSheet(
             """
                 QLabel {
@@ -154,7 +154,7 @@ class Label(QtWidgets.QLabel):
 
 class LineEdit(QtWidgets.QLineEdit):
     def __init__(self, parent=None) -> None:
-        super(LineEdit, self).__init__(parent)
+        super().__init__(parent)
         self.setStyleSheet(
             """
             QLineEdit {
@@ -179,7 +179,7 @@ class CalibrationDialog(QtWidgets.QDialog):
         blank: datatypes.Analyse = None,
         condition: int = None,
     ):
-        super(CalibrationDialog, self).__init__(parent)
+        super().__init__(parent)
         self._analyse = analyse
         self._blank = blank
         self._analyseData = analyse.getDataByConditionId(condition)

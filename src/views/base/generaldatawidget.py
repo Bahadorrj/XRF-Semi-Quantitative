@@ -10,7 +10,7 @@ class GeneralDataWidget(QtWidgets.QWidget):
         parent: QtWidgets.QWidget | None = None,
         editable: bool = False,
     ) -> None:
-        super(GeneralDataWidget, self).__init__(parent)
+        super().__init__(parent)
         self._editable = editable
         self._generalDataWidgetsMap = {}
         self._initializeUi()
@@ -22,7 +22,7 @@ class GeneralDataWidget(QtWidgets.QWidget):
         self._setUpView()
 
     def _createPlotWidget(self) -> None:
-        self._plotWidget = pg.PlotWidget()
+        self._plotWidget = pg.PlotWidget(self)
         self._plotWidget.setObjectName("plot-widget")
         self._plotWidget.getPlotItem().setMouseEnabled(x=False, y=False)
         self._plotWidget.setBackground("#FFFFFF")
@@ -54,12 +54,11 @@ class GeneralDataWidget(QtWidgets.QWidget):
         self._setCoordinate(0, 0)
 
     def _createGeneralDataGroupBox(self) -> None:
-        self._generalDataGroupBox = QtWidgets.QGroupBox()
+        self._generalDataGroupBox = QtWidgets.QGroupBox(self)
         self._generalDataGroupBox.setTitle("General Data")
 
     def _setUpView(self) -> None:
         self.mainLayout = QtWidgets.QGridLayout()
-        self.mainLayout.setContentsMargins(0, 0, 0, 0)
         self.mainLayout.setSpacing(10)
         self.mainLayout.addWidget(self._plotWidget, 0, 0)
         self.mainLayout.addWidget(self._generalDataGroupBox, 0, 1, 1, 2)

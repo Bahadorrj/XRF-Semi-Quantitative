@@ -44,7 +44,7 @@ class CalibrationsWidget(QtWidgets.QWidget):
             )
 
     def _initializeUi(self) -> None:
-        self._tableWidget = DataframeTableWidget(autofill=True)
+        self._tableWidget = DataframeTableWidget(self, autoFill=True)
         self._setUpView()
 
     def _setUpView(self) -> None:
@@ -55,6 +55,10 @@ class CalibrationsWidget(QtWidgets.QWidget):
         self.setLayout(self.mainLayout)
 
     def supply(self, method: datatypes.Method) -> None:
+        if method is None:
+            return
+        if self._method and self._method == method:
+            return
         self.blockSignals(True)
         self._method = method
         df = method.calibrations.drop("calibration_id", axis=1)
@@ -74,9 +78,10 @@ class MethodFormDialog(FormDialog):
         inputs: list | tuple | None = None,
         values: list | tuple | None = None,
     ) -> None:
-        super(MethodFormDialog, self).__init__(parent, inputs, values)
+        super().__init__(parent, inputs, values)
 
     def _check(self) -> None:
+        self._fill()
         self._errorLabel.clear()
         if not self._isFilenameValid():
             QtWidgets.QApplication.beep()
@@ -106,13 +111,15 @@ class MethodTrayWidget(TrayWidget):
         parent: QtWidgets.QWidget | None = None,
         dataframe: pandas.DataFrame | None = None,
     ) -> None:
-        super(MethodTrayWidget, self).__init__(parent)
+        super().__init__(parent)
+        self.setWindowFlag(QtCore.Qt.WindowType.Window)
         self._df = None
         self._method = None
         self._widgets = {
-            "Analytes And Conditions": AnalytesAndConditionsWidget(),
-            "Calibrations": CalibrationsWidget(),
+            "Analytes And Conditions": AnalytesAndConditionsWidget(self),
+            "Calibrations": CalibrationsWidget(self),
         }
+        self._methodExplorer = None
         self._initializeUi()
         if dataframe is not None:
             self.supply(dataframe)
@@ -148,7 +155,7 @@ class MethodTrayWidget(TrayWidget):
         Raises:
             ValueError: If the method details are invalid or cannot be processed.
         """
-        addDialog = MethodFormDialog(inputs=self._df.columns[1:-1])
+        addDialog = MethodFormDialog(self, inputs=self._df.columns[1:-1])
         addDialog.setWindowTitle("Add method")
         if addDialog.exec():
             filename = addDialog.fields["filename"]
@@ -172,18 +179,21 @@ class MethodTrayWidget(TrayWidget):
         items = {
             "filename": TableItem(filename),
             "description": TableItem(description),
-            "status": TableItem(status),
+            "state": TableItem(status),
         }
         self._tableWidget.addRow(items)
         # self._tableWidget.setCurrentCell(self._tableWidget.rowCount() - 1, 0)
 
     def editCurrentMethod(self) -> None:
+        self._cellClicked(self._tableWidget.currentRow(), 0)
         if self._method is not None:
-            methodExplorer = MethodExplorer(method=self._method)
-            methodExplorer.showMaximized()
-            methodExplorer.saved.connect(self._supplyWidgets)
-            methodExplorer.saved.connect(self._updateCurrentRow)
-            methodExplorer.requestNewMethod.connect(self._requestNewMethod)
+            if self._methodExplorer and self._methodExplorer.isVisible():
+                self._methodExplorer.close()
+            else:
+                self._methodExplorer = MethodExplorer(parent=self, method=self._method)
+                self._methodExplorer.showMaximized()
+                self._methodExplorer.saved.connect(self._saveSignalArrived)
+                self._methodExplorer.requestNewMethod.connect(self._requestNewMethod)
 
     def removeCurrentMethod(self) -> None:
         """Remove the currently selected method from the application.
@@ -200,7 +210,7 @@ class MethodTrayWidget(TrayWidget):
         if not self._method:
             raise ValueError("No method selected")
         # Ask the user if they are sure to remove the calibration
-        messageBox = QtWidgets.QMessageBox()
+        messageBox = QtWidgets.QMessageBox(self)
         messageBox.setIcon(QtWidgets.QMessageBox.Icon.Warning)
         messageBox.setText("Are you sure you want to remove the selected method?")
         messageBox.setWindowTitle("Remove Method")
@@ -218,7 +228,7 @@ class MethodTrayWidget(TrayWidget):
             reloadDataframes()
             self._df = getDataframe("Methods")
             self._tableWidget.removeRow(self._tableWidget.currentRow())
-            self._currentCellChanged(self._tableWidget.currentRow(), 0, -1, -1)
+            self._cellClicked(self._tableWidget.currentRow(), 0)
 
     def importMethod(self) -> None:
         """Import a method from an ATXM file into the application.
@@ -250,7 +260,7 @@ class MethodTrayWidget(TrayWidget):
                 self._df = getDataframe("Methods")
                 self._insertMethod()
             else:
-                messageBox = QtWidgets.QMessageBox()
+                messageBox = QtWidgets.QMessageBox(self)
                 messageBox.setIcon(QtWidgets.QMessageBox.Icon.Warning)
                 messageBox.setText(
                     "The selected method already exists in the database."
@@ -259,30 +269,29 @@ class MethodTrayWidget(TrayWidget):
                 messageBox.setStandardButtons(QtWidgets.QMessageBox.StandardButton.Ok)
                 messageBox.exec()
 
-    def _currentCellChanged(
-        self, currentRow: int, currentColumn: int, previousRow: int, previousColumn: int
-    ):
-        super()._currentCellChanged(
-            currentRow, currentColumn, previousRow, previousColumn
-        )
-        if currentRow not in [previousRow, -1]:
-            tableRow = self._tableWidget.getRow(currentRow)
+    def _cellClicked(self, row: int, column: int) -> None:
+        super()._cellClicked(row, column)
+        if row != -1:
+            tableRow = self._tableWidget.getRow(row)
             filename = tableRow.get("filename").text()
             path = resourcePath(f"methods/{filename}.atxm")
             self._method = Method.fromATXMFile(path)
             self._supplyWidgets()
-        elif currentRow == -1:
+        else:
             self._method = None
 
-    @QtCore.pyqtSlot()
+    def _saveSignalArrived(self) -> None:
+        self._supplyWidgets()
+        self._updateCurrentRow()
+
     def _updateCurrentRow(self) -> None:
         tableRow = self._tableWidget.getCurrentRow()
         tableRow["filename"].setText(self._method.filename)
         tableRow["description"].setText(self._method.description)
         tableRow["state"].setText(self._method.status())
 
-    @QtCore.pyqtSlot()
     def _supplyWidgets(self) -> None:
+        self._addWidgets(self._widgets)
         for widget in self._widgets.values():
             widget.supply(self._method)
 
@@ -307,8 +316,6 @@ class MethodTrayWidget(TrayWidget):
         df = self._df.drop("method_id", axis=1)
         df["state"] = df["state"].apply(Method.convertStateToStatus)
         self._tableWidget.supply(df)
-        if self._df.empty is False:
-            self._tableWidget.setCurrentCell(0, 0)
 
     @property
     def method(self):

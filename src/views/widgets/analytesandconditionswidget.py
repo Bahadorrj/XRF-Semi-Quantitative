@@ -1,21 +1,76 @@
-from functools import partial
+import pandas as pd
 
-from PyQt6 import QtCore, QtWidgets
+from functools import partial
+from typing import Sequence
+
+from PyQt6 import QtCore, QtWidgets, QtGui
 from numpy import nan
 
 from src.utils import datatypes
-from src.views.base.tablewidget import DataframeTableWidget
+from src.utils.paths import resourcePath
+from src.views.base.formdialog import FormDialog
+from src.views.base.tablewidget import DataframeTableWidget, TableItem
+
+
+class ConditionForm(FormDialog):
+    def __init__(
+        self,
+        parent: QtWidgets.QWidget | None = None,
+        inputs: Sequence | None = None,
+        values: Sequence | None = None,
+        previousConditionName: str | None = None,
+    ) -> None:
+        super().__init__(parent, inputs, values)
+        self._previousConditionName = previousConditionName
+
+    def _check(self) -> None:
+        self._fill()
+        self._errorLabel.clear()
+        mapper = {
+            0: self.parent().isConditionNameValid,
+            1: self.parent().isKiloVoltValid,
+            2: self.parent().isMilliAmpereValid,
+            3: self.parent().isTimeValid,
+            5: self.parent().isEnvironmentValid,
+            6: self.parent().isFilterValid,
+            7: self.parent().isMaskValid,
+        }
+        results = [mapper[i](self._values[i]) for i in mapper]
+        if results[0] is False:
+            results[0] = self._values[0] == self._previousConditionName
+        if not all(results):
+            QtWidgets.QApplication.beep()
+            errors = {
+                0: "Condition name already exists!",
+                1: "Kilovolt must be a number between 0 and 40 kV!",
+                2: "Milliampere must be a number between 0 and 1000 mA!",
+                3: "Time must be a number between 0 and 1000 ms!",
+                5: "Environment is invalid!",
+                6: "Filter must be one of the following integers: 1, 2, 3!",
+                7: "Mask must be a one of the following integers: 1, 2, 3!",
+            }
+            for index, result in enumerate(results):
+                if not result:
+                    list(self._fields.values())[index][1].setStyleSheet("color: red;")
+                    self._addError(errors[index] + "\n")
+                else:
+                    list(self._fields.values())[index][1].setStyleSheet("color: black;")
+            return
+        return super()._check()
 
 
 class AnalytesAndConditionsWidget(QtWidgets.QWidget):
-    """Widget for displaying analytes and their associated conditions.
+    """
+    Initializes an instance of the AnalytesAndConditionsWidget class.
 
-    This class provides a user interface for selecting analytes and managing their conditions through a periodic table layout and a condition table. It allows for interaction with the analytes, enabling users to add or modify conditions based on the selected elements.
+    This widget is designed to manage and display analytes and conditions in a user interface. It can be configured to be editable and to automatically fill in data based on the provided method.
 
     Args:
-        parent (QtWidgets.QWidget | None): An optional parent widget.
-        method (datatypes.Method | None): An optional method to initialize the widget with.
-        editable (bool): A flag indicating whether the widget is editable.
+        parent (QtWidgets.QWidget | None): The parent widget for this widget, or None if there is no parent.
+        method (datatypes.Method | None): An optional method to supply to the widget upon initialization.
+        autoFill (bool): A flag indicating whether the widget should automatically fill in data. Defaults to False.
+        editable (bool): A flag indicating whether the widget should allow user edits. Defaults to False.
+
     """
 
     def __init__(
@@ -26,19 +81,116 @@ class AnalytesAndConditionsWidget(QtWidgets.QWidget):
     ):
         super(AnalytesAndConditionsWidget, self).__init__(parent)
         self._method = None
+        self._conditions = None
         self._editable = editable
         self._buttonsMap = {}
         self._initializeUi()
         if method is not None:
             self.supply(method)
+        self.hide()
 
     def _initializeUi(self) -> None:
         self.setObjectName("analyte-widget")
+        if self._editable:
+            self._createActions(
+                {
+                    "Add": False,
+                    "Edit": True,
+                    "Remove": True,
+                }
+            )
+            self._createToolBar()
         self._createPeriodicLayout()
-        self._createConditionTableLayout()
+        self._createConditionTable()
         self._setUpView()
 
+    def _createActions(self, labels: dict) -> None:
+        self._actionsMap = {}
+        shortcuts = {"add": QtGui.QKeySequence("Ctrl+=")}
+        for label, disabled in labels.items():
+            action = QtGui.QAction(label, self)
+            key = "-".join(label.lower().split(" "))
+            action.setIcon(QtGui.QIcon(resourcePath(f"resources/icons/{key}.png")))
+            action.setDisabled(disabled)
+            self._actionsMap[key] = action
+            if shortcut := shortcuts.get(key):
+                action.setShortcut(shortcut)
+            action.triggered.connect(partial(self._actionTriggered, key))
+
+    @QtCore.pyqtSlot(str)
+    def _actionTriggered(self, key: str) -> None:
+        if key == "add":
+            self._addCondition()
+        elif key == "edit":
+            self._editCurrentCondition()
+        else:
+            self._removeCurrentCondition()
+
+    def _addCondition(self) -> None:
+        addDialog = ConditionForm(self, inputs=self._conditions.columns[1:])
+        addDialog.setWindowTitle("Add condition")
+        if addDialog.exec():
+            fields = addDialog.fields
+            fields["condition_id"] = max(self._conditions["condition_id"].values) + 1
+            tableRow = {
+                k: TableItem(fields[k], editable=self._editable) for k in fields
+            }
+            row = pd.DataFrame(fields, index=[0])
+            self._conditions.loc[len(self._conditions)] = row.iloc[0]
+            self._conditionTable.addRow(tableRow)
+
+    def _editCurrentCondition(self) -> None:
+        editDialog = ConditionForm(
+            self,
+            inputs=self._conditions.columns[1:],
+            values=self._conditions.iloc[self._conditionTable.currentRow()][
+                1:
+            ].tolist(),
+            previousConditionName=self._conditions.at[
+                self._conditionTable.currentRow(), "name"
+            ],
+        )
+        editDialog.setWindowTitle("Edit condition")
+        if editDialog.exec():
+            fields = editDialog.fields
+            tableRow = self._conditionTable.getCurrentRow()
+            for column in self._conditions.columns[1:]:
+                self._conditionTable.getCurrentRow()[column].setText(fields[column])
+                if column in ["kilovolt", "milliampere"]:
+                    value = float(fields[column])
+                elif column in ["time", "filter", "mask"]:
+                    value = int(fields[column])
+                elif column in ["rotation", "active"]:
+                    value = 0 if fields[column] == "False" else 1
+                else:
+                    value = fields[column]
+                self._conditions.at[self._conditionTable.currentRow(), column] = value
+                tableRow[column].setText(fields[column])
+                (
+                    tableRow["active"].setForeground(QtCore.Qt.GlobalColor.darkGreen)
+                    if fields["active"] == "True"
+                    else tableRow["active"].setForeground(QtCore.Qt.GlobalColor.red)
+                )
+                (
+                    tableRow["rotation"].setForeground(QtCore.Qt.GlobalColor.darkGreen)
+                    if fields["rotation"] == "True"
+                    else tableRow["rotation"].setForeground(QtCore.Qt.GlobalColor.red)
+                )
+
+    def _removeCurrentCondition(self) -> None:
+        if self._conditionTable.currentRow() == -1:
+            return
+        rowId = self._conditions.query(
+            f"name == '{self._conditionTable.item(self._conditionTable.currentRow(), 0).text()}'"
+        ).index.values[0]
+        self._conditions.drop(rowId, inplace=True)
+        self._conditionTable.removeRow(self._conditionTable.currentRow())
+        if self._conditionTable.rowCount() == 0:
+            self._actionsMap["edit"].setDisabled(True)
+            self._actionsMap["remove"].setDisabled(True)
+
     def _createPeriodicLayout(self) -> None:
+        # fmt: off
         vLayout = QtWidgets.QVBoxLayout()
         vLayout.setSpacing(0)
         vLayout.setContentsMargins(0, 0, 0, 0)
@@ -60,7 +212,8 @@ class AnalytesAndConditionsWidget(QtWidgets.QWidget):
             layout.setContentsMargins(0, 0, 0, 0)
             for symbol in row:
                 if symbol:
-                    button = QtWidgets.QPushButton(symbol)
+                    button = QtWidgets.QPushButton(symbol, self)
+                    button.setObjectName("periodic-button")
                     button.setCheckable(True)
                     if self._editable is False:
                         button.setDisabled(True)
@@ -88,6 +241,7 @@ class AnalytesAndConditionsWidget(QtWidgets.QWidget):
         self._periodicTableLayout.addStretch()
         self._periodicTableLayout.addLayout(vLayout)
         self._periodicTableLayout.addStretch()
+        # fmt: on
 
     @QtCore.pyqtSlot(bool)
     def _addElementToCondition(self, symbol: str, checked: bool) -> None:
@@ -104,29 +258,94 @@ class AnalytesAndConditionsWidget(QtWidgets.QWidget):
                 else nan
             )
 
-    def _createConditionTableLayout(self) -> None:
-        self._conditionTable = DataframeTableWidget(autofill=True)
+    def _createToolBar(self) -> None:
+        self._toolBar = QtWidgets.QToolBar(self)
+        self._toolBar.setIconSize(QtCore.QSize(16, 16))
+        self._toolBar.setToolButtonStyle(
+            QtCore.Qt.ToolButtonStyle.ToolButtonTextUnderIcon
+        )
+        self._toolBar.setMovable(False)
+        self._fillToolBarWithActions()
+
+    def _fillToolBarWithActions(self) -> None:
+        for action in self._actionsMap.values():
+            self._toolBar.addAction(action)
+
+    def _createConditionTable(self) -> None:
+        self._conditionTable = DataframeTableWidget(self, autoFill=True, editable=False)
         self._conditionTable.setMinimumWidth(900)
         self._conditionTable.setMaximumWidth(1200)
         self._conditionTable.verticalHeader().setSectionResizeMode(
-            QtWidgets.QHeaderView.ResizeMode.ResizeToContents
+            QtWidgets.QHeaderView.ResizeMode.Fixed
         )
         self._conditionTable.verticalHeader().setVisible(False)
-        self._conditionTable.currentCellChanged.connect(self._currentCellChanged)
-        self._conditionTableLayout = QtWidgets.QHBoxLayout()
-        self._conditionTableLayout.setContentsMargins(0, 0, 0, 0)
-        self._conditionTableLayout.addStretch()
-        self._conditionTableLayout.addWidget(self._conditionTable)
-        self._conditionTableLayout.addStretch()
+        self._conditionTable.cellClicked.connect(self._cellClicked)
 
-    @QtCore.pyqtSlot(int, int, int, int)
-    def _currentCellChanged(
-        self, currentRow: int, currentColumn: int, previousRow: int, previousColumn: int
-    ) -> None:
-        conditionId = int(
-            self._conditionTable.item(currentRow, 0).text().split(" ")[-1]
-        )
-        self._toggleConditionElements(conditionId)
+    @QtCore.pyqtSlot(int, int)
+    def _cellClicked(self, row: int, column: int) -> None:
+        if (
+            df := (
+                self._conditions.query(
+                    f"name == '{self._conditionTable.item(row, 0).text()}'"
+                )
+            )
+        ).empty is False:
+            conditionId = df["condition_id"].values[0]
+            self._toggleConditionElements(conditionId)
+
+    def _isItemValid(self, item) -> tuple:
+        value = item.text()
+        if self._conditionTable.currentColumn() == 0:
+            return (self.isConditionNameValid(value), value)
+        if self._conditionTable.currentColumn() == 1:
+            return (self.isKiloVoltValid(value), float(value))
+        if self._conditionTable.currentColumn() == 2:
+            return (self.isMilliAmpereValid(value), float(value))
+        if self._conditionTable.currentColumn() == 3:
+            return (self.isTimeValid(value), int(value))
+        if self._conditionTable.currentColumn() == 5:
+            return (self.isEnvironmentValid(value), value)
+        if self._conditionTable.currentColumn() == 6:
+            return (self.isFilterValid(value), int(value))
+        if self._conditionTable.currentColumn() == 7:
+            return (self.isMaskValid(value), int(value))
+        return (False, value)
+
+    def isConditionNameValid(self, value: str) -> bool:
+        return value not in self._conditions["name"].values
+
+    def isKiloVoltValid(self, value: str) -> bool:
+        try:
+            return 0 < float(value) <= 40
+        except ValueError:
+            return False
+
+    def isMilliAmpereValid(self, value: str) -> bool:
+        try:
+            return 0 < float(value) <= 1
+        except ValueError:
+            return False
+
+    def isTimeValid(self, value: str) -> bool:
+        try:
+            return 0 < int(value) <= 240
+        except ValueError:
+            return False
+
+    def isEnvironmentValid(self, value: str) -> bool:
+        return True
+
+    def isFilterValid(self, value: str) -> bool:
+        try:
+            return 0 <= int(value) <= 3
+        except ValueError:
+            return False
+
+    def isMaskValid(self, value: str) -> bool:
+        try:
+            return 0 <= int(value) <= 3
+        except ValueError:
+            return False
 
     def _toggleConditionElements(self, conditionId: int) -> None:
         symbols = self._method.elements.query(
@@ -139,11 +358,16 @@ class AnalytesAndConditionsWidget(QtWidgets.QWidget):
 
     def _setUpView(self) -> None:
         self.mainLayout = QtWidgets.QVBoxLayout()
-        self.mainLayout.setContentsMargins(30, 30, 30, 30)
-        self.mainLayout.setSpacing(30)
         self.mainLayout.addLayout(self._periodicTableLayout)
-        self.mainLayout.addLayout(self._conditionTableLayout)
-        self.setLayout(self.mainLayout)
+        self.mainLayout.addSpacing(30)
+        if self._editable:
+            self.mainLayout.addWidget(self._toolBar)
+        self.mainLayout.addWidget(self._conditionTable)
+        hLayout = QtWidgets.QHBoxLayout()
+        hLayout.addStretch()
+        hLayout.addLayout(self.mainLayout)
+        hLayout.addStretch()
+        self.setLayout(hLayout)
 
     def setFocus(self):
         self._conditionTable.setFocus()
@@ -160,11 +384,18 @@ class AnalytesAndConditionsWidget(QtWidgets.QWidget):
         Returns:
             None
         """
+        if method is None:
+            return
+        if self._method and self._method == method:
+            return
+        if self._editable:
+            self._actionsMap["edit"].setDisabled(False)
+            self._actionsMap["remove"].setDisabled(False)
         self.blockSignals(True)
         self._method = method
-        self._conditionTable.supply(method.conditions.drop("condition_id", axis=1))
+        self._conditions = self._method.conditions
+        self._conditionTable.supply(self._conditions.drop("condition_id", axis=1))
         self.blockSignals(False)
-        self._conditionTable.setCurrentCell(0, 0)
 
     @property
     def buttonsMap(self):

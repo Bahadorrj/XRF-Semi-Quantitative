@@ -1,3 +1,4 @@
+from functools import partial
 from typing import Sequence
 
 from PyQt6 import QtGui, QtWidgets, QtCore
@@ -10,7 +11,7 @@ class FormDialog(QtWidgets.QDialog):
         inputs: Sequence | None = None,
         values: Sequence | None = None,
     ) -> None:
-        super(FormDialog, self).__init__(parent)
+        super().__init__(parent, QtCore.Qt.WindowType.Dialog)
         self.setModal(True)
         self._inputs = inputs
         self._values = values
@@ -28,22 +29,50 @@ class FormDialog(QtWidgets.QDialog):
         if self._values is None:
             self._values = ["" for _ in self._inputs]
         for i, v in zip(self._inputs, self._values):
-            label = QtWidgets.QLabel(i)
-            lineEdit = QtWidgets.QLineEdit(v)
-            if i == "concentration":
-                lineEdit.setValidator(QtGui.QDoubleValidator())
-            lineEdit.setFixedWidth(150)
-            self._fields[i] = (label, lineEdit)
+            label = QtWidgets.QLabel(i, self)
+            if i in ("active", "rotation"):
+                comboBox = QtWidgets.QComboBox(self)
+                comboBox.setFixedSize(150, 30)
+                comboBox.currentTextChanged.connect(
+                    partial(self._currentTextChanged, comboBox)
+                )
+                items = ["True", "False"]
+                comboBox.addItems(items)
+                comboBox.setCurrentText(str(bool(v)))
+                self._fields[i] = (label, comboBox)
+            else:
+                lineEdit = QtWidgets.QLineEdit(str(v), self)
+                if i in ("concentration", "kilovolt", "milliampere"):
+                    lineEdit.setValidator(QtGui.QDoubleValidator())
+                elif i in ("time", "filter", "mask"):
+                    lineEdit.setValidator(QtGui.QIntValidator())
+                lineEdit.setFixedSize(150, 30)
+                lineEdit.editingFinished.connect(
+                    partial(self._formatLineEdit, i, lineEdit)
+                )
+                self._fields[i] = (label, lineEdit)
+
+    def _currentTextChanged(self, comboBox: QtWidgets.QComboBox, text: str) -> None:
+        (
+            comboBox.setStyleSheet("color: darkgreen;")
+            if text == "True"
+            else comboBox.setStyleSheet("color: red;")
+        )
+
+    def _formatLineEdit(self, inputName: str, lineEdit: QtWidgets.QLineEdit) -> None:
+        if inputName in {"concentration", "kilovolt", "milliampere"}:
+            lineEdit.setText(f"{float(lineEdit.text()):.1f}")
 
     def _createErrorLabel(self) -> None:
-        self._errorLabel = QtWidgets.QLabel()
+        self._errorLabel = QtWidgets.QLabel(self)
         self._errorLabel.setStyleSheet("color: red;")
 
     def _addError(self, message: str) -> None:
         self._errorLabel.setText(self._errorLabel.text() + message)
 
     def _createButtonBox(self) -> None:
-        self._buttonBox = QtWidgets.QDialogButtonBox()
+        self._buttonBox = QtWidgets.QDialogButtonBox(self)
+        self._buttonBox.setStyleSheet("")
         self._buttonBox.setStandardButtons(
             QtWidgets.QDialogButtonBox.StandardButton.Cancel
             | QtWidgets.QDialogButtonBox.StandardButton.Ok
@@ -56,14 +85,18 @@ class FormDialog(QtWidgets.QDialog):
         for widgets in self._fields.values():
             qLabel, qLineEdit = widgets
             self.mainLayout.addRow(qLabel, qLineEdit)
-        self.mainLayout.addWidget(self._errorLabel)
+        self.mainLayout.addRow(self._errorLabel)
         self.mainLayout.addWidget(self._buttonBox)
         self.setLayout(self.mainLayout)
 
     def _fill(self) -> None:
         for index, widgets in enumerate(self._fields.values()):
-            _, qLineEdit = widgets
-            self._values[index] = qLineEdit.text()
+            _, widget = widgets
+            self._values[index] = (
+                widget.text()
+                if isinstance(widget, QtWidgets.QLineEdit)
+                else widget.currentText()
+            )
 
     def _check(self) -> None:
         self._fill()

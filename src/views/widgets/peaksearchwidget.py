@@ -14,8 +14,8 @@ from src.views.base.tablewidget import DataframeTableWidget, TableItem
 
 
 class StatusButton(QtWidgets.QPushButton):
-    def __init__(self, text: str):
-        super().__init__(text)
+    def __init__(self, text: str, parent: QtWidgets.QWidget | None):
+        super().__init__(text, parent)
         self.currentText = self.text()
         self.previousText = self.currentText
         self.setObjectName("status-button")
@@ -74,9 +74,10 @@ class PeakSearchTableWidget(DataframeTableWidget):
         self,
         parent: QtWidgets.QWidget | None = None,
         dataframe: DataFrame | None = None,
-        autofill: bool = False,
+        autoFill: bool = False,
+        editable: bool = False,
     ) -> None:
-        super(PeakSearchTableWidget, self).__init__(parent, dataframe, autofill)
+        super().__init__(parent, dataframe, autoFill, editable)
         self.setObjectName("peak-lines-table")
         self.setHeaders(
             [
@@ -121,7 +122,7 @@ class PeakSearchWidget(QtWidgets.QWidget):
         parent: QtWidgets.QWidget | None = None,
         calibration: datatypes.Calibration | None = None,
     ):
-        super(PeakSearchWidget, self).__init__(parent)
+        super().__init__(parent)
         self._calibration = None
         self._df = None
         self._activeIntensities = None
@@ -134,8 +135,15 @@ class PeakSearchWidget(QtWidgets.QWidget):
         self._initializeUi()
         if calibration is not None:
             self.supply(calibration)
+        self.hide()
 
     def _initializeUi(self) -> None:
+        self._createActions(
+            {
+                "undo": True,
+                "region": False,
+            }
+        )
         self._createToolBar()
         self._createSearchLayout()
         self._createStatusLayout()
@@ -143,37 +151,29 @@ class PeakSearchWidget(QtWidgets.QWidget):
         self._createPlotViewBox()
         self._setUpView()
 
-    def _createToolBar(self) -> None:
-        self._toolBar = QtWidgets.QToolBar(self)
-        self._toolBar.setIconSize(QtCore.QSize(16, 16))
-        self._toolBar.setToolButtonStyle(QtCore.Qt.ToolButtonStyle.ToolButtonIconOnly)
-        self._toolBar.setMovable(False)
-        self._fillToolBarWithActions(self._toolBar)
+    def _createActions(self, labels: dict) -> None:
+        self._actionsMap = {}
+        for label, disabled in labels.items():
+            action = QtGui.QAction(label, self)
+            key = "-".join(label.lower().split(" "))
+            action.setIcon(QtGui.QIcon(resourcePath(f"resources/icons/{key}.png")))
+            action.setDisabled(disabled)
+            self._actionsMap[key] = action
+            action.triggered.connect(partial(self._actionTriggered, key))
 
-    def _fillToolBarWithActions(self, toolBar: QtWidgets.QToolBar) -> None:
-        self._undoAction = QtGui.QAction(
-            icon=QtGui.QIcon(resourcePath("resources/icons/undo.png"))
-        )
-        # self._redoAction = QtGui.QAction(icon=QtGui.QIcon(resource_path("resources/icons/redo.png")))
-        self._regionAction = QtGui.QAction(
-            icon=QtGui.QIcon(resourcePath("resources/icons/brackets.png"))
-        )
-        self._regionAction.setCheckable(True)
-        self._undoAction.setDisabled(True)
-        # self._redoAction.setDisabled(True)
-        self._undoAction.setShortcut(QtGui.QKeySequence("Ctrl+z"))
-        # self._redoAction.setShortcut(QtGui.QKeySequence("Ctrl+r"))
-        toolBar.addAction(self._undoAction)
-        # toolBar.addAction(self._redoAction)
-        toolBar.addAction(self._regionAction)
+    @QtCore.pyqtSlot(str)
+    def _actionTriggered(self, key: str) -> None:
+        if key == "undo":
+            self._undo()
+        elif key == "region":
+            self._toggleRegions()
 
-    @QtCore.pyqtSlot()
     def _undo(self) -> None:
         if not self._undoStack:
             return
         temp = self._undoStack.pop()
         if not self._undoStack:
-            self._undoAction.setDisabled(True)
+            self._actionsMap["undo"].setDisabled(True)
         items = temp if isinstance(temp, list) else [temp]
         for package in items:
             rowId, values, action = package
@@ -187,10 +187,9 @@ class PeakSearchWidget(QtWidgets.QWidget):
     #         self._tableWidget.updateRow(rowId, values)
     #         if not self._redoStack:
     #             self._redoAction.setDisabled(True)
-    #         self._undoAction.setDisabled(False)
+    #         self._actionsMap["undo"].setDisabled(False)
     #         self._rowChanged(rowId, action)
 
-    @QtCore.pyqtSlot()
     def _toggleRegions(self, checked: bool) -> None:
         self._regionActive = checked
         for data in self._plotDataList:
@@ -200,21 +199,32 @@ class PeakSearchWidget(QtWidgets.QWidget):
                 else:
                     self._peakPlot.removeItem(data.region)
 
+    def _createToolBar(self) -> None:
+        self._toolBar = QtWidgets.QToolBar(self)
+        self._toolBar.setIconSize(QtCore.QSize(16, 16))
+        self._toolBar.setToolButtonStyle(QtCore.Qt.ToolButtonStyle.ToolButtonIconOnly)
+        self._toolBar.setMovable(False)
+        self._fillToolBarWithActions()
+
+    def _fillToolBarWithActions(self) -> None:
+        self._toolBar.addAction(self._actionsMap["undo"])
+        self._toolBar.addAction(self._actionsMap["region"])
+
     def _createSearchLayout(self) -> None:
-        self._searchLineEdit = QtWidgets.QLineEdit()
+        self._searchLineEdit = QtWidgets.QLineEdit(self)
         self._searchLineEdit.setObjectName("search-line-edit")
         self._searchLineEdit.setSizePolicy(
             QtWidgets.QSizePolicy.Policy.Fixed, QtWidgets.QSizePolicy.Policy.Fixed
         )
-        self._searchComboBox = QtWidgets.QComboBox()
+        self._searchComboBox = QtWidgets.QComboBox(self)
         self._searchComboBox.setObjectName("search-combo-box")
         self._searchComboBox.setCurrentIndex(0)
         self._searchLineEdit.setDisabled(True)
         self._searchComboBox.setDisabled(True)
         self._searchLayout = QtWidgets.QHBoxLayout()
-        self._searchLayout.addWidget(QtWidgets.QLabel("Element Symbol: "))
+        self._searchLayout.addWidget(QtWidgets.QLabel("Element Symbol: ", self))
         self._searchLayout.addWidget(self._searchLineEdit)
-        self._searchLayout.addWidget(QtWidgets.QLabel("Radiation Type: "))
+        self._searchLayout.addWidget(QtWidgets.QLabel("Radiation Type: ", self))
         self._searchLayout.addWidget(self._searchComboBox)
         self._searchLayout.addStretch()
 
@@ -242,7 +252,7 @@ class PeakSearchWidget(QtWidgets.QWidget):
                 self._tableWidget.addRow(self._createTableRow(plotData))
 
     def _createTableWidget(self) -> None:
-        self._tableWidget = PeakSearchTableWidget()
+        self._tableWidget = PeakSearchTableWidget(self)
         self._tableWidget.setMaximumHeight(200)
         self._tableWidget.cellClicked.connect(self._cellClicked)
 
@@ -261,6 +271,10 @@ class PeakSearchWidget(QtWidgets.QWidget):
 
     def _createTableRow(self, plotData: datatypes.PlotData) -> dict:
         row = self._df.iloc[plotData.rowId]
+        try:
+            intensity = self._activeIntensities[row["symbol"]][row["radiation_type"]]
+        except KeyError:
+            intensity = 0
         tableRow = {
             "rowId": plotData.rowId,
             "hide-button": self._createHideWidget(plotData),
@@ -269,9 +283,7 @@ class PeakSearchWidget(QtWidgets.QWidget):
             "kiloelectron-volt": TableItem(str(row["kiloelectron_volt"])),
             "low_kiloelectron_volt": TableItem(str(row["low_kiloelectron_volt"])),
             "high_kiloelectron_volt": TableItem(str(row["high_kiloelectron_volt"])),
-            "intensity": TableItem(
-                str(self._activeIntensities[row["symbol"]][row["radiation_type"]])
-            ),
+            "intensity": TableItem(str(intensity)),
             "condition-combo-box": self._createConditionComboBox(plotData),
             "status": (
                 TableItem("Activated")
@@ -289,11 +301,11 @@ class PeakSearchWidget(QtWidgets.QWidget):
     def _createHideWidget(self, plotData: datatypes.PlotData) -> HideButton:
         if plotData.visible:
             widget = HideButton(
-                icon=QtGui.QIcon(resourcePath("resources/icons/show.png"))
+                parent=self, icon=QtGui.QIcon(resourcePath("resources/icons/show.png"))
             )
         else:
             widget = HideButton(
-                icon=QtGui.QIcon(resourcePath("resources/icons/hide.png"))
+                parent=self, icon=QtGui.QIcon(resourcePath("resources/icons/hide.png"))
             )
         widget.clicked.connect(partial(self._plotDataChanged, plotData.rowId, "hide"))
         return widget
@@ -301,7 +313,7 @@ class PeakSearchWidget(QtWidgets.QWidget):
     def _createConditionComboBox(
         self, plotData: datatypes.PlotData
     ) -> ConditionComboBox:
-        widget = ConditionComboBox()
+        widget = ConditionComboBox(self)
         if plotData.active:
             widget.setDisabled(True)
         if plotData.conditionId is not None:
@@ -313,9 +325,9 @@ class PeakSearchWidget(QtWidgets.QWidget):
 
     def _createStatusButton(self, plotData: datatypes.PlotData) -> StatusButton:
         if not plotData.active:
-            widget = StatusButton("Activate")
+            widget = StatusButton("Activate", self)
         else:
-            widget = StatusButton("Deactivate")
+            widget = StatusButton("Deactivate", self)
         widget.clicked.connect(partial(self._plotDataChanged, plotData.rowId, "status"))
         return widget
 
@@ -327,9 +339,9 @@ class PeakSearchWidget(QtWidgets.QWidget):
             self._addPlotDataToUndoStack(rowId, action)
 
     def _createStatusLayout(self) -> None:
-        self._statusLabel = QtWidgets.QLabel()
+        self._statusLabel = QtWidgets.QLabel(self)
         self._statusLabel.setObjectName("status-label")
-        self._coordinateLabel = QtWidgets.QLabel()
+        self._coordinateLabel = QtWidgets.QLabel(self)
         self._coordinateLabel.setObjectName("coordinate-label")
         self._coordinateLabel.setSizePolicy(
             QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Fixed
@@ -341,7 +353,7 @@ class PeakSearchWidget(QtWidgets.QWidget):
 
     def _createPlotViewBox(self) -> None:
         self._createStatusLayout()
-        self._graphicsLayoutWidget = pg.GraphicsLayoutWidget()
+        self._graphicsLayoutWidget = pg.GraphicsLayoutWidget(self)
         self._createPeakPlot()
         self._createSpectrumPlot()
 
@@ -363,7 +375,6 @@ class PeakSearchWidget(QtWidgets.QWidget):
 
     def _setUpView(self) -> None:
         self.mainLayout = QtWidgets.QVBoxLayout()
-        self.mainLayout.setContentsMargins(0, 0, 0, 0)
         self.mainLayout.addWidget(self._toolBar)
         self.mainLayout.addLayout(self._searchLayout)
         self.mainLayout.addWidget(self._tableWidget)
@@ -547,7 +558,7 @@ class PeakSearchWidget(QtWidgets.QWidget):
 
     def _addPlotDataToUndoStack(self, rowId: int, action: str) -> None:
         if not self._undoStack:
-            self._undoAction.setDisabled(False)
+            self._actionsMap["undo"].setDisabled(False)
         # if len(self._undoStack) > 30:
         #     self._undoStack.popleft()
         # if self._flag:
@@ -680,9 +691,6 @@ class PeakSearchWidget(QtWidgets.QWidget):
         self._searchComboBox.setDisabled(False)
         self._searchLineEdit.editingFinished.connect(self._search)
         self._searchComboBox.currentTextChanged.connect(self._search)
-        self._undoAction.triggered.connect(self._undo)
-        # self._redoAction.triggered.connect(self._redo)
-        self._regionAction.triggered.connect(self._toggleRegions)
         self._peakPlot.sigRangeChanged.connect(self._adjustZoom)
         self._peakPlot.scene().sigMouseMoved.connect(self._mouseMoved)
         self._peakPlot.scene().sigMouseClicked.connect(self._openPopUp)
@@ -709,6 +717,10 @@ class PeakSearchWidget(QtWidgets.QWidget):
         Returns:
             None
         """
+        if calibration is None:
+            return
+        if self._calibration and self._calibration == calibration:
+            return
         self.blockSignals(True)
         self._calibration = calibration
         self._analyse = self._calibration.analyse

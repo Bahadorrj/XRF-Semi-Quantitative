@@ -1,15 +1,16 @@
+from calendar import c
 from functools import partial, cache
 from typing import Optional
 
 import numpy as np
+import pandas
 import pyqtgraph as pg
 from PyQt6 import QtCore, QtGui, QtWidgets
 
 from src.utils import datatypes
-from src.utils import encryption
 from src.utils.database import getDataframe
 from src.utils.paths import resourcePath
-from src.views.explorers.methodexplorer import MethodsCalibrationTrayWidget
+from src.views.base.tablewidget import TableWidget
 from src.views.trays.calibrationtray import CalibrationTrayWidget
 from src.views.trays.methodtray import MethodTrayWidget
 
@@ -31,11 +32,13 @@ COLORS = [
 ]
 
 
-class ConditionForm(QtWidgets.QListView):
-    def __init__(self, parent=None):
-        super(ConditionForm, self).__init__(parent)
-        self._df = getDataframe("Conditions")
+class ConditionFormWidget(QtWidgets.QListView):
+    def __init__(self, parent=None, conditions: pandas.DataFrame | None = None):
+        super().__init__(parent)
+        self._conditions = None
         self._initializeUi()
+        if conditions is not None:
+            self.supply(conditions)
 
     def _initializeUi(self) -> None:
         self.setObjectName("condition-form")
@@ -56,16 +59,14 @@ class ConditionForm(QtWidgets.QListView):
 
     def _createComboBox(self):
         self._selectorComboBox = QtWidgets.QComboBox(self)
-        self._selectorComboBox.addItems(self._df.query("active == 1")["name"])
-        self._selectorComboBox.currentTextChanged.connect(self._showConditionInList)
+        self._selectorComboBox.currentTextChanged.connect(self._currentTextChanged)
+
+    def _currentTextChanged(self, text: str):
+        conditionId = self._df.query(f"name == '{text}'")["condition_id"].values[0]
+        self._showConditionInList(conditionId)
 
     def _createTable(self):
-        self._tableWidget = QtWidgets.QTableWidget(self)
-        self._tableWidget.setColumnCount(1)
-        self._tableWidget.setRowCount(len(self._df.columns[1:-1]))
-        self._tableWidget.setVerticalHeaderLabels(
-            [label.title() for label in self._df.columns[1:-1]]
-        )
+        self._tableWidget = TableWidget(self)
         self._tableWidget.horizontalHeader().setSectionResizeMode(
             QtWidgets.QHeaderView.ResizeMode.Stretch
         )
@@ -77,10 +78,9 @@ class ConditionForm(QtWidgets.QListView):
         self._tableWidget.setEditTriggers(
             QtWidgets.QTreeWidget.EditTrigger.NoEditTriggers
         )
-        self._showConditionInList(1)
 
     def _showConditionInList(self, conditionId: int):
-        conditionDf = self._df[self._df["condition_id"] == conditionId].drop(
+        conditionDf = self._df.query(f"condition_id == {conditionId}").drop(
             ["condition_id", "active"], axis=1
         )
         for index in range(conditionDf.size):
@@ -90,10 +90,30 @@ class ConditionForm(QtWidgets.QListView):
             item.setTextAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
             self._tableWidget.setItem(index, 0, item)
 
+    def supply(self, conditions: pandas.DataFrame) -> None:
+        if conditions is None:
+            return
+        if self._df is not None and self._df.equals(conditions):
+            return
+        self.blockSignals(True)
+        self._df = conditions
+        self._selectorComboBox.blockSignals(True)
+        self._selectorComboBox.clear()
+        self._selectorComboBox.addItems(self._df.query("active == 1")["name"])
+        self._selectorComboBox.blockSignals(False)
+        self._tableWidget.resetTable()
+        self._tableWidget.setColumnCount(1)
+        self._tableWidget.setRowCount(len(self._df.columns[1:-1]))
+        self._tableWidget.setVerticalHeaderLabels(
+            [label.title() for label in self._df.columns[1:-1]]
+        )
+        self._showConditionInList(1)
+        self.blockSignals(False)
+
 
 class PlotWindow(QtWidgets.QMainWindow):
     def __init__(self):
-        super(PlotWindow, self).__init__()
+        super().__init__()
         self._analyse = None
         self._analyseFiles = []
         self._initializeUi()
@@ -106,7 +126,7 @@ class PlotWindow(QtWidgets.QMainWindow):
         self._createToolBar()
         self._createPlotWidget()
         self._createTreeWidget()
-        self._createListWidget()
+        self._createConditionFormWidget()
         self._createCoordinateLabel()
         self._setUpView()
 
@@ -115,19 +135,16 @@ class PlotWindow(QtWidgets.QMainWindow):
         actions = {
             "New": False,
             "Open": False,
-            "Save": True,
             "Save as": True,
             "Close": False,
             "Print": True,
             "Print Preview": True,
             "Print Setup": True,
             "Standards Tray List": False,
-            "Defaults": True,
-            "Calibrate": True,
             "Methods Tray List": False,
         }
         for label, disabled in actions.items():
-            action = QtGui.QAction(label)
+            action = QtGui.QAction(label, self)
             key = "-".join(label.lower().split(" "))
             action.setIcon(QtGui.QIcon(resourcePath(f"resources/icons/{key}.png")))
             action.setDisabled(disabled)
@@ -181,9 +198,7 @@ class PlotWindow(QtWidgets.QMainWindow):
             if action in ["new", "save-as", "print-setup"]:
                 self._menusMap["file"].addSeparator()
 
-        calibrationActions = ["standards-tray-list", "defaults", "calibrate"]
-        for action in calibrationActions:
-            self._menusMap["calibration"].addAction(self._actionsMap[action])
+        self._menusMap["calibration"].addAction(self._actionsMap["standards-tray-list"])
 
         self._menusMap["method"].addAction(self._actionsMap["methods-tray-list"])
 
@@ -201,11 +216,10 @@ class PlotWindow(QtWidgets.QMainWindow):
 
     def _fillToolBarWithActions(self, toolBar: QtWidgets.QToolBar) -> None:
         toolBar.addAction(self._actionsMap["open"])
-        toolBar.addAction(self._actionsMap["save"])
         toolBar.addAction(self._actionsMap["save-as"])
 
     def _createPlotWidget(self) -> None:
-        self._plotWidget = pg.PlotWidget()
+        self._plotWidget = pg.PlotWidget(self)
         self._plotWidget.setObjectName("plot-widget")
         self._plotWidget.setBackground("#FFFFFF")
         plotItem = self._plotWidget.getPlotItem()
@@ -225,7 +239,7 @@ class PlotWindow(QtWidgets.QMainWindow):
         self._coordinateLabel.setText(f"x = {round(x, 2)} y = {round(y, 2)}")
 
     def _createTreeWidget(self) -> None:
-        self._treeWidget = QtWidgets.QTreeWidget()
+        self._treeWidget = QtWidgets.QTreeWidget(self)
         self._treeWidget.setObjectName("file-tree")
         self._treeWidget.setColumnCount(2)
         self._treeWidget.setHeaderLabels(["File", "Color"])
@@ -251,8 +265,9 @@ class PlotWindow(QtWidgets.QMainWindow):
             item.setText(0, label)
             self._treeWidget.addTopLevelItem(item)
 
-    def _createListWidget(self) -> None:
-        self._formWidget = ConditionForm(self)
+    def _createConditionFormWidget(self) -> None:
+        self._conditionFormWidget = ConditionFormWidget(self)
+        self._conditionFormWidget.hide()
 
     def _createCoordinateLabel(self) -> None:
         self._coordinateLabel = QtWidgets.QLabel(self)
@@ -267,7 +282,7 @@ class PlotWindow(QtWidgets.QMainWindow):
         splitter.addWidget(self._plotWidget)
         secondSplitter = QtWidgets.QSplitter(QtCore.Qt.Orientation.Vertical)
         secondSplitter.addWidget(self._treeWidget)
-        secondSplitter.addWidget(self._formWidget)
+        secondSplitter.addWidget(self._conditionFormWidget)
         secondSplitter.setChildrenCollapsible(False)
         splitter.addWidget(secondSplitter)
         self.mainLayout = QtWidgets.QVBoxLayout()
@@ -322,7 +337,7 @@ class PlotWindow(QtWidgets.QMainWindow):
             colorButton.setColor(COLORS[index])
             colorButton.sigColorChanged.connect(self._drawCanvas)
             self._treeWidget.setItemWidget(child, 1, colorButton)
-        mapper = {"txt": 0, "atx": 1}
+        mapper = {"txt": 0, "atx": 1, None: 2}
         self._treeWidget.topLevelItem(mapper[analyse.extension]).addChild(item)
 
     def _openAnalyse(self) -> None:
@@ -359,7 +374,7 @@ class PlotWindow(QtWidgets.QMainWindow):
             self._plotWidget.clear()
 
     def _openMethodTrayListWidget(self) -> None:
-        methodTray = MethodTrayWidget(dataframe=getDataframe("Methods"))
+        methodTray = MethodTrayWidget(parent=self, dataframe=getDataframe("Methods"))
         methodTray.showMaximized()
 
     def _openCalibrationTrayListWidget(self):
@@ -384,10 +399,16 @@ class PlotWindow(QtWidgets.QMainWindow):
         return activePlotAttrs
 
     def _itemClicked(self, item: QtWidgets.QTreeWidgetItem, column: int) -> None:
+        if self._treeWidget.indexOfTopLevelItem(item.parent()) == -1:
+            return
+        tmp = self._analyse
         self._analyse = next(
             a for a in self._analyseFiles if a.filename == item.text(0)
         )
-        if self._analyse:
+        if self._analyse and self._analyse != tmp:
+            if self._conditionFormWidget.isVisible() is False:
+                self._conditionFormWidget.show()
+            self._conditionFormWidget.supply(self._analyse.conditions)
             self._actionsMap["save-as"].setDisabled(False)
 
     def _drawCanvas(self) -> None:
@@ -414,7 +435,7 @@ class PlotWindow(QtWidgets.QMainWindow):
     def _getAnalyseFromIndex(
         self, extensionIndex: int, analyseIndex: int
     ) -> datatypes.Analyse:
-        mapper = {0: "txt", 1: "atx"}
+        mapper = {0: "txt", 1: "atx", 2: None}
         return list(
             filter(lambda a: a.extension == mapper[extensionIndex], self._analyseFiles)
         )[analyseIndex]
@@ -438,13 +459,13 @@ class PlotWindow(QtWidgets.QMainWindow):
         )
         self._analyse.saveTo(filepath)
 
-    def closeEvent(self, event):
-        # Intercept the close event
-        # Check if the close is initiated by the close button
-        if event.spontaneous():
-            # Hide the window instead of closing
-            self.hide()
-            event.ignore()
-        else:
-            # Handle the close event normally
-            event.accept()
+    # def closeEvent(self, event):
+    #     # Intercept the close event
+    #     # Check if the close is initiated by the close button
+    #     if event.spontaneous():
+    #         # Hide the window instead of closing
+    #         self.hide()
+    #         event.ignore()
+    #     else:
+    #         # Handle the close event normally
+    #         event.accept()

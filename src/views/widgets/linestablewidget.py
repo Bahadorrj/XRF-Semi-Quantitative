@@ -44,6 +44,7 @@ class LinesTableWidget(QtWidgets.QWidget):
         self._initializeUi()
         if calibration is not None:
             self.supply(calibration)
+        self.hide()
 
     def _initializeUi(self) -> None:
         self._createFilterLayout()
@@ -51,19 +52,19 @@ class LinesTableWidget(QtWidgets.QWidget):
         self._setUpView()
 
     def _createFilterLayout(self) -> None:
-        self._searchComboBox = QtWidgets.QComboBox()
+        self._searchComboBox = QtWidgets.QComboBox(self)
         self._searchComboBox.setObjectName("search-combo-box")
         self._searchComboBox.currentTextChanged.connect(self.setFilter)
         self._searchLayout = QtWidgets.QHBoxLayout()
-        self._searchLayout.addWidget(QtWidgets.QLabel("Filter by: "))
+        self._searchLayout.addWidget(QtWidgets.QLabel("Filter by: ", self))
         self._searchLayout.addWidget(self._searchComboBox)
         self._searchLayout.addStretch()
 
     def _setUpView(self) -> None:
-        self.mainLayout = QtWidgets.QVBoxLayout(self)
-        self.mainLayout.setContentsMargins(0, 0, 0, 0)
+        self.mainLayout = QtWidgets.QVBoxLayout()
         self.mainLayout.addLayout(self._searchLayout)
         self.mainLayout.addWidget(self._linesTableWidget)
+        self.setLayout(self.mainLayout)
 
     @QtCore.pyqtSlot(str)
     def setFilter(self, filterName: str) -> None:
@@ -77,8 +78,10 @@ class LinesTableWidget(QtWidgets.QWidget):
             self._activeTableWidget.show()
 
     def _createTableWidgets(self) -> None:
-        self._linesTableWidget = DataframeTableWidget(autofill=True)
-        self._activeTableWidget = DataframeTableWidget(autofill=True)
+        self._linesTableWidget = DataframeTableWidget(self, autoFill=True)
+        self._linesTableWidget.hide()
+        self._activeTableWidget = DataframeTableWidget(self, autoFill=True)
+        self._activeTableWidget.hide()
 
     def supply(self, calibration: datatypes.Calibration) -> None:
         """Updates the widget with the provided calibration data.
@@ -93,6 +96,10 @@ class LinesTableWidget(QtWidgets.QWidget):
         Returns:
             None
         """
+        if calibration is None:
+            return
+        if self._calibration and self._calibration == calibration:
+            return
         self.blockSignals(True)
         self._calibration = calibration
         self._linesDf = self._calibration.lines.drop(["line_id", "element_id"], axis=1)

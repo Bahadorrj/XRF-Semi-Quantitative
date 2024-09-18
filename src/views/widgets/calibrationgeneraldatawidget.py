@@ -34,42 +34,45 @@ class CalibrationGeneralDataWidget(GeneralDataWidget):
         calibration: datatypes.Calibration | None = None,
         editable: bool = False,
     ) -> None:
-        super(CalibrationGeneralDataWidget, self).__init__(parent, editable)
+        super().__init__(parent, editable)
         self._generalDataWidgetsMap = (
             {
-                "element": QtWidgets.QLineEdit(),
-                "concentration": QtWidgets.QLineEdit(),
-                "type": QtWidgets.QComboBox(),
-                "area": QtWidgets.QLineEdit(),
-                "mass": QtWidgets.QLineEdit(),
-                "rho": QtWidgets.QLineEdit(),
-                "background Model": QtWidgets.QComboBox(),
-                "rest": QtWidgets.QComboBox(),
-                "diluent": QtWidgets.QComboBox(),
+                "element": QtWidgets.QLineEdit(self),
+                "concentration": QtWidgets.QLineEdit(self),
+                "type": QtWidgets.QComboBox(self),
+                "area": QtWidgets.QLineEdit(self),
+                "mass": QtWidgets.QLineEdit(self),
+                "rho": QtWidgets.QLineEdit(self),
+                "background Model": QtWidgets.QComboBox(self),
+                "rest": QtWidgets.QComboBox(self),
+                "diluent": QtWidgets.QComboBox(self),
             }
             if self._editable
             else {
-                "element": QtWidgets.QLabel(),
-                "concentration": QtWidgets.QLabel(),
-                "type": QtWidgets.QLabel(),
-                "area": QtWidgets.QLabel(),
-                "mass": QtWidgets.QLabel(),
-                "rho": QtWidgets.QLabel(),
-                "background Model": QtWidgets.QLabel(),
-                "rest": QtWidgets.QLabel(),
-                "diluent": QtWidgets.QLabel(),
+                "element": QtWidgets.QLabel(self),
+                "concentration": QtWidgets.QLabel(self),
+                "type": QtWidgets.QLabel(self),
+                "area": QtWidgets.QLabel(self),
+                "mass": QtWidgets.QLabel(self),
+                "rho": QtWidgets.QLabel(self),
+                "background Model": QtWidgets.QLabel(self),
+                "rest": QtWidgets.QLabel(self),
+                "diluent": QtWidgets.QLabel(self),
             }
         )
         self._fillGeneralDataGroupBox()
         for key, widget in self._generalDataWidgetsMap.items():
             if isinstance(widget, QtWidgets.QComboBox):
-                widget.currentTextChanged.connect(partial(self._addToGeneralData, key, widget))
+                widget.currentTextChanged.connect(
+                    partial(self._addToGeneralData, key, widget)
+                )
             elif isinstance(widget, QtWidgets.QLineEdit):
                 widget.textEdited.connect(partial(self._addToGeneralData, key, widget))
         self._calibration = None
         self._element = None
         if calibration is not None:
             self.supply(calibration)
+        self.hide()
 
     def _fillWidgetsFromCalibration(self) -> None:
         for key, widget in self._generalDataWidgetsMap.items():
@@ -135,6 +138,10 @@ class CalibrationGeneralDataWidget(GeneralDataWidget):
         )
 
     def supply(self, calibration: datatypes.Calibration) -> None:
+        if calibration is None:
+            return
+        if self._calibration and self._calibration == calibration:
+            return
         self.blockSignals(True)
         self._calibration = calibration
         self._element = calibration.element

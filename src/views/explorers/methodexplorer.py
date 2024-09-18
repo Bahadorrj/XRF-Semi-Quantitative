@@ -24,15 +24,16 @@ class MethodsCalibrationTrayWidget(CalibrationTrayWidget):
         self._df = None
         self._calibration = None
         self._widgets = {
-            "General Data": CalibrationGeneralDataWidget(),
-            "Coefficient": CoefficientWidget(),
-            "Lines": LinesTableWidget(),
+            "General Data": CalibrationGeneralDataWidget(self),
+            "Coefficient": CoefficientWidget(self),
+            "Lines": LinesTableWidget(self),
         }
         self._acquisitionWidget = AcquisitionWidget()
         self._acquisitionWidget.getAnalyseFile.connect(self._getAnalyseFile)
         self._initializeUi()
         if method is not None:
             self.supply(method)
+        self.hide()
 
     def _initializeUi(self) -> None:
         self.setObjectName("tray-widget")
@@ -102,9 +103,10 @@ class MethodsCalibrationTrayWidget(CalibrationTrayWidget):
             index = self._df.query(f"filename == '{filename}'").index
             self._df.drop(index, inplace=True)
             self._tableWidget.removeRow(self._tableWidget.currentRow())
-            self._currentCellChanged(self._tableWidget.currentRow(), 0, -1, -1)
 
     def supply(self, method: datatypes.Method) -> None:
+        if method is None:
+            return
         super().supply(method.calibrations)
 
 
@@ -117,12 +119,12 @@ class MethodExplorer(Explorer):
         parent: QtWidgets.QWidget | None = None,
         method: datatypes.Method | None = None,
     ):
-        super(MethodExplorer, self).__init__(parent)
+        super().__init__(parent)
         self._method = None
         self._initMethod = None
         self._widgets = {
-            "Analytes And Conditions": AnalytesAndConditionsWidget(editable=True),
-            "Calibrations": MethodsCalibrationTrayWidget(),
+            "Analytes And Conditions": AnalytesAndConditionsWidget(self, editable=True),
+            "Calibrations": MethodsCalibrationTrayWidget(self),
         }
         self._initializeUi()
         if method is not None:
@@ -145,7 +147,7 @@ class MethodExplorer(Explorer):
 
     def newMethod(self):
         if self._method != self._initMethod:
-            messageBox = QtWidgets.QMessageBox()
+            messageBox = QtWidgets.QMessageBox(self)
             messageBox.setIcon(QtWidgets.QMessageBox.Icon.Question)
             messageBox.setText(
                 "Do you want to save the changes before opening a new method?"
@@ -179,7 +181,7 @@ class MethodExplorer(Explorer):
         self.saved.emit()
 
     def openMethod(self):
-        messageBox = QtWidgets.QMessageBox()
+        messageBox = QtWidgets.QMessageBox(self)
         messageBox.setIcon(QtWidgets.QMessageBox.Icon.Question)
         messageBox.setText(
             "Do you want to save the changes before opening another method?"
@@ -205,15 +207,20 @@ class MethodExplorer(Explorer):
             oldWidget = self.mainLayout.itemAt(1).widget()
             oldWidget.hide()
             newWidget = self._widgets[label]
+            newWidget.setContentsMargins(20, 20, 20, 20)
             self.mainLayout.replaceWidget(oldWidget, newWidget)
             newWidget.show()
             newWidget.setFocus()
-            
+
     def _supplyWidgets(self) -> None:
         for widget in self._widgets.values():
             widget.supply(self._method)
 
     def supply(self, method: datatypes.Method) -> None:
+        if method is None:
+            return
+        if self._method and self._method == method:
+            return
         self.blockSignals(True)
         self._method = method
         self._initMethod = self._method.copy()
@@ -223,7 +230,7 @@ class MethodExplorer(Explorer):
 
     def closeEvent(self, a0: QCloseEvent | None) -> None:
         if self._method != self._initMethod:
-            messageBox = QtWidgets.QMessageBox()
+            messageBox = QtWidgets.QMessageBox(self)
             messageBox.setIcon(QtWidgets.QMessageBox.Icon.Question)
             messageBox.setText(
                 "Do you want to save the changes before closing the method edit?"

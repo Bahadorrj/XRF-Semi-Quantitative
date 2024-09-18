@@ -24,7 +24,7 @@ class TrayWidget(QtWidgets.QWidget):
     """
 
     def __init__(self, parent: QtWidgets.QWidget | None = None) -> None:
-        super(TrayWidget, self).__init__(parent)
+        super().__init__(parent)
         self.setMinimumSize(1280, 720)
 
         self._widgets = {}
@@ -54,15 +54,12 @@ class TrayWidget(QtWidgets.QWidget):
         self._setUpView()
 
     def _createActions(self, labels: dict) -> None:
-        shortcuts = {"add": QtGui.QKeySequence("Ctrl+=")}
         for label, disabled in labels.items():
-            action = QtGui.QAction(label)
+            action = QtGui.QAction(label, self)
             key = "-".join(label.lower().split(" "))
             action.setIcon(QtGui.QIcon(resourcePath(f"resources/icons/{key}.png")))
             action.setDisabled(disabled)
             self._actionsMap[key] = action
-            if shortcut := shortcuts.get(key, None):
-                action.setShortcut(shortcut)
             action.triggered.connect(partial(self._actionTriggered, key))
 
     @QtCore.pyqtSlot(str)
@@ -70,7 +67,7 @@ class TrayWidget(QtWidgets.QWidget):
         pass
 
     def _createMenus(self, labels: list | tuple) -> None:
-        self._menuBar = QtWidgets.QMenuBar()
+        self._menuBar = QtWidgets.QMenuBar(self)
         self._menuBar.setSizePolicy(
             QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Fixed
         )
@@ -103,7 +100,7 @@ class TrayWidget(QtWidgets.QWidget):
             self._menusMap["edit"].addAction(action)
 
     def _createToolBar(self) -> None:
-        self._toolBar = QtWidgets.QToolBar()
+        self._toolBar = QtWidgets.QToolBar(self)
         self._toolBar.setIconSize(QtCore.QSize(16, 16))
         self._toolBar.setToolButtonStyle(
             QtCore.Qt.ToolButtonStyle.ToolButtonTextUnderIcon
@@ -120,35 +117,29 @@ class TrayWidget(QtWidgets.QWidget):
         self._toolBar.addAction(self._actionsMap["remove"])
 
     def _createTableWidget(self) -> None:
-        self._tableWidget = DataframeTableWidget(autofill=True)
-        self._tableWidget.currentCellChanged.connect(self._currentCellChanged)
+        self._tableWidget = DataframeTableWidget(self, autoFill=True)
+        self._tableWidget.cellClicked.connect(self._cellClicked)
 
     @QtCore.pyqtSlot(int, int)
-    def _currentCellChanged(
-        self, currentRow: int, currentColumn: int, previousRow: int, previousColumn: int
-    ) -> None:
-        if currentRow not in [previousRow, -1]:
-            if self._tabWidget.count() == 0:
-                self._addWidgets(self._widgets)
-            if editAction := self._actionsMap.get("edit", None):
+    def _cellClicked(self, row: int, column: int) -> None:
+        if row != -1:
+            if editAction := self._actionsMap.get("edit"):
                 editAction.setDisabled(False)
-            if removeAction := self._actionsMap.get("remove", None):
+            if removeAction := self._actionsMap.get("remove"):
                 removeAction.setDisabled(False)
-        elif currentRow == -1:
-            self._tabWidget.clear()
-            if editAction := self._actionsMap.get("edit", None):
+        else:
+            if editAction := self._actionsMap.get("edit"):
                 editAction.setDisabled(True)
-            if removeAction := self._actionsMap.get("remove", None):
+            if removeAction := self._actionsMap.get("remove"):
                 removeAction.setDisabled(True)
 
     def _createTabWidget(self) -> None:
-        self._tabWidget = QtWidgets.QTabWidget()
+        self._tabWidget = QtWidgets.QTabWidget(self)
 
     def _addWidgets(self, widgets: dict):
         self._tabWidget.clear()
         for label, widget in widgets.items():
-            if widget.contentsMargins().left() == 0:
-                widget.mainLayout.setContentsMargins(10, 10, 10, 10)
+            widget.mainLayout.setContentsMargins(10, 10, 10, 10)
             self._tabWidget.addTab(widget, label)
 
     def _setUpView(self) -> None:
@@ -179,6 +170,10 @@ class TrayWidget(QtWidgets.QWidget):
         Returns:
             None
         """
+        if dataframe is None:
+            return
+        if self._df is not None and self._df.equals(dataframe):
+            return
         self.blockSignals(True)
         self._df = dataframe
         self._tabWidget.clear()

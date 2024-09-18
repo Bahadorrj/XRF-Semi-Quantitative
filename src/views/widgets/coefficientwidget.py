@@ -41,11 +41,12 @@ class CoefficientWidget(QtWidgets.QWidget):
         parent: QtWidgets.QWidget | None = None,
         calibration: datatypes.Calibration | None = None,
     ):
-        super(CoefficientWidget, self).__init__(parent)
+        super().__init__(parent)
         self._calibration = None
         self._initializeUi()
         if calibration is not None:
             self.supply(calibration)
+        self.hide()
 
     def _initializeUi(self) -> None:
         self._createLineSelectionLayout()
@@ -55,17 +56,17 @@ class CoefficientWidget(QtWidgets.QWidget):
     def _createLineSelectionLayout(self) -> None:
         self._lineSelectLayout = QtWidgets.QHBoxLayout()
         self._lineSelectLayout.addWidget(QtWidgets.QLabel("Active Lines:"))
-        self._searchComboBox = QtWidgets.QComboBox()
+        self._searchComboBox = QtWidgets.QComboBox(self)
         self._searchComboBox.setObjectName("search-combo-box")
         self._searchComboBox.currentTextChanged.connect(self._drawCanvas)
         self._lineSelectLayout.addWidget(self._searchComboBox)
         self._lineSelectLayout.addStretch()
-        self._slopeLabel = QtWidgets.QLabel("Slope:")
+        self._slopeLabel = QtWidgets.QLabel("Slope:", self)
         self._lineSelectLayout.addWidget(self._slopeLabel)
         self._lineSelectLayout.addStretch()
 
     def _createPlotWidget(self) -> None:
-        self._plotWidget = pg.PlotWidget()
+        self._plotWidget = pg.PlotWidget(self)
         self._plotWidget.setObjectName("plot-widget")
         self._plotWidget.setBackground("#FFFFFF")
         self._plotWidget.showGrid(x=True, y=True)
@@ -75,7 +76,6 @@ class CoefficientWidget(QtWidgets.QWidget):
 
     def _setUpView(self) -> None:
         self.mainLayout = QtWidgets.QVBoxLayout()
-        self.mainLayout.setContentsMargins(0, 0, 0, 0)
         self.mainLayout.addLayout(self._lineSelectLayout)
         self.mainLayout.addWidget(self._plotWidget)
         self.setLayout(self.mainLayout)
@@ -130,6 +130,10 @@ class CoefficientWidget(QtWidgets.QWidget):
         Returns:
             None
         """
+        if calibration is None:
+            return
+        if self._calibration and self._calibration == calibration:
+            return
         self.blockSignals(True)
         self._calibration = calibration
         self._initializeRadiations()

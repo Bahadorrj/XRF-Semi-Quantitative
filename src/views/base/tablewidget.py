@@ -4,9 +4,11 @@ from PyQt6 import QtWidgets, QtCore
 
 
 class TableItem(QtWidgets.QTableWidgetItem):
-    def __init__(self, text: str):
+    def __init__(self, text: str | None = None, editable: bool = False):
         super().__init__(text)
-        self.setFlags(self.flags() & ~QtCore.Qt.ItemFlag.ItemIsEditable)
+        self._editable = editable
+        if not self._editable:
+            self.setFlags(self.flags() & ~QtCore.Qt.ItemFlag.ItemIsEditable)
         self.setTextAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
         self.currentText = self.text()
         self.previousText = self.currentText
@@ -62,7 +64,7 @@ class TableWidget(QtWidgets.QTableWidget):
     rowChanged = QtCore.pyqtSignal(int, str)
 
     def __init__(self, parent: QtWidgets.QWidget | None = None):
-        super(TableWidget, self).__init__(parent)
+        super().__init__(parent)
         self.rows = {}
         self.setAlternatingRowColors(True)
         self.setFrameShape(QtWidgets.QFrame.Shape.NoFrame)
@@ -125,12 +127,14 @@ class TableWidget(QtWidgets.QTableWidget):
                 break
 
     def resetTable(self) -> None:
+        self.blockSignals(True)
         self.setRowCount(0)
         self.rows.clear()
+        self.blockSignals(False)
 
     def updateRow(self, rowIndex: int, row: dict) -> None:
-        rowIndex = self.rows[rowIndex]
         self.blockSignals(True)
+        rowIndex = self.rows[rowIndex]
         for columnIndex, component in row.items():
             if isinstance(component, QtWidgets.QWidget):
                 self.setCellWidget(rowIndex, columnIndex, component)
@@ -146,7 +150,7 @@ class DataframeTableWidget(TableWidget):
     Args:
         parent (QWidget | None): Optional parent widget for the table.
         dataframe (DataFrame | None): Optional pandas DataFrame to initialize the table with.
-        autofill (bool): If True, the table will be automatically filled with data from the DataFrame upon initialization.
+        autoFill (bool): If True, the table will be automatically filled with data from the DataFrame upon initialization.
 
     Methods:
         _fillTable() -> None:
@@ -160,11 +164,13 @@ class DataframeTableWidget(TableWidget):
         self,
         parent: QtWidgets.QWidget | None = None,
         dataframe: pandas.DataFrame | None = None,
-        autofill: bool = False,
+        autoFill: bool = False,
+        editable: bool = False,
     ) -> None:
-        super(DataframeTableWidget, self).__init__(parent)
+        super().__init__(parent)
         self._df = None
-        self._autofill = autofill
+        self._autoFill = autoFill
+        self._editable = editable
         if self._df is not None:
             self.supply(dataframe)
 
@@ -174,10 +180,11 @@ class DataframeTableWidget(TableWidget):
         for rowIndex, row in enumerate(self._df.itertuples(index=False)):
             items = {"rowId": rowIndex}
             for columnIndex, value in enumerate(row):
-                item = TableItem(str(value))
+                item = TableItem(str(value), self._editable)
                 items[self._df.columns[columnIndex]] = item
             self.addRow(items)
         if "active" in self.rows[0]:
+            self.blockSignals(True)
             for row in self.rows.values():
                 if int(row["active"].text()) == 1:
                     row["active"].setForeground(QtCore.Qt.GlobalColor.darkGreen)
@@ -185,18 +192,35 @@ class DataframeTableWidget(TableWidget):
                 else:
                     row["active"].setForeground(QtCore.Qt.GlobalColor.red)
                     row["active"].setText("False")
+            self.blockSignals(False)
+        if "rotation" in self.rows[0]:
+            self.blockSignals(True)
+            for row in self.rows.values():
+                if int(row["rotation"].text()) == 1:
+                    row["rotation"].setForeground(QtCore.Qt.GlobalColor.darkGreen)
+                    row["rotation"].setText("True")
+                else:
+                    row["rotation"].setForeground(QtCore.Qt.GlobalColor.red)
+                    row["rotation"].setText("False")
+            self.blockSignals(False)
         if "condition_id" in self.rows[0]:
+            self.blockSignals(True)
             for row in self.rows.values():
                 if (conditionId := row["condition_id"].text()) != "nan":
                     row["condition_id"].setText(conditionId.split(".")[0])
                 else:
                     row["condition_id"].setText(None)
+            self.blockSignals(False)
 
     def supply(self, dataframe: pandas.DataFrame):
+        if dataframe is None:
+            return
+        if self._df is not None and  self._df.equals(dataframe):
+            return
         self.blockSignals(True)
         self._df = dataframe
         self.resetTable()
-        if self._autofill:
+        if self._autoFill:
             self.setHeaders(
                 [" ".join(column.split("_")).title() for column in self._df.columns]
             )

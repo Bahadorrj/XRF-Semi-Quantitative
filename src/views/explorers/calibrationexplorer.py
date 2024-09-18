@@ -20,6 +20,7 @@ class CalibrationPropertiesWidget(QtWidgets.QWidget):
         self._initializeUi()
         if calibration is not None:
             self.supply(calibration)
+        self.hide()
 
     def _initializeUi(self) -> None:
         self._createFilenameLayout()
@@ -31,17 +32,17 @@ class CalibrationPropertiesWidget(QtWidgets.QWidget):
         self._filenameLayout = QtWidgets.QHBoxLayout()
         self._filenameLayout.addWidget(QtWidgets.QLabel("Filename:"))
         self._filenameLayout.addStretch(1)
-        self._filenameLineEdit = QtWidgets.QLineEdit()
+        self._filenameLineEdit = QtWidgets.QLineEdit(self)
         self._filenameLineEdit.textEdited.connect(self._updateFilename)
         self._filenameLayout.addWidget(self._filenameLineEdit)
         self._filenameLayout.addStretch(10)
 
     def _createAnalyseFileLayout(self) -> None:
         self._analyseFileLayout = QtWidgets.QHBoxLayout()
-        self._analyseFileLayout.addWidget(QtWidgets.QLabel("Analyse File:"))
+        self._analyseFileLayout.addWidget(QtWidgets.QLabel("Analyse File:", self))
         self._analyseFileLayout.addStretch(1)
 
-        self._analyseFileHyperLink = QtWidgets.QLabel()
+        self._analyseFileHyperLink = QtWidgets.QLabel(self)
         self._analyseFileHyperLink.setTextInteractionFlags(
             QtCore.Qt.TextInteractionFlag.TextBrowserInteraction
         )
@@ -57,7 +58,7 @@ class CalibrationPropertiesWidget(QtWidgets.QWidget):
         self._analyseFileLayout.addStretch(10)
 
     def _createErrorLabel(self) -> None:
-        self._errorLabel = QtWidgets.QLabel()
+        self._errorLabel = QtWidgets.QLabel(self)
         self._errorLabel.setStyleSheet("color: red;")
 
     def _setUpView(self) -> None:
@@ -99,12 +100,18 @@ class CalibrationPropertiesWidget(QtWidgets.QWidget):
             self._calibration.analyse = analyse
             self._analyseFileHyperLink.setText(f'<a href="#">{path}</a>')
 
-    def supply(self, calibration) -> None:
+    def supply(self, calibration: datatypes.Calibration) -> None:
+        if calibration is None:
+            return
+        if self._calibration and self._calibration == calibration:
+            return
+        self.blockSignals(True)
         self._calibration = calibration
         self._filenameLineEdit.setText(self._calibration.filename)
         self._analyseFileHyperLink.setText(
             f'<a href="#">{self._calibration.analyse.filePath}</a>'
         )
+        self.blockSignals(False)
 
 
 class CalibrationExplorer(Explorer):
@@ -116,14 +123,13 @@ class CalibrationExplorer(Explorer):
         parent: QtWidgets.QWidget | None = None,
         calibration: datatypes.Calibration | None = None,
     ):
-        super(CalibrationExplorer, self).__init__(parent)
+        super().__init__(parent)
         self._calibration = None
         self._initCalibration = None
         self._widgets = {
-            "General Data": CalibrationGeneralDataWidget(editable=True),
-            "Peak Search": PeakSearchWidget(),
-            "Coefficient": CoefficientWidget(),
-            "Properties": CalibrationPropertiesWidget(),
+            "General Data": CalibrationGeneralDataWidget(self, editable=True),
+            "Peak Search": PeakSearchWidget(self),
+            "Coefficient": CoefficientWidget(self),
         }
         self._initializeUi()
         if calibration is not None:
@@ -146,7 +152,7 @@ class CalibrationExplorer(Explorer):
 
     def newCalibration(self) -> None:
         if self._calibration != self._initCalibration:
-            messageBox = QtWidgets.QMessageBox()
+            messageBox = QtWidgets.QMessageBox(self)
             messageBox.setIcon(QtWidgets.QMessageBox.Icon.Question)
             messageBox.setText(
                 "Do you want to save the changes before opening a new calibration?"
@@ -181,7 +187,7 @@ class CalibrationExplorer(Explorer):
         self.saved.emit()
 
     def openCalibration(self):
-        messageBox = QtWidgets.QMessageBox()
+        messageBox = QtWidgets.QMessageBox(self)
         messageBox.setIcon(QtWidgets.QMessageBox.Icon.Question)
         messageBox.setText(
             "Do you want to save the changes before opening another calibration?"
@@ -213,8 +219,8 @@ class CalibrationExplorer(Explorer):
                 newWidget.displayAnalyseData(int(label.split(" ")[-1]))
             else:
                 newWidget = self._widgets[label]
-            if isinstance(newWidget, CoefficientWidget):
-                newWidget.supply(self._calibration)
+            newWidget.supply(self._calibration)
+            newWidget.setContentsMargins(20, 20, 20, 20)
             self.mainLayout.replaceWidget(oldWidget, newWidget)
             newWidget.show()
             newWidget.setFocus()
@@ -236,17 +242,20 @@ class CalibrationExplorer(Explorer):
             widget.supply(self._calibration)
 
     def supply(self, calibration: datatypes.Calibration):
+        if calibration is None:
+            return
+        if self._calibration and self._calibration == calibration:
+            return
         self.blockSignals(True)
         self._calibration = calibration
         self._initCalibration = self._calibration.copy()
         self._implementAnalyse()
         self._supplyWidgets()
         self.blockSignals(False)
-        self._treeWidget.setCurrentItem(self._treeWidget.topLevelItem(0))
 
     def closeEvent(self, a0: QtGui.QCloseEvent | None) -> None:
         if self._calibration != self._initCalibration:
-            messageBox = QtWidgets.QMessageBox()
+            messageBox = QtWidgets.QMessageBox(self)
             messageBox.setIcon(QtWidgets.QMessageBox.Icon.Question)
             messageBox.setText(
                 "Do you want to save the changes before closing the calibration edit?"

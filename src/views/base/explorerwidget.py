@@ -7,7 +7,7 @@ from src.utils.paths import resourcePath
 
 class Explorer(QtWidgets.QWidget):
     def __init__(self, parent: QtWidgets.QWidget | None = None):
-        super(Explorer, self).__init__(parent)
+        super().__init__(parent, QtCore.Qt.WindowType.Window)
         self.setMinimumSize(1600, 900)
         self._widgets = {}
 
@@ -24,7 +24,7 @@ class Explorer(QtWidgets.QWidget):
     def _createActions(self, labels: list | tuple) -> None:
         self._actionsMap = {}
         for label in labels:
-            action = QtGui.QAction(label)
+            action = QtGui.QAction(label, self)
             key = "-".join(label.lower().split(" "))
             action.setIcon(QtGui.QIcon(resourcePath(f"resources/icons/{key}.png")))
             self._actionsMap[key] = action
@@ -36,7 +36,7 @@ class Explorer(QtWidgets.QWidget):
 
     def _createMenus(self, labels: list | tuple) -> None:
         self._menusMap = {}
-        self._menuBar = QtWidgets.QMenuBar()
+        self._menuBar = QtWidgets.QMenuBar(self)
         for label in labels:
             menu = self._menuBar.addMenu(label)
             key = label.lower()[1:]
@@ -50,7 +50,7 @@ class Explorer(QtWidgets.QWidget):
         self._menusMap["help"].addAction(self._actionsMap["what's-this"])
 
     def _createToolBar(self) -> None:
-        self._toolBar = QtWidgets.QToolBar()
+        self._toolBar = QtWidgets.QToolBar(self)
         self._toolBar.setIconSize(QtCore.QSize(16, 16))
         self._toolBar.setToolButtonStyle(QtCore.Qt.ToolButtonStyle.ToolButtonIconOnly)
         self._toolBar.setMovable(False)
@@ -61,7 +61,7 @@ class Explorer(QtWidgets.QWidget):
         self._toolBar.addAction(self._actionsMap["save"])
 
     def _createTreeWidget(self) -> None:
-        self._treeWidget = QtWidgets.QTreeWidget()
+        self._treeWidget = QtWidgets.QTreeWidget(self)
         # self._treeWidget.setSizePolicy(
         #     QtWidgets.QSizePolicy.Policy.Preferred,
         #     QtWidgets.QSizePolicy.Policy.Expanding,
@@ -86,6 +86,9 @@ class Explorer(QtWidgets.QWidget):
 
     @QtCore.pyqtSlot()
     def _changeWidget(self) -> None:
+        pass
+
+    def _supplyWidgets(self) -> None:
         pass
 
     def _setUpView(self) -> None:

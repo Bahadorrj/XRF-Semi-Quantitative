@@ -40,11 +40,13 @@ class AcquisitionWidget(QtWidgets.QWidget):
         layout = QtWidgets.QVBoxLayout()
         self.mainLayout = QtWidgets.QHBoxLayout()
         self.mainLayout.addStretch()
-        openFromLocalButton = QtWidgets.QPushButton("Open from local storage")
+        openFromLocalButton = QtWidgets.QPushButton("Open from local storage", self)
         openFromLocalButton.clicked.connect(lambda: self.getAnalyseFile.emit())
         self.mainLayout.addWidget(openFromLocalButton)
         self.mainLayout.addStretch()
-        getFromSocketButton = QtWidgets.QPushButton("Get from connected XRF analyser")
+        getFromSocketButton = QtWidgets.QPushButton(
+            "Get from connected XRF analyser", self
+        )
         self.mainLayout.addWidget(getFromSocketButton)
         self.mainLayout.addStretch()
         layout.addStretch()
@@ -60,9 +62,10 @@ class CalibrationFormDialog(FormDialog):
         inputs: Sequence | None = None,
         values: Sequence | None = None,
     ) -> None:
-        super(CalibrationFormDialog, self).__init__(parent, inputs, values)
+        super().__init__(parent, inputs, values)
 
     def _check(self) -> None:
+        self._fill()
         self._errorLabel.clear()
         if not all(
             (
@@ -124,7 +127,8 @@ class CalibrationTrayWidget(TrayWidget):
         parent: QtWidgets.QWidget | None = None,
         dataframe: pandas.DataFrame | None = None,
     ) -> None:
-        super(CalibrationTrayWidget, self).__init__(parent)
+        super().__init__(parent)
+        self.setWindowFlag(QtCore.Qt.WindowType.Window)
         self._df = None
         self._calibration = None
         self._widgets = {
@@ -134,6 +138,7 @@ class CalibrationTrayWidget(TrayWidget):
         }
         self._acquisitionWidget = AcquisitionWidget()
         self._acquisitionWidget.getAnalyseFile.connect(self._getAnalyseFile)
+        self._calibrationExplorer = None
         self._initializeUi()
         if dataframe is not None:
             self.supply(dataframe)
@@ -173,7 +178,7 @@ class CalibrationTrayWidget(TrayWidget):
         Raises:
             ValueError: If the concentration cannot be converted to a float.
         """
-        addDialog = CalibrationFormDialog(inputs=self._df.columns[1:-1])
+        addDialog = CalibrationFormDialog(self, inputs=self._df.columns[1:-1])
         addDialog.setWindowTitle("Add calibration")
         if addDialog.exec():
             filename = addDialog.fields["filename"]
@@ -205,7 +210,6 @@ class CalibrationTrayWidget(TrayWidget):
             "state": TableItem(status),
         }
         self._tableWidget.addRow(items)
-        # self._tableWidget.setCurrentCell(self._tableWidget.rowCount() - 1, 0)
 
     def editCurrentCalibration(self) -> None:
         if self._calibration is None:
@@ -248,10 +252,14 @@ class CalibrationTrayWidget(TrayWidget):
 
     def _openCalibrationExplorer(self) -> None:
         if self._calibration is not None:
-            calibrationExplorer = CalibrationExplorer(calibration=self._calibration)
-            calibrationExplorer.showMaximized()
-            calibrationExplorer.saved.connect(self._supplyWidgets)
-            calibrationExplorer.saved.connect(self._updateCurrentRow)
+            if self._calibrationExplorer and self._calibrationExplorer.isVisible():
+                self._calibrationExplorer.close()
+            else:
+                self._calibrationExplorer = CalibrationExplorer(
+                    parent=self, calibration=self._calibration
+                )
+                self._calibrationExplorer.showMaximized()
+                self._calibrationExplorer.saved.connect(self._saveSignalArrived)
 
     def removeCurrentCalibration(self) -> None:
         """Remove the currently selected calibration from the application.
@@ -270,7 +278,7 @@ class CalibrationTrayWidget(TrayWidget):
         if not self._calibration:
             raise ValueError("No calibration selected")
         # Ask the user if they are sure to remove the calibration
-        messageBox = QtWidgets.QMessageBox()
+        messageBox = QtWidgets.QMessageBox(self)
         messageBox.setIcon(QtWidgets.QMessageBox.Icon.Warning)
         messageBox.setText("Are you sure you want to remove the selected calibration?")
         messageBox.setWindowTitle("Remove Calibration")
@@ -288,7 +296,6 @@ class CalibrationTrayWidget(TrayWidget):
             reloadDataframes()
             self._df = getDataframe("Calibrations")
             self._tableWidget.removeRow(self._tableWidget.currentRow())
-            self._currentCellChanged(self._tableWidget.currentRow(), 0, -1, -1)
 
     def importCalibration(self) -> None:
         """Import a calibration from an ATXC file into the application.
@@ -301,10 +308,10 @@ class CalibrationTrayWidget(TrayWidget):
         Returns:
             None
         """
-        filePath, _ = QtWidgets.QFileDialog.getOpenFileName(
+        filePaths, _ = QtWidgets.QFileDialog.getOpenFileNames(
             self, "Open Calibration", "./", "Antique'X calibration (*.atxc)"
         )
-        if filePath:
+        for filePath in filePaths:
             if self._df.query(f"filename == '{Path(filePath).stem}'").empty:
                 self._calibration = Calibration.fromATXCFile(filePath)
                 getDatabase().executeQuery(
@@ -313,13 +320,13 @@ class CalibrationTrayWidget(TrayWidget):
                         self._calibration.filename,
                         self._calibration.element,
                         self._calibration.concentration,
-                        0,
+                        self._calibration.state,
                     ),
                 )
                 reloadDataframes()
                 self._insertCalibration()
             else:
-                messageBox = QtWidgets.QMessageBox()
+                messageBox = QtWidgets.QMessageBox(self)
                 messageBox.setIcon(QtWidgets.QMessageBox.Icon.Warning)
                 messageBox.setText(
                     "The selected calibration already exists in the database."
@@ -328,22 +335,21 @@ class CalibrationTrayWidget(TrayWidget):
                 messageBox.setStandardButtons(QtWidgets.QMessageBox.StandardButton.Ok)
                 messageBox.exec()
 
-    def _currentCellChanged(
-        self, currentRow: int, currentColumn: int, previousRow: int, previousColumn: int
-    ) -> None:
-        super()._currentCellChanged(
-            currentRow, currentColumn, previousRow, previousColumn
-        )
-        if currentRow not in [previousRow, -1]:
+    def _cellClicked(self, row: int, column: int) -> None:
+        super()._cellClicked(row, column)
+        if row != -1:
             tableRow = self._tableWidget.getCurrentRow()
             filename = tableRow.get("filename").text()
             path = resourcePath(f"calibrations/{filename}.atxc")
             self._calibration = Calibration.fromATXCFile(path)
             self._supplyWidgets()
-        elif currentRow == -1:
+        else:
             self._calibration = None
 
-    @QtCore.pyqtSlot()
+    def _saveSignalArrived(self) -> None:
+        self._supplyWidgets()
+        self._updateCurrentRow()
+
     def _updateCurrentRow(self) -> None:
         tableRow = self._tableWidget.getCurrentRow()
         tableRow["filename"].setText(self._calibration.filename)
@@ -351,7 +357,6 @@ class CalibrationTrayWidget(TrayWidget):
         tableRow["concentration"].setText(str(self._calibration.concentration))
         tableRow["state"].setText(self._calibration.status())
 
-    @QtCore.pyqtSlot()
     def _supplyWidgets(self) -> None:
         if self._calibration.state != 0:
             self._addWidgets(self._widgets)
@@ -361,7 +366,7 @@ class CalibrationTrayWidget(TrayWidget):
             self._addWidgets({"Acquisition": self._acquisitionWidget})
 
     @QtCore.pyqtSlot()
-    def _getAnalyseFile(self):
+    def _getAnalyseFile(self) -> bool:
         path, _ = QtWidgets.QFileDialog.getOpenFileName(
             self,
             "Open Analyse File",
@@ -386,12 +391,13 @@ class CalibrationTrayWidget(TrayWidget):
                 self._calibration.status()
             )
             self._supplyWidgets()
+            return True
+        return False
 
     @QtCore.pyqtSlot()
     def _requestNewCalibration(self) -> None:
-        self.addCalibration()
-        self._getAnalyseFile()
-        self._openCalibrationExplorer()
+        if self.addCalibration() and self._getAnalyseFile():
+            self._openCalibrationExplorer()
 
     def supply(self, dataframe: pandas.DataFrame) -> None:
         """Supply data to the table widget from a given DataFrame.
@@ -406,11 +412,11 @@ class CalibrationTrayWidget(TrayWidget):
             None
         """
         super().supply(dataframe)
+        self.blockSignals(True)
         df = self._df.drop("calibration_id", axis=1)
         df["state"] = df["state"].apply(Calibration.convertStateToStatus)
         self._tableWidget.supply(df)
-        if self._df.empty is False:
-            self._tableWidget.setCurrentCell(0, 0)
+        self.blockSignals(False)
 
     @property
     def calibration(self):
