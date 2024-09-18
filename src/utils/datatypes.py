@@ -8,7 +8,7 @@ from collections import defaultdict
 from dataclasses import dataclass, field
 from json import JSONDecodeError, dump, loads, dumps
 from pathlib import Path
-from typing import Any
+from typing import Any, Sequence
 from PyQt6.QtCore import Qt
 
 from src.utils import calculation
@@ -140,6 +140,8 @@ class Analyse:
         ]
         if "file_path" in analyseDict:
             analyseDict["filePath"] = analyseDict.pop("file_path")
+        analyseDict["conditions"] = pandas.DataFrame(analyseDict.pop("conditions"))
+        analyseDict["conditions"].reset_index(inplace=True, drop=True)
         analyseDict["generalData"] = analyseDict.pop("general_data")
         analyse = cls(**analyseDict)
         if analyseDict.get("filename"):
@@ -353,6 +355,20 @@ class Method:
     elements: pandas.DataFrame = field(
         default_factory=lambda: getDataframe("Elements").copy()
     )
+    interferences: pandas.DataFrame | None = field(default=None)
+    coefficients: pandas.DataFrame | None = field(default=None)
+
+    def __post_init__(self):
+        if self.calibrations.empty:
+            return
+        calibrations = [
+            Calibration.fromATXCFile(f"calibrations/{f}.atxc")
+            for f in self.calibrations["filename"].values
+        ]
+        if self.interferences is None:
+            self.fillInterferences(calibrations)
+        if self.coefficients is None:
+            self.fillCoefficients(calibrations)
 
     def __eq__(self, other: "Method"):
         if other is None:
@@ -365,6 +381,44 @@ class Method:
             and self.calibrations.equals(other.calibrations)
             and self.conditions.equals(other.conditions)
             and self.elements.equals(other.elements)
+        )
+
+    def fillInterferences(self, calibrations: Sequence) -> None:
+        if self.calibrations.empty:
+            self.interferences = pandas.DataFrame({})
+            return
+        self.interferences = pandas.DataFrame(
+            {
+                k: v
+                for k, v in zip(
+                    [calibration.element for calibration in calibrations],
+                    [
+                        {
+                            x: list(y.values())[0]
+                            for x, y in calibration.interferences.items()
+                        }
+                        for calibration in calibrations
+                    ],
+                )
+            }
+        )
+
+    def fillCoefficients(self, calibrations: Sequence) -> None:
+        if self.calibrations.empty:
+            self.coefficients = pandas.DataFrame({})
+            return
+        self.coefficients = pandas.DataFrame(
+            {
+                k: v
+                for k, v in zip(
+                    [calibration.element for calibration in calibrations],
+                    [
+                        list(calibration.coefficients.values())[0]
+                        for calibration in calibrations
+                    ],
+                )
+            },
+            index=[0],
         )
 
     def status(self) -> str:
@@ -382,6 +436,12 @@ class Method:
         )
 
     def save(self) -> None:
+        calibrations = [
+            Calibration.fromATXCFile(f"calibrations/{f}.atxc")
+            for f in self.calibrations["filename"].values
+        ]
+        self.fillInterferences(calibrations)
+        self.fillCoefficients(calibrations)
         methodPath = resourcePath(f"methods/{self.filename}.atxm")
         key = encryption.loadKey()
         jsonText = dumps(self.toHashableDict())
@@ -410,6 +470,7 @@ class Method:
             "calibrations": self.calibrations.to_dict(),
             "conditions": self.conditions.to_dict(),
             "elements": self.elements.to_dict(),
+            "interferences": self.interferences.to_dict(),
         }
 
     @classmethod
@@ -420,6 +481,7 @@ class Method:
         kwargs["elements"].reset_index(drop=True, inplace=True)
         kwargs["calibrations"] = pandas.DataFrame(kwargs["calibrations"])
         kwargs["calibrations"].reset_index(drop=True, inplace=True)
+        kwargs["interferences"] = pandas.DataFrame(kwargs["interferences"])
         return cls(**kwargs)
 
     @classmethod

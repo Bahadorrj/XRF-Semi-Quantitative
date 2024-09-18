@@ -15,6 +15,32 @@ from src.views.explorers.methodexplorer import MethodExplorer
 from src.views.widgets.analytesandconditionswidget import AnalytesAndConditionsWidget
 
 
+class InterferencesTableWidget(DataframeTableWidget):
+    def __init__(
+        self,
+        parent: QtWidgets.QWidget | None = None,
+        method: datatypes.Method | None = None,
+    ):
+        super().__init__(parent, autoFill=True)
+        self._method = None
+        self.mainLayout = QtWidgets.QVBoxLayout(self)
+        if method is not None:
+            self.supply(method)
+        self.hide()
+
+    def supply(self, method: datatypes.Method):
+        if method is None:
+            return
+        self.blockSignals(True)
+        self._method = method
+        super().supply(method.interferences)
+        self.horizontalHeader().setSectionResizeMode(
+            QtWidgets.QHeaderView.ResizeMode.ResizeToContents
+        )
+        self.setVerticalHeaderLabels(self._method.interferences.index)
+        self.blockSignals(False)
+
+
 class CalibrationsWidget(QtWidgets.QWidget):
     """A widget for displaying and managing calibrations associated with a method in MethodTrayWidget.
 
@@ -118,6 +144,7 @@ class MethodTrayWidget(TrayWidget):
         self._widgets = {
             "Analytes And Conditions": AnalytesAndConditionsWidget(self),
             "Calibrations": CalibrationsWidget(self),
+            "Interferences": InterferencesTableWidget(self),
         }
         self._methodExplorer = None
         self._initializeUi()

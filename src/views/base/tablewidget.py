@@ -171,7 +171,7 @@ class DataframeTableWidget(TableWidget):
         self._df = None
         self._autoFill = autoFill
         self._editable = editable
-        if self._df is not None:
+        if dataframe is not None:
             self.supply(dataframe)
 
     def _fillTable(self) -> None:
@@ -215,7 +215,7 @@ class DataframeTableWidget(TableWidget):
     def supply(self, dataframe: pandas.DataFrame):
         if dataframe is None:
             return
-        if self._df is not None and  self._df.equals(dataframe):
+        if self._df is not None and self._df.equals(dataframe):
             return
         self.blockSignals(True)
         self._df = dataframe
