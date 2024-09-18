@@ -6,7 +6,7 @@ import threading
 from PyQt6 import QtCore, QtWidgets
 
 from src.utils.database import getDatabase, getDataframe
-from src.utils.datatypes import Analyse, Method
+from src.utils.datatypes import Analyse, Calibration, Method
 from src.utils.paths import resourcePath
 from src.views.windows.plotwindow import PlotWindow
 
@@ -76,7 +76,9 @@ class ClientHandler(QtCore.QObject):
         elif command == "-chk":
             self.sendServerStatus()
         elif command == "-als":
-            threading.Thread(target=self.addAnalyse).start()
+            self.addAnalyse()
+        elif command == "-cal":
+            self.addCalibration()
         elif command == "-ext":
             self.exitApplication()
         elif command == "-met":
@@ -102,27 +104,30 @@ class ClientHandler(QtCore.QObject):
         logging.info("Application exit")
 
     def handleMethodRequest(self):
-        logging.info("Requesting method name...")
+        logging.info("Listening for method name...")
         methodName = self.conn.recv(255).decode("utf-8")
         message = f"Received method: {methodName}"
         logging.info(message)
         if (
-            df := getDataframe("Methods").query(f"filename == '{methodName}'")
+            getDataframe("Methods").query(f"filename == '{methodName}'")
         ).empty is False:
-            filename = df["filename"].values[0]
-            method = Method.fromATXMFile(resourcePath(f"methods/{filename}.atxm"))
-            conditions = {
-                row[1]: dict(zip(method.conditions.columns[2:], row[2:]))
-                for row in method.conditions.itertuples(index=False)
-            }
-            calibrationIds = method.calibrations["calibration_id"].values.tolist()
-            obj = {
-                "conditions": conditions,
-                "calibration_ids": calibrationIds,
-            }
-            self.conn.sendall(dumps(obj).encode("utf-8"))
+            method = Method.fromATXMFile(f"methods/{methodName}.atxm")
+            self.conn.sendall(method.forVB().encode("utf-8"))
 
     def addAnalyse(self):
         with self.dataLock:
+            logging.info("Listening for analyse data...")
             analyse = Analyse.fromSocket(self.conn)
+            analyse.saveTo(resourcePath(f"analysis/tmp/{analyse.filename}.txt"))
             self.guiHandler.addAnalyseSignal.emit(analyse)
+
+    def addCalibration(self):
+        with self.dataLock:
+            logging.info("Listening for calibration data...")
+            analyse = Analyse.fromSocket(self.conn)
+            calibration = Calibration.fromATXCFile(
+                resourcePath(f"calibrations/{analyse.filename}.atxc")
+            )
+            calibration.analyse = analyse
+            calibration.state = 1
+            calibration.save()
