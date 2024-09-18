@@ -356,6 +356,4 @@ fabric.properties
 # End of https://www.toptal.com/developers/gitignore/api/visualstudiocode
 *.ui
 *.sql
-/calibrations
-/methods
 /analysis
