@@ -52,6 +52,7 @@ class ClientHandler(QtCore.QObject):
 
     def handleClient(self):
         try:
+            self.processCommand("-hlp")
             while True:
                 with self.commandLock:
                     logging.info("Listening for command...")
@@ -82,6 +83,20 @@ class ClientHandler(QtCore.QObject):
             self.exitApplication()
         elif command == "-met":
             self.handleMethodRequest()
+        elif command == "-hlp":
+            helpText = {
+                "-opn": "Opens the GUI window",
+                "-cls": "Closes (hides) the GUI window",
+                "-chk": "Checks and sends server status",
+                "-als": "Adds a new analysis",
+                "-cal": "Adds a new calibration",
+                "-ext": "Exits the application",
+                "-met": "Handles method requests from the client",
+                "-hlp": "Shows this help message",
+            }
+            logging.info("Available commands:")
+            for cmd, desc in helpText.items():
+                logging.info(f"{cmd}: {desc}")
         else:
             logging.warning(
                 f"There is not any action related to {command}. "

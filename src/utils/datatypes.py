@@ -1,3 +1,4 @@
+import logging
 import socket
 import pandas
 import numpy as np
@@ -42,7 +43,9 @@ class AnalyseData:
                 )
                 intensities[row.symbol][row.radiation_type] = intensity
             except ValueError:
-                print(row)
+                logging.error(
+                    f"ValueError while calculating intensities failed for {row}"
+                )
         return intensities
 
     def toHashableDict(self) -> dict:

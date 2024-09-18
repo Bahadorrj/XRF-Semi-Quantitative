@@ -1,6 +1,6 @@
 import os
 import sqlite3
-
+import logging
 import pandas as pd
 
 from src.utils.paths import resourcePath
@@ -14,8 +14,9 @@ class Database:
         except sqlite3.Error as e:
             self.conn = None
             self.path = None
-            print(f"Database initialization failed for path: {path}")
-            print(f"Error: {e}")
+            logging.error(
+                f"Database initialization failed for path: {path}\nError: {e}"
+            )
 
     def executeQuery(self, query: str, values: list | tuple | None = None):
         try:
@@ -27,8 +28,9 @@ class Database:
             self.conn.commit()
             return cursor
         except sqlite3.Error as e:
-            print(f"Executing query failed with query: {query} and values: {values}")
-            print(f"Error: {e}")
+            logging.error(
+                f"Executing query failed with query: {query} and values: {values}\nError: {e}"
+            )
 
     def fetchData(self, query: str, values: list | tuple | None = None) -> list:
         try:
@@ -39,8 +41,9 @@ class Database:
                 cursor.execute(query, values)
             return cursor.fetchall()
         except sqlite3.Error as e:
-            print(f"Fetching data failed with query: {query} and values: {values}")
-            print(f"Error: {e}")
+            logging.error(
+                f"Fetching data failed with query: {query} and values: {values}\nError: {e}"
+            )
 
     def closeConnection(self):
         if self.conn is not None:

@@ -112,8 +112,9 @@ class ConditionFormWidget(QtWidgets.QListView):
 
 
 class PlotWindow(QtWidgets.QMainWindow):
-    def __init__(self):
+    def __init__(self, bundleType: int = 0):
         super().__init__()
+        self._bundleType = bundleType
         self._analyse = None
         self._analyseFiles = []
         self._initializeUi()
@@ -459,13 +460,13 @@ class PlotWindow(QtWidgets.QMainWindow):
         )
         self._analyse.saveTo(filepath)
 
-    # def closeEvent(self, event):
-    #     # Intercept the close event
-    #     # Check if the close is initiated by the close button
-    #     if event.spontaneous():
-    #         # Hide the window instead of closing
-    #         self.hide()
-    #         event.ignore()
-    #     else:
-    #         # Handle the close event normally
-    #         event.accept()
+    def closeEvent(self, event):
+        # Intercept the close event
+        # Check if the close is initiated by the close button
+        if event.spontaneous() or self._bundleType == 1:
+            # Hide the window instead of closing
+            self.hide()
+            event.ignore()
+        else:
+            # Handle the close event normally
+            event.accept()

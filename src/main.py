@@ -38,7 +38,18 @@ def main() -> None:
         _style = f.read()
         _style = _style.replace("icons/", resourcePath("resources/icons/"))
         app.setStyleSheet(_style)
-    window = PlotWindow()
-    connectServerAndGUI("127.0.0.1", 16000, window, app)
-    # window.showMaximized()
+    ans = input(
+        "Select the application type you want to use\n1) Standalone 2) Bundled with VB: "
+    )
+    while ans not in ["1", "2"]:
+        logging.error("Invalid input")
+        ans = input(
+            "Select the application type you want to use\n1) Standalone 2) Bundled with VB: "
+        )
+    window = PlotWindow(int(ans))
+    if ans == "1":
+        window.showMaximized()
+        window.raise_()
+    else:
+        connectServerAndGUI("127.0.0.1", 16000, window, app)
     sys.exit(app.exec())
