@@ -222,7 +222,7 @@ QLineEdit {
 }
 
 /* Method Explorer */
-#analyte-widget QPushButton {
+#periodic-button {
     width: 30px;
     height: 30px;
     border: 2px inset #696969;
@@ -231,19 +231,19 @@ QLineEdit {
     color: #9C9FA3;
 }
 
-#analyte-widget QPushButton::hover {
+#periodic-button::hover {
     background-color: #C0C0C0;
     color: #F5F5F5;
     font-weight: bold;
 }
 
-#analyte-widget QPushButton::pressed  {
+#periodic-button::pressed  {
     background-color: #696969;
     color: #F5F5F5;
     font-weight: bold;
 }
 
-#analyte-widget QPushButton::checked {
+#periodic-button::checked {
     background-color: #33BDC4;
     color: #F5F5F5;
     font-weight: bold;
