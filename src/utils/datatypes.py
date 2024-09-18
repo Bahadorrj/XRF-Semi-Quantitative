@@ -125,6 +125,44 @@ class Analyse:
                 }
         return intensities
 
+    def calculateConcentrations(self, method: "Method") -> dict:
+        concentrations = {}
+        interferences = method.interferences
+        coefficients = method.coefficients
+        activeIntensities = self.calculateActiveIntensities(getDataframe("Lines"))
+        allIntensities = {
+            d.conditionId: d.calculateIntensities(getDataframe("Lines"))
+            for d in self.data
+        }
+        for activeElement, d in activeIntensities.items():
+            intensity = list(d.values())[0]
+            if (
+                activeElement not in interferences.index
+                or activeElement not in coefficients.columns
+            ):
+                continue
+            row = interferences.loc[activeElement]
+            for interfererElement, interference in row.items():
+                if interfererElement == activeElement:
+                    continue
+                interfererRow = getDataframe("Lines").query(
+                    f"symbol == '{interfererElement}' and active == 1"
+                )
+                interfererRadiation = interfererRow["radiation_type"].values[0]
+                interfererConditionId = interfererRow["condition_id"].values[0]
+                interfererIntensity = allIntensities[int(interfererConditionId)][
+                    interfererElement
+                ][interfererRadiation]
+                intensity -= interfererIntensity * interference
+                if intensity <= 0:
+                    intensity = 0
+                    break
+            if intensity > 0:
+                concentrations[activeElement] = float(
+                    intensity * coefficients[activeElement].values[0]
+                )
+        return concentrations
+
     def toHashableDict(self) -> dict:
         return {
             "file_path": self.filePath,
