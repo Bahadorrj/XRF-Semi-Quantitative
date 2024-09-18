@@ -463,7 +463,7 @@ class PlotWindow(QtWidgets.QMainWindow):
     def closeEvent(self, event):
         # Intercept the close event
         # Check if the close is initiated by the close button
-        if event.spontaneous() or self._bundleType == 1:
+        if event.spontaneous() and self._bundleType != 1:
             # Hide the window instead of closing
             self.hide()
             event.ignore()
