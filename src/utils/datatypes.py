@@ -129,10 +129,10 @@ class Analyse:
         concentrations = {}
         interferences = method.interferences
         coefficients = method.coefficients
-        activeIntensities = self.calculateActiveIntensities(getDataframe("Lines"))
+        lines = method.lines
+        activeIntensities = self.calculateActiveIntensities(lines)
         allIntensities = {
-            d.conditionId: d.calculateIntensities(getDataframe("Lines"))
-            for d in self.data
+            d.conditionId: d.calculateIntensities(lines) for d in self.data
         }
         for activeElement, d in activeIntensities.items():
             intensity = list(d.values())[0]
@@ -145,7 +145,7 @@ class Analyse:
             for interfererElement, interference in row.items():
                 if interfererElement == activeElement:
                     continue
-                interfererRow = getDataframe("Lines").query(
+                interfererRow = lines.query(
                     f"symbol == '{interfererElement}' and active == 1"
                 )
                 interfererRadiation = interfererRow["radiation_type"].values[0]
@@ -154,13 +154,14 @@ class Analyse:
                     interfererElement
                 ][interfererRadiation]
                 intensity -= interfererIntensity * interference
-                if intensity <= 0:
+                if intensity < 0:
                     intensity = 0
                     break
-            if intensity > 0:
-                concentrations[activeElement] = float(
-                    intensity * coefficients[activeElement].values[0]
-                )
+            concentrations[activeElement] = float(
+                intensity * coefficients[activeElement].values[0]
+            )
+        concentrations = {k: v for k, v in concentrations.items() if v > 0}
+        concentrations["unknown"] = 100 - sum(list(concentrations.values()))
         return concentrations
 
     def toHashableDict(self) -> dict:
@@ -178,9 +179,11 @@ class Analyse:
         ]
         if "file_path" in analyseDict:
             analyseDict["filePath"] = analyseDict.pop("file_path")
-        analyseDict["conditions"] = pandas.DataFrame(analyseDict.pop("conditions"))
-        analyseDict["conditions"].reset_index(inplace=True, drop=True)
-        analyseDict["generalData"] = analyseDict.pop("general_data")
+        if "conditions" in analyseDict:
+            analyseDict["conditions"] = pandas.DataFrame(analyseDict.pop("conditions"))
+            analyseDict["conditions"].reset_index(inplace=True, drop=True)
+        if "general_data" in analyseDict:
+            analyseDict["generalData"] = analyseDict.pop("general_data")
         analyse = cls(**analyseDict)
         if analyseDict.get("filename"):
             analyse.filename = analyseDict["filename"]
@@ -257,7 +260,8 @@ class Calibration:
         if other is None:
             return False
         return (
-            self.filename == other.filename
+            self.calibrationId == other.calibrationId
+            and self.filename == other.filename
             and self.element == other.element
             and self.concentration == other.concentration
             and self.state == other.state
@@ -344,6 +348,7 @@ class Calibration:
             "state": self.state,
             "analyse": self.analyse.toHashableDict() if self.analyse else None,
             "lines": self.lines.to_dict(),
+            "activeIntensities": self.activeIntensities,
             "coefficients": self.coefficients,
             "interferences": self.interferences,
         }
@@ -393,8 +398,11 @@ class Method:
     elements: pandas.DataFrame = field(
         default_factory=lambda: getDataframe("Elements").copy()
     )
-    interferences: pandas.DataFrame | None = field(default=None)
+    lines: pandas.DataFrame = field(
+        default_factory=lambda: getDataframe("Lines").copy()
+    )
     coefficients: pandas.DataFrame | None = field(default=None)
+    interferences: pandas.DataFrame | None = field(default=None)
 
     def __post_init__(self):
         if self.calibrations.empty:
@@ -403,10 +411,10 @@ class Method:
             Calibration.fromATXCFile(f"calibrations/{f}.atxc")
             for f in self.calibrations["filename"].values
         ]
-        if self.interferences is None:
-            self.fillInterferences(calibrations)
         if self.coefficients is None:
             self.fillCoefficients(calibrations)
+        if self.interferences is None:
+            self.fillInterferences(calibrations)
 
     def __eq__(self, other: "Method"):
         if other is None:
@@ -419,6 +427,9 @@ class Method:
             and self.calibrations.equals(other.calibrations)
             and self.conditions.equals(other.conditions)
             and self.elements.equals(other.elements)
+            and self.lines.equals(other.lines)
+            and self.coefficients.equals(other.coefficients)
+            and self.interferences.equals(other.interferences)
         )
 
     def fillInterferences(self, calibrations: Sequence) -> None:
@@ -471,6 +482,9 @@ class Method:
             self.calibrations.copy(),
             self.conditions.copy(),
             self.elements.copy(),
+            self.lines.copy(),
+            self.coefficients.copy() if self.coefficients is not None else None,
+            self.interferences.copy() if self.interferences is not None else None,
         )
 
     def save(self) -> None:
@@ -480,6 +494,15 @@ class Method:
         ]
         self.fillInterferences(calibrations)
         self.fillCoefficients(calibrations)
+        for row in self.elements.itertuples():
+            if (
+                df := self.lines.query(f"symbol == '{row.symbol}' and active == 1")
+            ).empty is False:
+                index = int(df.index.values[0])
+                try:
+                    self.lines.at[index, "conditions_id"] = int(row.condition_id)
+                except ValueError:
+                    self.lines.at[index, "conditions_id"] = np.nan
         methodPath = resourcePath(f"methods/{self.filename}.atxm")
         key = encryption.loadKey()
         jsonText = dumps(self.toHashableDict())
@@ -508,6 +531,8 @@ class Method:
             "calibrations": self.calibrations.to_dict(),
             "conditions": self.conditions.to_dict(),
             "elements": self.elements.to_dict(),
+            "lines": self.lines.to_dict(),
+            "coefficients": self.coefficients.to_dict(),
             "interferences": self.interferences.to_dict(),
         }
 
@@ -517,8 +542,11 @@ class Method:
         kwargs["conditions"].reset_index(drop=True, inplace=True)
         kwargs["elements"] = pandas.DataFrame(kwargs["elements"])
         kwargs["elements"].reset_index(drop=True, inplace=True)
+        kwargs["lines"] = pandas.DataFrame(kwargs["lines"])
+        kwargs["lines"].reset_index(drop=True, inplace=True)
         kwargs["calibrations"] = pandas.DataFrame(kwargs["calibrations"])
         kwargs["calibrations"].reset_index(drop=True, inplace=True)
+        kwargs["coefficients"] = pandas.DataFrame(kwargs["coefficients"])
         kwargs["interferences"] = pandas.DataFrame(kwargs["interferences"])
         return cls(**kwargs)
 
