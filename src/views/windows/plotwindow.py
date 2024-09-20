@@ -33,6 +33,44 @@ COLORS = [
 ]
 
 
+class ResultDialog(QtWidgets.QDialog):
+    def __init__(self, parent=None, result: dict | None = None):
+        super().__init__(parent)
+        self._result = None
+        self._initializeUi()
+        if result is not None:
+            self.supply(result)
+
+    def _initializeUi(self) -> None:
+        self.setWindowTitle("Result")
+        self._createLabel()
+        self._createButtonBox()
+        self._setUpView()
+
+    def _createLabel(self) -> None:
+        self._label = QtWidgets.QLabel(self)
+        self._label.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
+
+    def _createButtonBox(self) -> None:
+        self._buttonBox = QtWidgets.QDialogButtonBox(self)
+        self._buttonBox.setStandardButtons(QtWidgets.QDialogButtonBox.StandardButton.Ok)
+        self._buttonBox.accepted.connect(self.accept)
+
+    def _setUpView(self) -> None:
+        self.mainLayout = QtWidgets.QVBoxLayout()
+        self.mainLayout.addWidget(self._label)
+        self.mainLayout.addWidget(self._buttonBox)
+        self.setLayout(self.mainLayout)
+
+    def supply(self, result: dict):
+        self.blockSignals(True)
+        self._result = result
+        self._label.clear()
+        txt = "".join(f"{key}: {value}\n" for key, value in result.items())
+        self._label.setText(txt)
+        self.blockSignals(False)
+
+
 class ConditionFormWidget(QtWidgets.QListView):
     def __init__(self, parent=None, conditions: pandas.DataFrame | None = None):
         super().__init__(parent)
@@ -119,6 +157,9 @@ class PlotWindow(QtWidgets.QMainWindow):
         self._bundleType = bundleType
         self._analyse = None
         self._analyseFiles = []
+        self._methodTray = None
+        self._calibrationTray = None
+        self._resultDialog = None
         self._initializeUi()
 
     def _initializeUi(self) -> None:
@@ -145,6 +186,7 @@ class PlotWindow(QtWidgets.QMainWindow):
             "Print Setup": True,
             "Standards Tray List": False,
             "Methods Tray List": False,
+            "Results": True,
         }
         for label, disabled in actions.items():
             action = QtGui.QAction(label, self)
@@ -168,6 +210,8 @@ class PlotWindow(QtWidgets.QMainWindow):
             self._openMethodTrayListWidget()
         elif key == "standards-tray-list":
             self._openCalibrationTrayListWidget()
+        elif key == "results":
+            self._openResultsWidget()
 
     def _createMenus(self) -> None:
         self._menusMap = {}
@@ -220,6 +264,7 @@ class PlotWindow(QtWidgets.QMainWindow):
     def _fillToolBarWithActions(self, toolBar: QtWidgets.QToolBar) -> None:
         toolBar.addAction(self._actionsMap["open"])
         toolBar.addAction(self._actionsMap["save-as"])
+        toolBar.addAction(self._actionsMap["results"])
 
     def _createPlotWidget(self) -> None:
         self._plotWidget = pg.PlotWidget(self)
@@ -377,14 +422,25 @@ class PlotWindow(QtWidgets.QMainWindow):
             self._plotWidget.clear()
 
     def _openMethodTrayListWidget(self) -> None:
-        methodTray = MethodTrayWidget(parent=self, dataframe=getDataframe("Methods"))
-        methodTray.showMaximized()
+        self._methodTray = MethodTrayWidget(
+            parent=self, dataframe=getDataframe("Methods")
+        )
+        self._methodTray.showMaximized()
 
     def _openCalibrationTrayListWidget(self):
-        calibrationTrayWidget = CalibrationTrayWidget(
+        self._calibrationTray = CalibrationTrayWidget(
             dataframe=getDataframe("Calibrations")
         )
-        calibrationTrayWidget.showMaximized()
+        self._calibrationTray.showMaximized()
+
+    def _openResultsWidget(self):
+        self._resultDialog = ResultDialog(
+            self,
+            self._analyse.calculateConcentrations(
+                datatypes.Method.fromATXMFile("methods/Fundamental.atxm")
+            ),
+        )
+        self._resultDialog.exec()
 
     def _findActivePlotAttrs(self) -> list:
         activePlotAttrs = []
@@ -413,6 +469,7 @@ class PlotWindow(QtWidgets.QMainWindow):
                 self._conditionFormWidget.show()
             self._conditionFormWidget.supply(self._analyse.conditions)
             self._actionsMap["save-as"].setDisabled(False)
+            self._actionsMap["results"].setDisabled(False)
 
     def _drawCanvas(self) -> None:
         self._plotWidget.clear()
