@@ -1,7 +1,7 @@
 import numpy as np
 import pyqtgraph as pg
-from PyQt6 import QtWidgets
 
+from PyQt6 import QtWidgets
 from src.utils import datatypes
 
 

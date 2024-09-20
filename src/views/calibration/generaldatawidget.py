@@ -1,10 +1,11 @@
-from functools import partial
-
 import pyqtgraph as pg
+
+from functools import partial
 from PyQt6 import QtWidgets
 
 from src.utils import datatypes, calculation
 from src.utils.database import getDataframe
+
 from src.views.base.generaldatawidget import GeneralDataWidget
 
 pg.setConfigOptions(antialias=True)

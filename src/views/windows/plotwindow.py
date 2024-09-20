@@ -1,4 +1,3 @@
-from calendar import c
 from functools import partial, cache
 from typing import Optional
 
@@ -11,8 +10,10 @@ from src.utils import datatypes
 from src.utils.database import getDataframe
 from src.utils.paths import resourcePath
 from src.views.base.tablewidget import TableWidget
-from src.views.trays.calibrationtray import CalibrationTrayWidget
-from src.views.trays.methodtray import MethodTrayWidget
+from src.views.calibration.calibrationtraywidget import CalibrationTrayWidget
+from src.views.method.methodtraywidget import MethodTrayWidget
+
+pg.setConfigOptions(antialias=False)
 
 COLORS = [
     "#FF0000",
@@ -36,6 +37,7 @@ class ConditionFormWidget(QtWidgets.QListView):
     def __init__(self, parent=None, conditions: pandas.DataFrame | None = None):
         super().__init__(parent)
         self._conditions = None
+        self._df = None
         self._initializeUi()
         if conditions is not None:
             self.supply(conditions)

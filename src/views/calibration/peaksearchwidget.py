@@ -1,15 +1,16 @@
-from collections import deque
 import contextlib
-from functools import partial
-
 import numpy as np
 import pyqtgraph as pg
+
+from collections import deque
+from functools import partial
 from PyQt6 import QtWidgets, QtCore, QtGui
 from pandas import DataFrame
 
 from src.utils import calculation, datatypes
 from src.utils.database import getDataframe
 from src.utils.paths import resourcePath
+
 from src.views.base.tablewidget import DataframeTableWidget, TableItem
 
 

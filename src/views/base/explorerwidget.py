@@ -5,7 +5,7 @@ from PyQt6 import QtCore, QtGui, QtWidgets
 from src.utils.paths import resourcePath
 
 
-class Explorer(QtWidgets.QWidget):
+class ExplorerWidget(QtWidgets.QWidget):
     def __init__(self, parent: QtWidgets.QWidget | None = None):
         super().__init__(parent, QtCore.Qt.WindowType.Window)
         self.setMinimumSize(1600, 900)

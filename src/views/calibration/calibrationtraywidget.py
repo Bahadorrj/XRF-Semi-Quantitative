@@ -1,6 +1,5 @@
 import os
 from pathlib import Path
-from typing import Sequence
 
 import pandas
 from PyQt6 import QtCore, QtWidgets
@@ -8,117 +7,17 @@ from PyQt6 import QtCore, QtWidgets
 from src.utils import datatypes
 from src.utils.database import getDataframe, getDatabase, reloadDataframes
 from src.utils.datatypes import Calibration, Analyse
-from src.utils.paths import isValidFilename, resourcePath
-from src.views.base.formdialog import FormDialog
+from src.utils.paths import resourcePath
+
 from src.views.base.tablewidget import TableItem
 from src.views.base.traywidget import TrayWidget
-from src.views.explorers.calibrationexplorer import CalibrationExplorer
-from src.views.widgets.calibrationgeneraldatawidget import CalibrationGeneralDataWidget
-from src.views.widgets.coefficientwidget import CoefficientWidget
-from src.views.widgets.linestablewidget import LinesTableWidget
 
-
-class AcquisitionWidget(QtWidgets.QWidget):
-    """Widget for acquiring data from various sources.
-
-    This widget provides buttons for users to either open files from local storage or retrieve data from a connected XRF analyzer. It emits a signal when the user chooses to open a file, facilitating interaction with other components of the application.
-
-    Args:
-        parent (QtWidgets.QWidget | None): An optional parent widget.
-
-    Attributes:
-        getAnalyseFile (QtCore.pyqtSignal): Signal emitted to request an analysis file.
-    """
-
-    getAnalyseFile = QtCore.pyqtSignal()
-
-    def __init__(self, parent: QtWidgets.QWidget | None = None) -> None:
-        super().__init__(parent)
-        self._initializeUi()
-
-    def _initializeUi(self) -> None:
-        layout = QtWidgets.QVBoxLayout()
-        self.mainLayout = QtWidgets.QHBoxLayout()
-        self.mainLayout.addStretch()
-        openFromLocalButton = QtWidgets.QPushButton("Open from local storage", self)
-        openFromLocalButton.clicked.connect(lambda: self.getAnalyseFile.emit())
-        self.mainLayout.addWidget(openFromLocalButton)
-        self.mainLayout.addStretch()
-        getFromSocketButton = QtWidgets.QPushButton(
-            "Get from connected XRF analyser", self
-        )
-        self.mainLayout.addWidget(getFromSocketButton)
-        self.mainLayout.addStretch()
-        layout.addStretch()
-        layout.addLayout(self.mainLayout)
-        layout.addStretch()
-        self.setLayout(layout)
-
-
-class CalibrationFormDialog(FormDialog):
-    def __init__(
-        self,
-        parent: QtWidgets.QWidget | None = None,
-        inputs: Sequence | None = None,
-        values: Sequence | None = None,
-    ) -> None:
-        super().__init__(parent, inputs, values)
-
-    def _check(self) -> None:
-        self._fill()
-        self._errorLabel.clear()
-        if not all(
-            (
-                self._isFilenameValid(),
-                self._isElementValid(),
-                self._isConcentrationValid(),
-            )
-        ):
-            QtWidgets.QApplication.beep()
-            return
-        return super()._check()
-
-    def _isFilenameValid(self) -> bool:
-        filenameLineEdit = self._fields["filename"][-1]
-        filename = filenameLineEdit.text()
-        filenameLineEdit.setStyleSheet("color: red;")
-        if not isValidFilename(filename):
-            self._addError("This filename is not allowed!\n")
-            return False
-        if os.path.exists(resourcePath(f"calibrations/{filename}.atxc")):
-            self._addError("This filename already exists!\n")
-            return False
-        if filename == "":
-            self._addError("Please enter a filename!\n")
-            return False
-        filenameLineEdit.setStyleSheet("color: black;")
-        return True
-
-    def _isElementValid(self) -> bool:
-        elementLineEdit = self._fields["element"][-1]
-        element = elementLineEdit.text()
-        elementLineEdit.setStyleSheet("color: red;")
-        if element not in getDataframe("Elements")["symbol"].values:
-            self._addError("This element is not valid!\n")
-            return False
-        if element == "":
-            self._addError("Please enter an element!\n")
-            return False
-        elementLineEdit.setStyleSheet("color: black;")
-        return True
-
-    def _isConcentrationValid(self) -> bool:
-        concentrationLineEdit = self._fields["concentration"][-1]
-        concentration = concentrationLineEdit.text()
-        concentrationLineEdit.setStyleSheet("color: red;")
-        if concentration == "":
-            self._addError("Please enter a concentration!\n")
-            return False
-        if not 0 <= float(concentration) <= 100:
-            self._addError("This concentration is not valid!\n")
-            return False
-        concentrationLineEdit.setStyleSheet("color: black;")
-        return True
+from src.views.calibration.analyseacquisitionswidget import AnalyseAcquisitionWidget
+from src.views.calibration.calibrationfiledialog import CalibrationFormDialog
+from src.views.calibration.calibrationexplorerwidget import CalibrationExplorerWidget
+from src.views.calibration.generaldatawidget import CalibrationGeneralDataWidget
+from src.views.calibration.coefficientwidget import CoefficientWidget
+from src.views.calibration.linestablewidget import LinesTableWidget
 
 
 class CalibrationTrayWidget(TrayWidget):
@@ -136,7 +35,7 @@ class CalibrationTrayWidget(TrayWidget):
             "Coefficient": CoefficientWidget(),
             "Lines": LinesTableWidget(),
         }
-        self._acquisitionWidget = AcquisitionWidget()
+        self._acquisitionWidget = AnalyseAcquisitionWidget()
         self._acquisitionWidget.getAnalyseFile.connect(self._getAnalyseFile)
         self._calibrationExplorer = None
         self._initializeUi()
@@ -255,7 +154,7 @@ class CalibrationTrayWidget(TrayWidget):
             if self._calibrationExplorer and self._calibrationExplorer.isVisible():
                 self._calibrationExplorer.close()
             else:
-                self._calibrationExplorer = CalibrationExplorer(
+                self._calibrationExplorer = CalibrationExplorerWidget(
                     parent=self, calibration=self._calibration
                 )
                 self._calibrationExplorer.showMaximized()

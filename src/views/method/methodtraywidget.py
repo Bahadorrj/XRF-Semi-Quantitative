@@ -6,129 +6,17 @@ from PyQt6 import QtCore, QtWidgets
 
 from src.utils import datatypes
 from src.utils.database import getDataframe, getDatabase, reloadDataframes
-from src.utils.datatypes import Calibration, Method
-from src.utils.paths import isValidFilename, resourcePath
-from src.views.base.formdialog import FormDialog
-from src.views.base.tablewidget import TableItem, DataframeTableWidget
+from src.utils.datatypes import Method
+from src.utils.paths import resourcePath
+
+from src.views.base.tablewidget import TableItem
 from src.views.base.traywidget import TrayWidget
-from src.views.explorers.methodexplorer import MethodExplorer
-from src.views.widgets.analytesandconditionswidget import AnalytesAndConditionsWidget
 
-
-class InterferencesTableWidget(DataframeTableWidget):
-    def __init__(
-        self,
-        parent: QtWidgets.QWidget | None = None,
-        method: datatypes.Method | None = None,
-    ):
-        super().__init__(parent, autoFill=True)
-        self._method = None
-        self.mainLayout = QtWidgets.QVBoxLayout(self)
-        if method is not None:
-            self.supply(method)
-        self.hide()
-
-    def supply(self, method: datatypes.Method):
-        if method is None:
-            return
-        self.blockSignals(True)
-        self._method = method
-        super().supply(method.interferences)
-        self.horizontalHeader().setSectionResizeMode(
-            QtWidgets.QHeaderView.ResizeMode.ResizeToContents
-        )
-        self.setVerticalHeaderLabels(self._method.interferences.index)
-        self.blockSignals(False)
-
-
-class CalibrationsWidget(QtWidgets.QWidget):
-    """A widget for displaying and managing calibrations associated with a method in MethodTrayWidget.
-
-    This class initializes the user interface for calibrations and allows for reinitialization with a new method's calibrations. It provides a structured layout to display calibration data in a table format.
-
-    Args:
-        parent (QtWidgets.QWidget | None): The parent widget for this widget.
-        method (datatypes.Method | None): An optional method object containing calibration data.
-
-    Methods:
-        _initializeUi: Initializes the user interface components.
-        _setUpView: Sets up the layout and adds the table widget to the main layout.
-        supply: Updates the widget with new calibration data from a method.
-    """
-
-    def __init__(
-        self,
-        parent: QtWidgets.QWidget | None = None,
-        method: datatypes.Method | None = None,
-    ) -> None:
-        super().__init__(parent)
-        self._method = None
-        self._initializeUi()
-        if method is not None:
-            self._tableWidget.supply(
-                self._method.calibrations.drop("calibration_id", axis=1)
-            )
-
-    def _initializeUi(self) -> None:
-        self._tableWidget = DataframeTableWidget(self, autoFill=True)
-        self._setUpView()
-
-    def _setUpView(self) -> None:
-        self.mainLayout = QtWidgets.QVBoxLayout()
-        self.mainLayout.setContentsMargins(10, 10, 10, 10)
-        self.mainLayout.setSpacing(5)
-        self.mainLayout.addWidget(self._tableWidget)
-        self.setLayout(self.mainLayout)
-
-    def supply(self, method: datatypes.Method) -> None:
-        if method is None:
-            return
-        if self._method and self._method == method:
-            return
-        self.blockSignals(True)
-        self._method = method
-        df = method.calibrations.drop("calibration_id", axis=1)
-        df["state"] = df["state"].apply(Calibration.convertStateToStatus)
-        self._tableWidget.supply(df)
-        self.blockSignals(False)
-
-    @property
-    def method(self):
-        return self._method
-
-
-class MethodFormDialog(FormDialog):
-    def __init__(
-        self,
-        parent: QtWidgets.QWidget | None = None,
-        inputs: list | tuple | None = None,
-        values: list | tuple | None = None,
-    ) -> None:
-        super().__init__(parent, inputs, values)
-
-    def _check(self) -> None:
-        self._fill()
-        self._errorLabel.clear()
-        if not self._isFilenameValid():
-            QtWidgets.QApplication.beep()
-            return
-        return super()._check()
-
-    def _isFilenameValid(self) -> bool:
-        filenameLineEdit = self._fields["filename"][-1]
-        filename = filenameLineEdit.text()
-        filenameLineEdit.setStyleSheet("color: red;")
-        if not isValidFilename(filename):
-            self._addError("This filename is not allowed!\n")
-            return False
-        if os.path.exists(resourcePath(f"methods/{filename}.atxm")):
-            self._addError("This filename already exists!\n")
-            return False
-        if filename == "":
-            self._addError("Please enter a filename!\n")
-            return False
-        filenameLineEdit.setStyleSheet("color: black;")
-        return True
+from src.views.method.calibrationtablewidget import CalibrationsTableWidget
+from src.views.method.methodexplorerwidget import MethodExplorer
+from src.views.method.analytesandconditionswidget import AnalytesAndConditionsWidget
+from src.views.method.interferencetablewidget import InterferencesTableWidget
+from src.views.method.methodfiledialog import MethodFormDialog
 
 
 class MethodTrayWidget(TrayWidget):
@@ -143,7 +31,7 @@ class MethodTrayWidget(TrayWidget):
         self._method = None
         self._widgets = {
             "Analytes And Conditions": AnalytesAndConditionsWidget(self),
-            "Calibrations": CalibrationsWidget(self),
+            "Calibrations": CalibrationsTableWidget(self),
             "Interferences": InterferencesTableWidget(self),
         }
         self._methodExplorer = None

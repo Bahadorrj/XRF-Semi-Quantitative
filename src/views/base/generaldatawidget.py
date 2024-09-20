@@ -24,7 +24,7 @@ class GeneralDataWidget(QtWidgets.QWidget):
     def _createPlotWidget(self) -> None:
         self._plotWidget = pg.PlotWidget(self)
         self._plotWidget.setObjectName("plot-widget")
-        self._plotWidget.getPlotItem().setMouseEnabled(x=False, y=False)
+        # self._plotWidget.getPlotItem().setMouseEnabled(x=False, y=False)
         self._plotWidget.setBackground("#FFFFFF")
         self._plotWidget.setFrameShape(QtWidgets.QFrame.Shape.NoFrame)
         plotItem = self._plotWidget.getPlotItem()
