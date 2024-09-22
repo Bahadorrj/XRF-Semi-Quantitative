@@ -72,7 +72,6 @@ class FormDialog(QtWidgets.QDialog):
 
     def _createButtonBox(self) -> None:
         self._buttonBox = QtWidgets.QDialogButtonBox(self)
-        self._buttonBox.setStyleSheet("")
         self._buttonBox.setStandardButtons(
             QtWidgets.QDialogButtonBox.StandardButton.Cancel
             | QtWidgets.QDialogButtonBox.StandardButton.Ok

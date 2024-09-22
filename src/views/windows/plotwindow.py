@@ -437,7 +437,7 @@ class PlotWindow(QtWidgets.QMainWindow):
         self._resultDialog = ResultDialog(
             self,
             self._analyse.calculateConcentrations(
-                datatypes.Method.fromATXMFile("methods/Fundamental.atxm")
+                datatypes.Method.fromATXMFile(resourcePath("methods/Fundamental.atxm"))
             ),
         )
         self._resultDialog.exec()
