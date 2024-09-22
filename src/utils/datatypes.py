@@ -8,7 +8,7 @@ from collections import defaultdict
 from dataclasses import dataclass, field
 from json import JSONDecodeError, dump, loads, dumps
 from pathlib import Path
-from typing import Any, Sequence
+from typing import Sequence
 from PyQt6.QtCore import Qt
 
 from src.utils import calculation
@@ -72,7 +72,9 @@ class AnalyseData:
 class Analyse:
     filePath: str | None = field(default=None)
     data: list[AnalyseData] = field(default_factory=list)
-    conditions: pandas.DataFrame | None = field(default=None)
+    conditions: pandas.DataFrame = field(
+        default_factory=lambda: getDataframe("Conditions")
+    )
     generalData: dict = field(default_factory=dict)
     filename: str | None = field(default=None)
     extension: str | None = field(default=None)
@@ -105,13 +107,21 @@ class Analyse:
     def saveTo(self, filePath) -> None:
         if filePath.endswith(".atx"):
             key = encryption.loadKey()
-            jsonText = dumps(self.toHashableDict())
+            hashableDict = self.toHashableDict()
+            hashableDict["file_path"] = filePath
+            hashableDict["filename"] = Path(filePath).stem
+            hashableDict["extension"] = filePath.split(".")[-1]
+            jsonText = dumps(hashableDict)
             encryptedText = encryption.encryptText(jsonText, key)
             with open(filePath, "wb") as f:
                 f.write(encryptedText + b"\n")
         elif filePath.endswith(".txt"):
             with open(filePath, "w") as f:
-                dump(self.toHashableDict(), f, indent=4)
+                hashableDict = self.toHashableDict()
+                hashableDict["file_path"] = filePath
+                hashableDict["filename"] = Path(filePath).stem
+                hashableDict["extension"] = filePath.split(".")[-1]
+                dump(hashableDict, f, indent=4)
 
     def calculateActiveIntensities(self, lines: pandas.DataFrame) -> dict:
         allIntensities = [d.calculateIntensities(lines) for d in self.data]
@@ -407,14 +417,15 @@ class Method:
     def __post_init__(self):
         if self.calibrations.empty:
             return
-        calibrations = [
-            Calibration.fromATXCFile(f"calibrations/{f}.atxc")
-            for f in self.calibrations["filename"].values
-        ]
-        if self.coefficients is None:
-            self.fillCoefficients(calibrations)
-        if self.interferences is None:
-            self.fillInterferences(calibrations)
+        if self.coefficients is None or self.interferences is None:
+            calibrations = [
+                Calibration.fromATXCFile(resourcePath(f"calibrations/{f}.atxc"))
+                for f in self.calibrations["filename"].values
+            ]
+            if self.coefficients is None:
+                self.fillCoefficients(calibrations)
+            if self.interferences is None:
+                self.fillInterferences(calibrations)
 
     def __eq__(self, other: "Method"):
         if other is None:
@@ -489,7 +500,7 @@ class Method:
 
     def save(self) -> None:
         calibrations = [
-            Calibration.fromATXCFile(f"calibrations/{f}.atxc")
+            Calibration.fromATXCFile(resourcePath(f"calibrations/{f}.atxc"))
             for f in self.calibrations["filename"].values
         ]
         self.fillInterferences(calibrations)
@@ -573,14 +584,22 @@ class BackgroundProfile:
     name: str
     description: str
     smoothness: float = field(default=1.0)
-    height: Any | None = field(default=None)
-    threshold: Any | None = field(default=None)
-    distance: Any | None = field(default=None)
-    prominence: Any | None = field(default=None)
-    width: Any | None = field(default=None)
-    wlen: Any | None = field(default=None)
-    rel_height: float = field(default=0.5)
-    plateau_size: Any | None = field(default=None)
+    height: str | None = field(default=None)
+    threshold: str | None = field(default=None)
+    distance: str | None = field(default=None)
+    prominence: str | None = field(default=None)
+    width: str | None = field(default=None)
+    wlen: str | None = field(default=None)
+    rel_height: str | None = field(default=None)
+    plateau_size: str | None = field(default=None)
+
+    def peakKwargs(self) -> dict:
+        return {
+            f: eval(value)
+            for f, value in self.__dict__.items()
+            if f not in ["smoothness", "backgroundId", "description", "name"]
+            and value is not None
+        }
 
 
 @dataclass(order=True)
