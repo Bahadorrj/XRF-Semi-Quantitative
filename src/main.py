@@ -8,11 +8,11 @@ from PyQt6 import QtWidgets, QtGui
 
 from src.controllers import GuiHandler, ClientHandler
 from src.utils.paths import resourcePath
-from src.views.windows.plotwindow import PlotWindow
+from src.views.windows.mainwindow import MainWindow
 
 
 def connectServerAndGUI(
-    host, port, plotWindow: PlotWindow, app: QtWidgets.QApplication
+    host, port, mainWindow: MainWindow, app: QtWidgets.QApplication
 ) -> None:
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         s.bind((host, port))
@@ -20,7 +20,7 @@ def connectServerAndGUI(
         logging.info(f"Server listening on {host}:{port}")
         conn, addr = s.accept()
         logging.info(f"Connected to {addr}")
-        guiHandler = GuiHandler(plotWindow)
+        guiHandler = GuiHandler(mainWindow)
         clientHandler = ClientHandler(conn, guiHandler, app)
         threading.Thread(target=clientHandler.handleClient).start()
 
@@ -46,7 +46,7 @@ def main() -> None:
         ans = input(
             "Select the application type you want to use\n1) Standalone 2) Bundled with VB: "
         )
-    window = PlotWindow(int(ans))
+    window = MainWindow(int(ans))
     if ans == "1":
         window.showMaximized()
         window.raise_()

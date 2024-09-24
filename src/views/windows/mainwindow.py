@@ -12,6 +12,7 @@ from src.utils.paths import resourcePath
 from src.views.base.tablewidget import TableWidget
 from src.views.calibration.calibrationtraywidget import CalibrationTrayWidget
 from src.views.method.methodtraywidget import MethodTrayWidget
+from src.views.background.backgroundtray import BackgroundTrayWidget
 
 pg.setConfigOptions(antialias=False)
 
@@ -151,7 +152,7 @@ class ConditionFormWidget(QtWidgets.QListView):
         self.blockSignals(False)
 
 
-class PlotWindow(QtWidgets.QMainWindow):
+class MainWindow(QtWidgets.QMainWindow):
     def __init__(self, bundleType: int = 0):
         super().__init__()
         self._bundleType = bundleType
@@ -159,6 +160,7 @@ class PlotWindow(QtWidgets.QMainWindow):
         self._analyseFiles = []
         self._methodTray = None
         self._calibrationTray = None
+        self._backgroundTray = None
         self._resultDialog = None
         self._initializeUi()
 
@@ -186,6 +188,7 @@ class PlotWindow(QtWidgets.QMainWindow):
             "Print Setup": True,
             "Standards Tray List": False,
             "Methods Tray List": False,
+            "Background Tray List": False,
             "Results": True,
         }
         for label, disabled in actions.items():
@@ -207,9 +210,11 @@ class PlotWindow(QtWidgets.QMainWindow):
         elif key == "save-as":
             self.saveFile()
         elif key == "methods-tray-list":
-            self._openMethodTrayListWidget()
+            self._openMethodTrayWidget()
         elif key == "standards-tray-list":
-            self._openCalibrationTrayListWidget()
+            self._openCalibrationTrayWidget()
+        elif key == "background-tray-list":
+            self._openBackgroundTrayWidget()
         elif key == "results":
             self._openResultsWidget()
 
@@ -222,6 +227,7 @@ class PlotWindow(QtWidgets.QMainWindow):
             "&View",
             "&Calibration",
             "&Method",
+            "&Background",
             "&Window",
             "&Help",
         ]
@@ -248,6 +254,8 @@ class PlotWindow(QtWidgets.QMainWindow):
         self._menusMap["calibration"].addAction(self._actionsMap["standards-tray-list"])
 
         self._menusMap["method"].addAction(self._actionsMap["methods-tray-list"])
+
+        self._menusMap["background"].addAction(self._actionsMap["background-tray-list"])
 
     def _createMenuBar(self) -> None:
         self._createMenus()
@@ -421,19 +429,28 @@ class PlotWindow(QtWidgets.QMainWindow):
                     item.takeChild(0)
             self._plotWidget.clear()
 
-    def _openMethodTrayListWidget(self) -> None:
+    def _openMethodTrayWidget(self) -> None:
         self._methodTray = MethodTrayWidget(
             parent=self, dataframe=getDataframe("Methods")
         )
         self._methodTray.showMaximized()
 
-    def _openCalibrationTrayListWidget(self):
+    def _openCalibrationTrayWidget(self) -> None:
         self._calibrationTray = CalibrationTrayWidget(
-            dataframe=getDataframe("Calibrations")
+            parent=self, dataframe=getDataframe("Calibrations")
         )
         self._calibrationTray.showMaximized()
 
+    def _openBackgroundTrayWidget(self) -> None:
+        self._backgroundTray = BackgroundTrayWidget(
+            parent=self, dataframe=getDataframe("BackgroundProfiles")
+        )
+        self._backgroundTray.showMaximized()
+
     def _openResultsWidget(self):
+        self._analyse.backgroundProfile = datatypes.BackgroundProfile.fromATXBFile(
+            "backgrounds/PROFILE1.atxb"
+        )
         self._resultDialog = ResultDialog(
             self,
             self._analyse.calculateConcentrations(

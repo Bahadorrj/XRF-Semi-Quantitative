@@ -7,7 +7,7 @@ from PyQt6 import QtCore, QtWidgets
 from src.utils.database import getDatabase, getDataframe
 from src.utils.datatypes import Analyse, Calibration, Method
 from src.utils.paths import resourcePath
-from src.views.windows.plotwindow import PlotWindow
+from src.views.windows.mainwindow import MainWindow
 
 
 class GuiHandler(QtCore.QObject):
@@ -16,7 +16,7 @@ class GuiHandler(QtCore.QObject):
     addAnalyseSignal = QtCore.pyqtSignal(Analyse)
     exit = QtCore.pyqtSignal()
 
-    def __init__(self, window: PlotWindow):
+    def __init__(self, window: MainWindow):
         super().__init__()
         self.window = window
         self.openGuiSignal.connect(self.openGui)
