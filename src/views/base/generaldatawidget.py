@@ -98,8 +98,3 @@ class GeneralDataWidget(QtWidgets.QWidget):
         yMin = -maxIntensity * 0.1
         yMax = maxIntensity * 1.1
         self._plotWidget.setLimits(xMin=xMin, xMax=xMax, yMin=yMin, yMax=yMax)
-
-    def _addToGeneralData(
-        self, key: str, widget: QtWidgets.QLineEdit | QtWidgets.QComboBox
-    ) -> None:
-        pass

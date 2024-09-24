@@ -60,6 +60,7 @@ _dataframes = {
     "Conditions": _db.dataframe("SELECT * FROM Conditions"),
     "Calibrations": _db.dataframe("SELECT * FROM Calibrations"),
     "Methods": _db.dataframe("SELECT * FROM Methods"),
+    "BackgroundProfiles": _db.dataframe("SELECT * FROM BackgroundProfiles"),
 }
 
 
@@ -71,6 +72,7 @@ def reloadDataframes():
         "Conditions": _db.dataframe("SELECT * FROM Conditions"),
         "Calibrations": _db.dataframe("SELECT * FROM Calibrations"),
         "Methods": _db.dataframe("SELECT * FROM Methods"),
+        "BackgroundProfiles": _db.dataframe("SELECT * FROM BackgroundProfiles"),
     }
 
 

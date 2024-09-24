@@ -10,13 +10,6 @@ class TableItem(QtWidgets.QTableWidgetItem):
         if not self._editable:
             self.setFlags(self.flags() & ~QtCore.Qt.ItemFlag.ItemIsEditable)
         self.setTextAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
-        self.currentText = self.text()
-        self.previousText = self.currentText
-
-    def setText(self, text: str | None) -> None:
-        self.previousText = self.currentText
-        self.currentText = text
-        return super().setText(text)
 
 
 class TableWidget(QtWidgets.QTableWidget):

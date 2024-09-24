@@ -94,7 +94,7 @@ class CoefficientWidget(QtWidgets.QWidget):
 
                 # Calculate the line points
                 x = np.arange(0, intensity, 1)
-                y = np.arange(0, 100, 100 / x.size)
+                y = np.linspace(0, 100, x.size)
 
                 # Plot the line
                 self._plotWidget.plot(x=x, y=y, pen=pg.mkPen(color="r", width=2))
@@ -102,6 +102,7 @@ class CoefficientWidget(QtWidgets.QWidget):
                 self._slopeLabel.setText(f"Slope: {slope:.5f}")
 
     def _initializeRadiations(self) -> None:
+        self._searchComboBox.blockSignals(True)
         self._searchComboBox.clear()
         if self._calibration.analyse.data:
             try:
@@ -116,6 +117,7 @@ class CoefficientWidget(QtWidgets.QWidget):
             except IndexError:
                 items = [""]
             self._searchComboBox.addItems(items)
+        self._searchComboBox.blockSignals(False)
 
     def supply(self, calibration: datatypes.Calibration):
         """Updates the widget with the provided calibration data.

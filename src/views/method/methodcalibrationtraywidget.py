@@ -9,7 +9,7 @@ from src.views.calibration.calibrationtraywidget import (
     CalibrationTrayWidget,
 )
 from src.views.calibration.coefficientwidget import CoefficientWidget
-from src.views.calibration.generaldatawidget import (
+from src.views.calibration.calibrationgeneraldatawidget import (
     CalibrationGeneralDataWidget,
 )
 from src.views.calibration.linestablewidget import LinesTableWidget
@@ -104,6 +104,7 @@ class MethodCalibrationTrayWidget(CalibrationTrayWidget):
             index = self._df.query(f"filename == '{filename}'").index
             self._df.drop(index, inplace=True)
             self._tableWidget.removeRow(self._tableWidget.currentRow())
+            self._cellClicked(self._tableWidget.currentRow(), 0)
 
     def supply(self, method: datatypes.Method) -> None:
         if method is None:

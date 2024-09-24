@@ -4,7 +4,6 @@ from pathlib import Path
 import pandas
 from PyQt6 import QtCore, QtWidgets
 
-from src.utils import datatypes
 from src.utils.database import getDataframe, getDatabase, reloadDataframes
 from src.utils.datatypes import Method
 from src.utils.paths import resourcePath
@@ -54,7 +53,7 @@ class MethodTrayWidget(TrayWidget):
         if action in actions:
             actions[action]()
 
-    def addMethod(self) -> datatypes.Method:
+    def addMethod(self) -> Method:
         """Add a new method entry.
 
         This function opens a dialog for the user to input method details,
@@ -65,7 +64,7 @@ class MethodTrayWidget(TrayWidget):
             self: The instance of the class.
 
         Returns:
-            datatypes.Method: The newly created Method object.
+            Method: The newly created Method object.
 
         Raises:
             ValueError: If the method details are invalid or cannot be processed.
@@ -100,15 +99,30 @@ class MethodTrayWidget(TrayWidget):
         # self._tableWidget.setCurrentCell(self._tableWidget.rowCount() - 1, 0)
 
     def editCurrentMethod(self) -> None:
-        self._cellClicked(self._tableWidget.currentRow(), 0)
         if self._method is not None:
             if self._methodExplorer and self._methodExplorer.isVisible():
                 self._methodExplorer.close()
             else:
-                self._methodExplorer = MethodExplorer(parent=self, method=self._method)
+                self._methodExplorer = MethodExplorer(parent=self, method=self._method.copy())
                 self._methodExplorer.showMaximized()
                 self._methodExplorer.saved.connect(self._saveSignalArrived)
                 self._methodExplorer.requestNewMethod.connect(self._requestNewMethod)
+
+    def _saveSignalArrived(self) -> None:
+        self._supplyWidgets()
+        self._updateCurrentRow()
+
+    def _updateCurrentRow(self) -> None:
+        tableRow = self._tableWidget.getCurrentRow()
+        tableRow["filename"].setText(self._method.filename)
+        tableRow["description"].setText(self._method.description)
+        tableRow["state"].setText(self._method.status())
+
+    @QtCore.pyqtSlot()
+    def _requestNewMethod(self, method: Method) -> None:
+        self._method = method
+        self.addMethod()
+        self.editCurrentMethod()
 
     def removeCurrentMethod(self) -> None:
         """Remove the currently selected method from the application.
@@ -143,7 +157,8 @@ class MethodTrayWidget(TrayWidget):
             reloadDataframes()
             self._df = getDataframe("Methods")
             self._tableWidget.removeRow(self._tableWidget.currentRow())
-            self._cellClicked(self._tableWidget.currentRow(), 0)
+            if self._tableWidget.rowCount() == 0:
+                self._tabWidget.clear()
 
     def importMethod(self) -> None:
         """Import a method from an ATXM file into the application.
@@ -195,25 +210,10 @@ class MethodTrayWidget(TrayWidget):
         else:
             self._method = None
 
-    def _saveSignalArrived(self) -> None:
-        self._supplyWidgets()
-        self._updateCurrentRow()
-
-    def _updateCurrentRow(self) -> None:
-        tableRow = self._tableWidget.getCurrentRow()
-        tableRow["filename"].setText(self._method.filename)
-        tableRow["description"].setText(self._method.description)
-        tableRow["state"].setText(self._method.status())
-
     def _supplyWidgets(self) -> None:
         self._addWidgets(self._widgets)
         for widget in self._widgets.values():
             widget.supply(self._method)
-
-    @QtCore.pyqtSlot()
-    def _requestNewMethod(self) -> None:
-        self.addMethod()
-        self.editCurrentMethod()
 
     def supply(self, dataframe: pandas.DataFrame) -> None:
         """Supply data to the table widget from a given DataFrame.

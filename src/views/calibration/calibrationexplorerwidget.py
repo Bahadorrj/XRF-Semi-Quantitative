@@ -7,14 +7,14 @@ from src.utils.paths import resourcePath
 from src.views.base.explorerwidget import ExplorerWidget
 
 from src.views.calibration.coefficientwidget import CoefficientWidget
-from src.views.calibration.generaldatawidget import (
+from src.views.calibration.calibrationgeneraldatawidget import (
     CalibrationGeneralDataWidget,
 )
 from src.views.calibration.peaksearchwidget import PeakSearchWidget
 
 
 class CalibrationExplorerWidget(ExplorerWidget):
-    saved = QtCore.pyqtSignal()
+    saved = QtCore.pyqtSignal(datatypes.Calibration)
     requestNewCalibration = QtCore.pyqtSignal()
 
     def __init__(
@@ -28,7 +28,6 @@ class CalibrationExplorerWidget(ExplorerWidget):
         self._widgets = {
             "General Data": CalibrationGeneralDataWidget(self, editable=True),
             "Peak Search": PeakSearchWidget(self),
-            "Coefficient": CoefficientWidget(self),
         }
         self._initializeUi()
         if calibration is not None:
@@ -83,7 +82,7 @@ class CalibrationExplorerWidget(ExplorerWidget):
             f"state = {self._calibration.state} "
             f"WHERE calibration_id = {self._calibration.calibrationId}"
         )
-        self.saved.emit()
+        self.saved.emit(self._calibration)
 
     def openCalibration(self):
         messageBox = QtWidgets.QMessageBox(self)

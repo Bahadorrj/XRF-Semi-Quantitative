@@ -5,11 +5,13 @@ import numpy as np
 import pyqtgraph as pg
 
 from collections import defaultdict
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, asdict
 from json import JSONDecodeError, dump, loads, dumps
 from pathlib import Path
 from typing import Sequence
 from PyQt6.QtCore import Qt
+from scipy.interpolate import CubicSpline
+from scipy.signal import find_peaks
 
 from src.utils import calculation
 from src.utils import encryption
@@ -48,6 +50,36 @@ class AnalyseData:
                 )
         return intensities
 
+    def applyBackgroundProfile(self, profile: "BackgroundProfile") -> None:
+        self.y = self.calculateOptimalY(profile)
+
+    def calculateOptimalY(self, profile: "BackgroundProfile") -> np.ndarray:
+        if not profile:
+            return self.y
+        optimalY = self.y.copy()
+        xSmooth, ySmooth = self.smooth(self.x, self.y, profile.smoothness)
+        if kwargs := profile.peakKwargs():
+            peaks, _ = find_peaks(-ySmooth, **kwargs)
+        else:
+            peaks, _ = find_peaks(-ySmooth)
+        if peaks.size != 0:
+            regressionCurve = np.interp(self.x, xSmooth[peaks], ySmooth[peaks])
+            optimalY = (self.y - regressionCurve).clip(0)
+        if len(optimalY) > len(self.x):
+            optimalY = optimalY[: len(self.x)]
+        return optimalY
+
+    @staticmethod
+    def smooth(
+        x: np.ndarray, y: np.ndarray, level: float
+    ) -> tuple[np.ndarray, np.ndarray]:
+        cs = CubicSpline(x, y)
+        # Generate finer x values for smoother plot
+        X = np.linspace(0, x.size, int(x.size / level))
+        # Interpolate y values for the smoother plot
+        Y = cs(X)
+        return X, Y
+
     def toHashableDict(self) -> dict:
         return {
             "condition_id": self.conditionId,
@@ -73,8 +105,9 @@ class Analyse:
     filePath: str | None = field(default=None)
     data: list[AnalyseData] = field(default_factory=list)
     conditions: pandas.DataFrame = field(
-        default_factory=lambda: getDataframe("Conditions")
+        default_factory=lambda: getDataframe("Conditions").copy()
     )
+    _backgroundProfile: "BackgroundProfile" = field(default=None)
     generalData: dict = field(default_factory=dict)
     filename: str | None = field(default=None)
     extension: str | None = field(default=None)
@@ -84,6 +117,17 @@ class Analyse:
             self.filename = Path(self.filePath).stem
             self.extension = self.filePath.split(".")[-1]
 
+    @property
+    def backgroundProfile(self) -> "BackgroundProfile":
+        return self._backgroundProfile
+
+    @backgroundProfile.setter
+    def backgroundProfile(self, profile: "BackgroundProfile") -> None:
+        self._backgroundProfile = profile
+        for d in self.data:
+            d.applyBackgroundProfile(profile)
+        self.generalData["background profile"] = profile.filename
+
     def __eq__(self, other) -> bool:
         if other is None:
             return False
@@ -92,6 +136,8 @@ class Analyse:
         ), f"Comparison Error: between {type(self)} and {type(other)}"
         return (
             all(self.data[i] == other.data[i] for i in range(len(self.data)))
+            and self.conditions.equals(other.conditions)
+            and self.backgroundProfile == other.backgroundProfile
             and self.generalData == other.generalData
         )
 
@@ -102,7 +148,13 @@ class Analyse:
         return len(self.data) == 0
 
     def copy(self) -> "Analyse":
-        return Analyse(self.filePath, self.data.copy(), self.generalData.copy())
+        return Analyse(
+            self.filePath,
+            self.data.copy(),
+            self.conditions.copy(),
+            self.backgroundProfile.copy() if self.backgroundProfile else None,
+            self.generalData.copy(),
+        )
 
     def saveTo(self, filePath) -> None:
         if filePath.endswith(".atx"):
@@ -170,7 +222,7 @@ class Analyse:
             concentrations[activeElement] = float(
                 intensity * coefficients[activeElement].values[0]
             )
-        concentrations = {k: v for k, v in concentrations.items() if v > 0}
+        concentrations = {k: v for k, v in concentrations.items() if 0 < v <= 100}
         concentrations["unknown"] = 100 - sum(list(concentrations.values()))
         return concentrations
 
@@ -179,7 +231,12 @@ class Analyse:
             "file_path": self.filePath,
             "data": [d.toHashableDict() for d in self.data],
             "conditions": self.conditions.to_dict(),
-            "general_data": self.generalData,
+            "background_profile": (
+                self.backgroundProfile.toHashableDict()
+                if self.backgroundProfile
+                else None
+            ),
+            "general_data": self.generalData.copy(),
         }
 
     @classmethod
@@ -194,6 +251,11 @@ class Analyse:
             analyseDict["conditions"].reset_index(inplace=True, drop=True)
         if "general_data" in analyseDict:
             analyseDict["generalData"] = analyseDict.pop("general_data")
+        if "background_profile" in analyseDict:
+            if (profileDict := analyseDict.pop("background_profile", None)) is not None:
+                analyseDict["_backgroundProfile"] = BackgroundProfile.fromHashableDict(
+                    profileDict
+                )
         analyse = cls(**analyseDict)
         if analyseDict.get("filename"):
             analyse.filename = analyseDict["filename"]
@@ -216,7 +278,7 @@ class Analyse:
                             data.append(analyseData)
                         start = stop
                 data.sort(key=lambda x: x.conditionId)
-                return cls(filePath, data, getDataframe("Conditions"))
+                return cls(filePath, data)
 
     @classmethod
     def fromATXFile(cls, filePath: str) -> "Analyse":
@@ -342,7 +404,7 @@ class Calibration:
             )
             self.calculateCoefficients()
             self.calculateInterferences()
-        filePath = resourcePath(f"calibrations/{self.filename}.atxc")
+        filePath = resourcePath(resourcePath(f"calibrations/{self.filename}.atxc"))
         key = encryption.loadKey()
         jsonText = dumps(self.toHashableDict())
         encryptedText = encryption.encryptText(jsonText, key)
@@ -578,10 +640,10 @@ class Method:
             return "Edited by user"
 
 
-@dataclass(order=True)
+@dataclass(order=True, eq=True)
 class BackgroundProfile:
-    backgroundId: int
-    name: str
+    profileId: int
+    filename: str
     description: str
     smoothness: float = field(default=1.0)
     height: str | None = field(default=None)
@@ -592,14 +654,52 @@ class BackgroundProfile:
     wlen: str | None = field(default=None)
     rel_height: str | None = field(default=None)
     plateau_size: str | None = field(default=None)
+    state: int = field(default=0)
+
+    def status(self) -> str:
+        return self.convertStateToStatus(self.state)
 
     def peakKwargs(self) -> dict:
         return {
             f: eval(value)
             for f, value in self.__dict__.items()
-            if f not in ["smoothness", "backgroundId", "description", "name"]
+            if f not in ["profileId", "filename", "description", "smoothness", "state"]
             and value is not None
         }
+
+    def copy(self) -> "BackgroundProfile":
+        return BackgroundProfile(**self.__dict__)
+
+    def save(self) -> None:
+        filePath = resourcePath(resourcePath(f"backgrounds/{self.filename}.atxb"))
+        key = encryption.loadKey()
+        jsonText = dumps(self.toHashableDict())
+        encryptedText = encryption.encryptText(jsonText, key)
+        with open(filePath, "wb") as f:
+            f.write(encryptedText + b"\n")
+
+    def toHashableDict(self) -> dict:
+        return asdict(self)
+
+    @classmethod
+    def fromHashableDict(cls, kwargs: dict):
+        return None if kwargs is None else cls(**kwargs)
+
+    @classmethod
+    def fromATXBFile(cls, filePath: str) -> "BackgroundProfile":
+        key = encryption.loadKey()
+        with open(filePath, "r") as f:
+            encryptedText = f.readline()
+        decryptedText = encryption.decryptText(encryptedText, key)
+        kwargs = loads(decryptedText)
+        return cls(**kwargs)
+
+    @classmethod
+    def convertStateToStatus(cls, state: int) -> str:
+        if state == 0:
+            return "Initial state"
+        elif state == 1:
+            return "Edited by user"
 
 
 @dataclass(order=True)

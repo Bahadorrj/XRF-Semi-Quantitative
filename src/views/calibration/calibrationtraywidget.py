@@ -4,7 +4,6 @@ from pathlib import Path
 import pandas
 from PyQt6 import QtCore, QtWidgets
 
-from src.utils import datatypes
 from src.utils.database import getDataframe, getDatabase, reloadDataframes
 from src.utils.datatypes import Calibration, Analyse
 from src.utils.paths import resourcePath
@@ -15,7 +14,9 @@ from src.views.base.traywidget import TrayWidget
 from src.views.calibration.analyseacquisitionswidget import AnalyseAcquisitionWidget
 from src.views.calibration.calibrationfiledialog import CalibrationFormDialog
 from src.views.calibration.calibrationexplorerwidget import CalibrationExplorerWidget
-from src.views.calibration.generaldatawidget import CalibrationGeneralDataWidget
+from src.views.calibration.calibrationgeneraldatawidget import (
+    CalibrationGeneralDataWidget,
+)
 from src.views.calibration.coefficientwidget import CoefficientWidget
 from src.views.calibration.linestablewidget import LinesTableWidget
 
@@ -61,7 +62,7 @@ class CalibrationTrayWidget(TrayWidget):
         if action in actions:
             actions[action]()
 
-    def addCalibration(self) -> datatypes.Calibration:
+    def addCalibration(self) -> Calibration:
         """Add a new calibration entry.
 
         This function opens a dialog for the user to input calibration details,
@@ -72,7 +73,7 @@ class CalibrationTrayWidget(TrayWidget):
             self: The instance of the class.
 
         Returns:
-            datatypes.Calibration: The newly created Calibration object.
+            Calibration: The newly created Calibration object.
 
         Raises:
             ValueError: If the concentration cannot be converted to a float.
@@ -155,10 +156,56 @@ class CalibrationTrayWidget(TrayWidget):
                 self._calibrationExplorer.close()
             else:
                 self._calibrationExplorer = CalibrationExplorerWidget(
-                    parent=self, calibration=self._calibration
+                    parent=self, calibration=self._calibration.copy()
                 )
                 self._calibrationExplorer.showMaximized()
                 self._calibrationExplorer.saved.connect(self._saveSignalArrived)
+
+    def _saveSignalArrived(self, calibration: Calibration) -> None:
+        self._calibration = calibration
+        self._supplyWidgets()
+        self._updateCurrentRow()
+
+    def _updateCurrentRow(self) -> None:
+        tableRow = self._tableWidget.getCurrentRow()
+        tableRow["filename"].setText(self._calibration.filename)
+        tableRow["element"].setText(self._calibration.element)
+        tableRow["concentration"].setText(str(self._calibration.concentration))
+        tableRow["state"].setText(self._calibration.status())
+
+    @QtCore.pyqtSlot()
+    def _requestNewCalibration(self) -> None:
+        if self.addCalibration() and self._getAnalyseFile():
+            self._openCalibrationExplorer()
+
+    @QtCore.pyqtSlot()
+    def _getAnalyseFile(self) -> bool:
+        path, _ = QtWidgets.QFileDialog.getOpenFileName(
+            self,
+            "Open Analyse File",
+            "./",
+            "Antique'X Spectrum (*.atx);;Text Spectrum (*.txt)",
+        )
+        if path:
+            analyse = (
+                Analyse.fromTXTFile(path)
+                if path.endswith(".txt")
+                else Analyse.fromATXFile(path)
+            )
+            self._calibration.analyse = analyse
+            self._calibration.state = 1
+            self._calibration.save()
+            getDatabase().executeQuery(
+                f"UPDATE Calibrations SET state = 1 WHERE filename = '{self._calibration.filename}'"
+            )
+            reloadDataframes()
+            self._df = getDataframe("Calibrations")
+            self._tableWidget.getCurrentRow().get("state").setText(
+                self._calibration.status()
+            )
+            self._supplyWidgets()
+            return True
+        return False
 
     def removeCurrentCalibration(self) -> None:
         """Remove the currently selected calibration from the application.
@@ -195,6 +242,8 @@ class CalibrationTrayWidget(TrayWidget):
             reloadDataframes()
             self._df = getDataframe("Calibrations")
             self._tableWidget.removeRow(self._tableWidget.currentRow())
+            if self._tableWidget.rowCount() == 0:
+                self._tabWidget.clear()
 
     def importCalibration(self) -> None:
         """Import a calibration from an ATXC file into the application.
@@ -245,17 +294,6 @@ class CalibrationTrayWidget(TrayWidget):
         else:
             self._calibration = None
 
-    def _saveSignalArrived(self) -> None:
-        self._supplyWidgets()
-        self._updateCurrentRow()
-
-    def _updateCurrentRow(self) -> None:
-        tableRow = self._tableWidget.getCurrentRow()
-        tableRow["filename"].setText(self._calibration.filename)
-        tableRow["element"].setText(self._calibration.element)
-        tableRow["concentration"].setText(str(self._calibration.concentration))
-        tableRow["state"].setText(self._calibration.status())
-
     def _supplyWidgets(self) -> None:
         if self._calibration.state != 0:
             self._addWidgets(self._widgets)
@@ -263,40 +301,6 @@ class CalibrationTrayWidget(TrayWidget):
                 widget.supply(self._calibration)
         else:
             self._addWidgets({"Acquisition": self._acquisitionWidget})
-
-    @QtCore.pyqtSlot()
-    def _getAnalyseFile(self) -> bool:
-        path, _ = QtWidgets.QFileDialog.getOpenFileName(
-            self,
-            "Open Analyse File",
-            "./",
-            "Antique'X Spectrum (*.atx);;Text Spectrum (*.txt)",
-        )
-        if path:
-            analyse = (
-                Analyse.fromTXTFile(path)
-                if path.endswith(".txt")
-                else Analyse.fromATXFile(path)
-            )
-            self._calibration.analyse = analyse
-            self._calibration.state = 1
-            self._calibration.save()
-            getDatabase().executeQuery(
-                f"UPDATE Calibrations SET state = 1 WHERE filename = '{self._calibration.filename}'"
-            )
-            reloadDataframes()
-            self._df = getDataframe("Calibrations")
-            self._tableWidget.getCurrentRow().get("state").setText(
-                self._calibration.status()
-            )
-            self._supplyWidgets()
-            return True
-        return False
-
-    @QtCore.pyqtSlot()
-    def _requestNewCalibration(self) -> None:
-        if self.addCalibration() and self._getAnalyseFile():
-            self._openCalibrationExplorer()
 
     def supply(self, dataframe: pandas.DataFrame) -> None:
         """Supply data to the table widget from a given DataFrame.
