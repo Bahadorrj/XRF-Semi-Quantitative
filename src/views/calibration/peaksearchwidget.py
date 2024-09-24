@@ -70,6 +70,18 @@ class ConditionComboBox(QtWidgets.QComboBox):
         return super().setCurrentText(text)
 
 
+class TableItemWithMemory(TableItem):
+    def __init__(self, text: str | None = None, editable: bool = False):
+        super().__init__(text, editable)
+        self.currentText = self.text()
+        self.previousText = self.currentText
+
+    def setText(self, text: str | None) -> None:
+        self.previousText = self.currentText
+        self.currentText = text
+        return super().setText(text)
+
+
 class PeakSearchTableWidget(DataframeTableWidget):
     def __init__(
         self,
@@ -96,13 +108,11 @@ class PeakSearchTableWidget(DataframeTableWidget):
         )
 
     def updateRow(self, rowId: int, values: list) -> None:
-        if (
-            rowIndex := next(
-                (key for key, value in self.rows.items() if value["rowId"] == rowId),
-                None,
-            )
-            is None
-        ):
+        if listObject := [
+            key for key, value in self.rows.items() if value["rowId"] == rowId
+        ]:
+            rowIndex = listObject[0]
+        else:
             return
         self.blockSignals(True)
         for columnIndex, value in enumerate(values):
@@ -160,7 +170,11 @@ class PeakSearchWidget(QtWidgets.QWidget):
             action.setIcon(QtGui.QIcon(resourcePath(f"resources/icons/{key}.png")))
             action.setDisabled(disabled)
             self._actionsMap[key] = action
-            action.triggered.connect(partial(self._actionTriggered, key))
+            if label == "region":
+                action.setCheckable(True)
+                action.triggered.connect(self._toggleRegions)
+            else:
+                action.triggered.connect(self._undo)
 
     @QtCore.pyqtSlot(str)
     def _actionTriggered(self, key: str) -> None:
@@ -179,7 +193,16 @@ class PeakSearchWidget(QtWidgets.QWidget):
         for package in items:
             rowId, values, action = package
             self._tableWidget.updateRow(rowId, values)
-            self._plotDataChanged(rowId, action)
+            self._tableWidget.selectRowByID(rowId)
+            if self._isPlotDataChanged(rowId, action):
+                self._hoverOverPlotData(self._plotDataList[rowId])
+            if action == "region":
+                plotData = self._plotDataList[rowId]
+                minX = calculation.evToPx(float(values[4]))
+                maxX = calculation.evToPx(float(values[5]))
+                plotData.region.blockSignals(True)
+                plotData.region.setRegion((minX, maxX))
+                plotData.region.blockSignals(True)
 
     # def _redo(self) -> None:
     #     if self._redoStack:
@@ -282,9 +305,13 @@ class PeakSearchWidget(QtWidgets.QWidget):
             "symbol": TableItem(row["symbol"]),
             "radiation-type": TableItem(row["radiation_type"]),
             "kiloelectron-volt": TableItem(str(row["kiloelectron_volt"])),
-            "low_kiloelectron_volt": TableItem(str(row["low_kiloelectron_volt"])),
-            "high_kiloelectron_volt": TableItem(str(row["high_kiloelectron_volt"])),
-            "intensity": TableItem(str(intensity)),
+            "low_kiloelectron_volt": TableItemWithMemory(
+                str(row["low_kiloelectron_volt"])
+            ),
+            "high_kiloelectron_volt": TableItemWithMemory(
+                str(row["high_kiloelectron_volt"])
+            ),
+            "intensity": TableItemWithMemory(str(intensity)),
             "condition-combo-box": self._createConditionComboBox(plotData),
             "status": (
                 TableItem("Activated")
@@ -512,7 +539,6 @@ class PeakSearchWidget(QtWidgets.QWidget):
             except IndexError:
                 return default
 
-        self._addPlotDataToUndoStack(plotData.rowId, "region")
         minX, maxX = plotData.region.getRegion()
         minKev = getKev(minX, 0)
         maxKev = getKev(maxX, self._kev[-1])
@@ -583,8 +609,13 @@ class PeakSearchWidget(QtWidgets.QWidget):
                     values.insert(index, component.previousText)
                 else:
                     values.insert(index, component.currentText_)
+            elif isinstance(component, TableItemWithMemory):
+                if action == "region":
+                    values.insert(index, component.previousText)
+                else:
+                    values.insert(index, component.currentText)
             elif isinstance(component, TableItem):
-                values.insert(index, component.currentText)
+                values.insert(index, component.text())
         self._undoStack.append((rowId, values, action))
         # print(f"added to undo stack : {values}-{action}")
 
@@ -725,7 +756,7 @@ class PeakSearchWidget(QtWidgets.QWidget):
         self.blockSignals(True)
         self._calibration = calibration
         self._analyse = self._calibration.analyse
-        self._df = self._calibration.lines.reset_index(drop=True, inplace=False)
+        self._df = self._calibration.lines
         self._activeIntensities = self._calibration.activeIntensities
         self._kev = [calculation.pxToEv(i) for i in self._analyse.data[0].x]
         self._plotDataList = [
