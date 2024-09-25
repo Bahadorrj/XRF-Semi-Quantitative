@@ -39,6 +39,8 @@ class CalibrationsTableWidget(QtWidgets.QWidget):
         df = method.calibrations.drop("calibration_id", axis=1)
         df["state"] = df["state"].apply(Calibration.convertStateToStatus)
         self._tableWidget.supply(df)
+        self._tableWidget.clearSelection()
+        self._tableWidget.selectRow(0)
         self.blockSignals(False)
 
     @property

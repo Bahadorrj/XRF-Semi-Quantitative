@@ -233,10 +233,11 @@ class AnalytesAndConditionsWidget(QtWidgets.QWidget):
             QtWidgets.QHeaderView.ResizeMode.Fixed
         )
         self._conditionTable.verticalHeader().setVisible(False)
-        self._conditionTable.cellClicked.connect(self._cellClicked)
+        self._conditionTable.itemSelectionChanged.connect(self._itemSelectionChanged)
 
-    @QtCore.pyqtSlot(int, int)
-    def _cellClicked(self, row: int, column: int) -> None:
+    @QtCore.pyqtSlot()
+    def _itemSelectionChanged(self) -> None:
+        row = self._conditionTable.currentRow()
         if (
             df := (
                 self._conditions.query(
@@ -349,6 +350,8 @@ class AnalytesAndConditionsWidget(QtWidgets.QWidget):
         self._method = method
         self._conditions = self._method.conditions
         self._conditionTable.supply(self._conditions.drop("condition_id", axis=1))
+        self._conditionTable.clearSelection()
+        self._conditionTable.selectRow(0)
         self.blockSignals(False)
 
     @property

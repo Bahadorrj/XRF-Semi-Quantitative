@@ -103,7 +103,9 @@ class MethodTrayWidget(TrayWidget):
             if self._methodExplorer and self._methodExplorer.isVisible():
                 self._methodExplorer.close()
             else:
-                self._methodExplorer = MethodExplorer(parent=self, method=self._method.copy())
+                self._methodExplorer = MethodExplorer(
+                    parent=self, method=self._method.copy()
+                )
                 self._methodExplorer.showMaximized()
                 self._methodExplorer.saved.connect(self._saveSignalArrived)
                 self._methodExplorer.requestNewMethod.connect(self._requestNewMethod)
@@ -199,8 +201,10 @@ class MethodTrayWidget(TrayWidget):
                 messageBox.setStandardButtons(QtWidgets.QMessageBox.StandardButton.Ok)
                 messageBox.exec()
 
-    def _cellClicked(self, row: int, column: int) -> None:
-        super()._cellClicked(row, column)
+    @QtCore.pyqtSlot()
+    def _itemSelectionChanged(self) -> None:
+        super()._itemSelectionChanged()
+        row = self._tableWidget.currentRow()
         if row != -1:
             tableRow = self._tableWidget.getRow(row)
             filename = tableRow.get("filename").text()
@@ -227,10 +231,15 @@ class MethodTrayWidget(TrayWidget):
         Returns:
             None
         """
+        self.blockSignals(True)
         super().supply(dataframe)
         df = self._df.drop("method_id", axis=1)
         df["state"] = df["state"].apply(Method.convertStateToStatus)
         self._tableWidget.supply(df)
+        self._tableWidget.clearSelection()
+        self._tableWidget.selectRow(0)
+        self._tableWidget.setFocus()
+        self.blockSignals(False)
 
     @property
     def method(self):

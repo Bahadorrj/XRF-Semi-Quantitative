@@ -150,6 +150,7 @@ class CalibrationExplorerWidget(ExplorerWidget):
         self._implementAnalyse()
         self._supplyWidgets()
         self.blockSignals(False)
+        self._treeWidget.setCurrentItem(self._treeWidget.topLevelItem(0))
 
     def closeEvent(self, a0: QtGui.QCloseEvent | None) -> None:
         if self._calibration != self._initCalibration:

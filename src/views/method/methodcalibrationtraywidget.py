@@ -104,9 +104,10 @@ class MethodCalibrationTrayWidget(CalibrationTrayWidget):
             index = self._df.query(f"filename == '{filename}'").index
             self._df.drop(index, inplace=True)
             self._tableWidget.removeRow(self._tableWidget.currentRow())
-            self._cellClicked(self._tableWidget.currentRow(), 0)
 
     def supply(self, method: datatypes.Method) -> None:
         if method is None:
+            return
+        if self._df and self._df.equals(method.calibrations):
             return
         super().supply(method.calibrations)

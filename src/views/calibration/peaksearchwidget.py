@@ -278,11 +278,11 @@ class PeakSearchWidget(QtWidgets.QWidget):
     def _createTableWidget(self) -> None:
         self._tableWidget = PeakSearchTableWidget(self)
         self._tableWidget.setMaximumHeight(200)
-        self._tableWidget.cellClicked.connect(self._cellClicked)
+        self._tableWidget.itemSelectionChanged.connect(self._itemSelectionChanged)
 
-    @QtCore.pyqtSlot(int, int)
-    def _cellClicked(self, row: int, column: int) -> None:
-        tableRow = self._tableWidget.rows[row]
+    @QtCore.pyqtSlot()
+    def _itemSelectionChanged(self) -> None:
+        tableRow = self._tableWidget.getCurrentRow()
         plotData = self._plotDataList[tableRow.get("rowId")]
         self._hoverOverPlotData(plotData)
 

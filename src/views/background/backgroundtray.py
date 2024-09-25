@@ -155,8 +155,10 @@ class BackgroundTrayWidget(TrayWidget):
                 messageBox.setStandardButtons(QtWidgets.QMessageBox.StandardButton.Ok)
                 messageBox.exec()
 
-    def _cellClicked(self, row: int, column: int) -> None:
-        super()._cellClicked(row, column)
+    @QtCore.pyqtSlot()
+    def _itemSelectionChanged(self) -> None:
+        super()._itemSelectionChanged()
+        row = self._tableWidget.currentRow()
         if row != -1:
             tableRow = self._tableWidget.getCurrentRow()
             filename = tableRow.get("filename").text()
@@ -177,6 +179,9 @@ class BackgroundTrayWidget(TrayWidget):
         df = self._df.drop("profile_id", axis=1)
         df["state"] = df["state"].apply(BackgroundProfile.convertStateToStatus)
         self._tableWidget.supply(df)
+        self._tableWidget.clearSelection()
+        self._tableWidget.selectRow(0)
+        self._tableWidget.setFocus()
         self.blockSignals(False)
 
     @property

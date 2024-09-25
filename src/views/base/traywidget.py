@@ -118,10 +118,11 @@ class TrayWidget(QtWidgets.QWidget):
 
     def _createTableWidget(self) -> None:
         self._tableWidget = DataframeTableWidget(self, autoFill=True)
-        self._tableWidget.cellClicked.connect(self._cellClicked)
+        self._tableWidget.itemSelectionChanged.connect(self._itemSelectionChanged)
 
-    @QtCore.pyqtSlot(int, int)
-    def _cellClicked(self, row: int, column: int) -> None:
+    @QtCore.pyqtSlot()
+    def _itemSelectionChanged(self) -> None:
+        row = self._tableWidget.currentRow()
         if row != -1:
             if editAction := self._actionsMap.get("edit"):
                 editAction.setDisabled(False)

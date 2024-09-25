@@ -82,7 +82,7 @@ class TableWidget(QtWidgets.QTableWidget):
             self.setHorizontalHeaderItem(column, item)
 
     def addRow(self, row: dict) -> None:
-        self.blockSignals(True)
+        # self.blockSignals(True)
         self.setRowCount(self.rowCount() + 1)
         rowIndex, columnIndex = self.rowCount() - 1, 0
         for component in row.values():
@@ -93,14 +93,15 @@ class TableWidget(QtWidgets.QTableWidget):
                 self.setItem(rowIndex, columnIndex, component)
                 columnIndex += 1
         self.rows[rowIndex] = row
-        self.blockSignals(False)
+        self.selectRow(rowIndex)
+        # self.blockSignals(False)
 
     def removeRow(self, rowIndex: int) -> None:
-        self.blockSignals(True)
+        # self.blockSignals(True)
         self.rows.pop(rowIndex)
         self.rows = dict(zip(range(self.rowCount()), self.rows.values()))
         super().removeRow(rowIndex)
-        self.blockSignals(False)
+        # self.blockSignals(False)
 
     def getRow(self, rowIndex: int) -> dict:
         if rowIndex < 0 or rowIndex >= self.rowCount():
@@ -120,10 +121,10 @@ class TableWidget(QtWidgets.QTableWidget):
                 break
 
     def resetTable(self) -> None:
-        self.blockSignals(True)
+        # self.blockSignals(True)
         self.setRowCount(0)
         self.rows.clear()
-        self.blockSignals(False)
+        # self.blockSignals(False)
 
     def updateRow(self, rowIndex: int, row: dict) -> None:
         self.blockSignals(True)

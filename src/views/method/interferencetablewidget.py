@@ -37,4 +37,6 @@ class InterferencesTableWidget(QtWidgets.QWidget):
             QtWidgets.QHeaderView.ResizeMode.ResizeToContents
         )
         self._tableWidget.setVerticalHeaderLabels(self._method.interferences.index)
+        self._tableWidget.clearSelection()
+        self._tableWidget.selectRow(0)
         self.blockSignals(False)

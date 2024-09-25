@@ -72,9 +72,11 @@ class LinesTableWidget(QtWidgets.QWidget):
         oldWidget.hide()
         if filterName == "All Lines":
             self.mainLayout.replaceWidget(oldWidget, self._linesTableWidget)
+            self._linesTableWidget.selectRow(0)
             self._linesTableWidget.show()
         else:
             self.mainLayout.replaceWidget(oldWidget, self._activeTableWidget)
+            self._activeTableWidget.selectRow(0)
             self._activeTableWidget.show()
 
     def _createTableWidgets(self) -> None:
