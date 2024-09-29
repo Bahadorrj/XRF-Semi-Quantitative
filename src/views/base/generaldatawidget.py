@@ -83,11 +83,16 @@ class GeneralDataWidget(QtWidgets.QWidget):
         hLayout.addWidget(widget)
         self._generalDataLayout.addLayout(hLayout)
         if isinstance(widget, QtWidgets.QLineEdit):
-            widget.editingFinished.connect(partial(self._addToGeneralData, key, widget))
+            widget.editingFinished.connect(
+                partial(self._generalDataChanged, key, widget)
+            )
         elif isinstance(widget, QtWidgets.QComboBox):
             widget.currentTextChanged.connect(
-                partial(self._addToGeneralData, key, widget)
+                partial(self._generalDataChanged, key, widget)
             )
+
+    def _generalDataChanged(self, key, widget) -> None:
+        pass
 
     def _drawCanvas(self) -> None:
         pass

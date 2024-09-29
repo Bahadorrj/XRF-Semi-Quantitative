@@ -45,10 +45,10 @@ class BackgroundGeneralDataWidget(GeneralDataWidget):
         if editable:
             for key, widget in self._generalDataWidgetsMap.items():
                 widget.editingFinished.connect(
-                    partial(self._editingFinished, key, widget)
+                    partial(self._generalDataChanged, key, widget)
                 )
 
-    def _editingFinished(self, key: str, lineEdit: QtWidgets.QLineEdit) -> None:
+    def _generalDataChanged(self, key: str, lineEdit: QtWidgets.QLineEdit) -> None:
         if lineEdit.text() == "":
             setattr(self._profile, key, None)
             self._drawCanvas()

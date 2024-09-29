@@ -4,12 +4,12 @@ from pathlib import Path
 from PyQt6 import QtWidgets
 
 from src.utils import datatypes
-from src.views.calibration.calibrationtraywidget import (
+from src.views.calibration.traywidget import (
     AnalyseAcquisitionWidget,
     CalibrationTrayWidget,
 )
 from src.views.calibration.coefficientwidget import CoefficientWidget
-from src.views.calibration.calibrationgeneraldatawidget import (
+from src.views.calibration.generaldatawidget import (
     CalibrationGeneralDataWidget,
 )
 from src.views.calibration.linestablewidget import LinesTableWidget

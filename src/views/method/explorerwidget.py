@@ -1,35 +1,37 @@
 from PyQt6 import QtCore, QtWidgets
 
-from src.utils import datatypes
+from src.utils.datatypes import Method
 from src.utils.database import getDatabase
 
 from src.views.base.explorerwidget import ExplorerWidget
-from src.views.background.backgroundgeneraldatawidget import BackgroundGeneralDataWidget
+from src.views.method.analytesandconditionswidget import AnalytesAndConditionsWidget
+from src.views.method.calibrationtraywidget import MethodCalibrationTrayWidget
 
 
-class BackgroundExplorer(ExplorerWidget):
-    saved = QtCore.pyqtSignal(datatypes.BackgroundProfile)
+class MethodExplorer(ExplorerWidget):
+    saved = QtCore.pyqtSignal(Method)
     requestNewMethod = QtCore.pyqtSignal()
 
     def __init__(
         self,
         parent: QtWidgets.QWidget | None = None,
-        profile: datatypes.BackgroundProfile | None = None,
+        method: Method | None = None,
     ):
         super().__init__(parent)
-        self._profile = None
-        self._initProfile = None
+        self._method = None
+        self._initMethod = None
         self._widgets = {
-            "General Data": BackgroundGeneralDataWidget(self, editable=True)
+            "Analytes And Conditions": AnalytesAndConditionsWidget(self, editable=True),
+            "Calibrations": MethodCalibrationTrayWidget(self),
         }
         self._initializeUi()
-        if profile is not None:
-            self.supply(profile)
+        if method is not None:
+            self.supply(method)
 
     def _initializeUi(self) -> None:
         super()._initializeUi()
-        self.setObjectName("background-explorer")
-        self.setWindowTitle("Background explorer")
+        self.setObjectName("method-explorer")
+        self.setWindowTitle("Method explorer")
 
     @QtCore.pyqtSlot()
     def _actionTriggered(self, key: str) -> None:
@@ -42,13 +44,13 @@ class BackgroundExplorer(ExplorerWidget):
             action()
 
     def newMethod(self):
-        if self._profile != self._initProfile:
+        if self._method != self._initMethod:
             messageBox = QtWidgets.QMessageBox(self)
             messageBox.setIcon(QtWidgets.QMessageBox.Icon.Question)
             messageBox.setText(
-                "Do you want to save the changes before opening a new profile?"
+                "Do you want to save the changes before opening a new method?"
             )
-            messageBox.setWindowTitle("New profile")
+            messageBox.setWindowTitle("New method")
             messageBox.setStandardButtons(
                 QtWidgets.QMessageBox.StandardButton.Yes
                 | QtWidgets.QMessageBox.StandardButton.No
@@ -62,27 +64,27 @@ class BackgroundExplorer(ExplorerWidget):
             self.requestNewMethod.emit()
 
     def saveMethod(self) -> None:
-        if self._profile == self._initProfile:
+        if self._method == self._initMethod:
             return
-        self._profile.state = 1
-        self._profile.save()
-        self._initProfile = self._profile.copy()
+        self._method.state = 1
+        self._method.save()
+        self._initMethod = self._method.copy()
         getDatabase().executeQuery(
-            "UPDATE BackgroundProfiles "
-            f"SET filename = '{self._profile.filename}', "
-            f"description = '{self._profile.description}', "
-            f"state = {self._profile.state} "
-            f"WHERE profile_id = {self._profile.profileId}"
+            "UPDATE Methods "
+            f"SET filename = '{self._method.filename}', "
+            f"description = '{self._method.description}', "
+            f"state = {self._method.state} "
+            f"WHERE method_id = {self._method.methodId}"
         )
-        self.saved.emit(self._profile)
+        self.saved.emit(self._method)
 
     def openMethod(self):
         messageBox = QtWidgets.QMessageBox(self)
         messageBox.setIcon(QtWidgets.QMessageBox.Icon.Question)
         messageBox.setText(
-            "Do you want to save the changes before opening another profile?"
+            "Do you want to save the changes before opening another method?"
         )
-        messageBox.setWindowTitle("Open profile")
+        messageBox.setWindowTitle("Open method")
         messageBox.setStandardButtons(
             QtWidgets.QMessageBox.StandardButton.Yes
             | QtWidgets.QMessageBox.StandardButton.No
@@ -90,10 +92,10 @@ class BackgroundExplorer(ExplorerWidget):
         messageBox.setDefaultButton(QtWidgets.QMessageBox.StandardButton.Yes)
         if messageBox.exec() == QtWidgets.QMessageBox.StandardButton.Yes:
             filePath, _ = QtWidgets.QFileDialog.getOpenFileName(
-                self, "Open Background Profile", "./", "Antique'X background (*.atxb)"
+                self, "Open Method", "./", "Antique'X method (*.atxm)"
             )
             if filePath:
-                self.supply(datatypes.BackgroundProfile.fromATXBFile(filePath))
+                self.supply(Method.fromATXMFile(filePath))
 
     @QtCore.pyqtSlot()
     def _changeWidget(self) -> None:
@@ -110,28 +112,28 @@ class BackgroundExplorer(ExplorerWidget):
 
     def _supplyWidgets(self) -> None:
         for widget in self._widgets.values():
-            widget.supply(self._profile)
+            widget.supply(self._method)
 
-    def supply(self, profile: datatypes.BackgroundProfile) -> None:
-        if profile is None:
+    def supply(self, method: Method) -> None:
+        if method is None:
             return
-        if self._profile and self._profile == profile:
+        if self._method and self._method == method:
             return
         self.blockSignals(True)
-        self._profile = profile
-        self._initProfile = self._profile.copy()
+        self._method = method
+        self._initMethod = self._method.copy()
         self._supplyWidgets()
         self.blockSignals(False)
         self._treeWidget.setCurrentItem(self._treeWidget.topLevelItem(0))
 
     def closeEvent(self, a0) -> None:
-        if self._profile != self._initProfile:
+        if self._method != self._initMethod:
             messageBox = QtWidgets.QMessageBox(self)
             messageBox.setIcon(QtWidgets.QMessageBox.Icon.Question)
             messageBox.setText(
-                "Do you want to save the changes before closing the profile explorer?"
+                "Do you want to save the changes before closing the method edit?"
             )
-            messageBox.setWindowTitle("Close profile explorer")
+            messageBox.setWindowTitle("Close method edit")
             messageBox.setStandardButtons(
                 QtWidgets.QMessageBox.StandardButton.Yes
                 | QtWidgets.QMessageBox.StandardButton.No
@@ -139,4 +141,6 @@ class BackgroundExplorer(ExplorerWidget):
             messageBox.setDefaultButton(QtWidgets.QMessageBox.StandardButton.Yes)
             if messageBox.exec() == QtWidgets.QMessageBox.StandardButton.Yes:
                 self.saveMethod()
-        return super().closeEvent(a0)
+            a0.accept()
+        else:
+            return super().closeEvent(a0)

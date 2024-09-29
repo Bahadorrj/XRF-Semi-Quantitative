@@ -7,7 +7,7 @@ from src.utils.paths import resourcePath
 from src.views.base.explorerwidget import ExplorerWidget
 
 from src.views.calibration.coefficientwidget import CoefficientWidget
-from src.views.calibration.calibrationgeneraldatawidget import (
+from src.views.calibration.generaldatawidget import (
     CalibrationGeneralDataWidget,
 )
 from src.views.calibration.peaksearchwidget import PeakSearchWidget

@@ -12,9 +12,9 @@ from src.views.base.tablewidget import TableItem
 from src.views.base.traywidget import TrayWidget
 
 from src.views.calibration.analyseacquisitionswidget import AnalyseAcquisitionWidget
-from src.views.calibration.calibrationfiledialog import CalibrationFormDialog
-from src.views.calibration.calibrationexplorerwidget import CalibrationExplorerWidget
-from src.views.calibration.calibrationgeneraldatawidget import (
+from src.views.calibration.fromdialog import CalibrationFormDialog
+from src.views.calibration.explorerwidget import CalibrationExplorerWidget
+from src.views.calibration.generaldatawidget import (
     CalibrationGeneralDataWidget,
 )
 from src.views.calibration.coefficientwidget import CoefficientWidget
@@ -92,7 +92,7 @@ class CalibrationTrayWidget(TrayWidget):
             self._df = getDataframe("Calibrations")
             calibrationId = int(self._df.iloc[-1].values[0])
             self._calibration = Calibration(
-                calibrationId, filename, element, concentration
+                calibrationId, filename, {element: concentration}
             )
             self._calibration.save()
             self._insertCalibration()

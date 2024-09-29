@@ -10,9 +10,10 @@ from src.utils import datatypes
 from src.utils.database import getDataframe
 from src.utils.paths import resourcePath
 from src.views.base.tablewidget import TableWidget
-from src.views.calibration.calibrationtraywidget import CalibrationTrayWidget
-from src.views.method.methodtraywidget import MethodTrayWidget
-from src.views.background.backgroundtray import BackgroundTrayWidget
+from src.views.calibration.traywidget import CalibrationTrayWidget
+from src.views.method.traywidget import MethodTrayWidget
+from src.views.background.traywidget import BackgroundTrayWidget
+from src.views.base.generaldatawidget import GeneralDataWidget
 
 pg.setConfigOptions(antialias=False)
 
@@ -32,6 +33,20 @@ COLORS = [
     "#00FF7F",
     "#FF7F00",
 ]
+
+
+# class AnalyseGeneralDataGroupBox(QtWidgets.QGroupBox):
+#     def __init__(self, parent: QtWidgets.QWidget | None = None, analyse: datatypes.Analyse | None = None):
+#         super().__init__(parent)
+#         self.setTitle("General Data")
+#         self._analyse = None
+#         self._generalDataWidgetsMap = None
+#         self._initializeUi()
+#         if analyse is not None:
+#             self.supply(analyse)
+#         self.hide()
+
+#     def _initializeUi(self) -> None:
 
 
 class ResultDialog(QtWidgets.QDialog):

@@ -1,11 +1,7 @@
 import pyqtgraph as pg
-import numpy as np
 
 from functools import partial
 from PyQt6 import QtWidgets
-
-from scipy.interpolate import CubicSpline
-from scipy.signal import find_peaks
 
 from src.utils import datatypes, calculation
 from src.utils.database import getDataframe
@@ -51,48 +47,43 @@ class CalibrationGeneralDataWidget(GeneralDataWidget):
     def _createWidgets(self) -> None:
         editable = self._editable
         keys = [
-            "element",
-            "concentration",
-            "type",
-            "area",
-            "mass",
-            "rho",
-            "background profile",
-            "rest",
-            "diluent",
+            "Type",
+            "Area",
+            "Mass",
+            "Rho",
+            "Background Profile",
+            "Rest",
+            "Diluent",
         ]
         if editable:
             for key in keys:
-                if key == "background profile":
+                if key == "Background Profile":
                     widget = QtWidgets.QComboBox(self)
                     items = getDataframe("BackgroundProfiles")["filename"].to_list()
                     items.insert(0, "")
                     widget.addItems(items)
                     widget.currentTextChanged.connect(
-                        partial(self._addToGeneralData, key, widget)
+                        partial(self._generalDataChanged, key, widget)
                     )
                 else:
                     widget = QtWidgets.QLineEdit(self)
                     widget.textEdited.connect(
-                        partial(self._addToGeneralData, key, widget)
+                        partial(self._generalDataChanged, key, widget)
                     )
                 self._generalDataWidgetsMap[key] = widget
         else:
             self._generalDataWidgetsMap = {k: QtWidgets.QLabel(self) for k in keys}
         self._fillGeneralDataGroupBox()
 
-    def _addToGeneralData(
+    def _generalDataChanged(
         self, key: str, widget: QtWidgets.QLineEdit | QtWidgets.QComboBox
     ) -> None:
-        if key == "element":
-            self._calibration.element = widget.text()
-        elif key == "concentration":
-            self._calibration.concentration = float(widget.text())
-        elif key == "background profile":
-            profile = datatypes.BackgroundProfile.fromATXBFile(
-                resourcePath(f"backgrounds/{widget.currentText()}.atxb")
-            )
-            self._calibration.analyse.backgroundProfile = profile
+        if key == "Background Profile":
+            if filename := widget.currentText():
+                profile = datatypes.BackgroundProfile.fromATXBFile(
+                    resourcePath(f"backgrounds/{filename}.atxb")
+                )
+                self._calibration.analyse.backgroundProfile = profile
         else:
             self._calibration.analyse.generalData[key] = (
                 widget.text()
@@ -108,10 +99,6 @@ class CalibrationGeneralDataWidget(GeneralDataWidget):
                 widget.setText(value)
             else:
                 widget.setCurrentText(value)
-        self._generalDataWidgetsMap["element"].setText(self._element)
-        self._generalDataWidgetsMap["concentration"].setText(
-            f"{self._calibration.concentration:.1f}"
-        )
 
     def _drawCanvas(self) -> None:
         self._plotWidget.clear()

@@ -5,11 +5,11 @@ from PyQt6 import QtCore, QtWidgets
 
 from src.utils.database import getDataframe, getDatabase, reloadDataframes
 from src.utils.datatypes import BackgroundProfile
-from src.views.background.backgroundfiledialog import BackgroundFileDialog
+from src.views.background.formdialog import BackgroundFileDialog
 from src.views.base.traywidget import TrayWidget
-from src.views.background.backgroundgeneraldatawidget import BackgroundGeneralDataWidget
+from src.views.background.generaldatawidget import BackgroundGeneralDataWidget
 from src.views.base.tablewidget import TableItem
-from src.views.background.backgroundexplorer import BackgroundExplorer
+from src.views.background.explorerwidget import BackgroundExplorer
 
 
 class BackgroundTrayWidget(TrayWidget):

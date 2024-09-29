@@ -12,10 +12,10 @@ from src.views.base.tablewidget import TableItem
 from src.views.base.traywidget import TrayWidget
 
 from src.views.method.calibrationtablewidget import CalibrationsTableWidget
-from src.views.method.methodexplorerwidget import MethodExplorer
+from src.views.method.explorerwidget import MethodExplorer
 from src.views.method.analytesandconditionswidget import AnalytesAndConditionsWidget
 from src.views.method.interferencetablewidget import InterferencesTableWidget
-from src.views.method.methodfiledialog import MethodFormDialog
+from src.views.method.formdialog import MethodFormDialog
 
 
 class MethodTrayWidget(TrayWidget):
