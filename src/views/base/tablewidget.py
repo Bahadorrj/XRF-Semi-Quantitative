@@ -82,7 +82,6 @@ class TableWidget(QtWidgets.QTableWidget):
             self.setHorizontalHeaderItem(column, item)
 
     def addRow(self, row: dict) -> None:
-        # self.blockSignals(True)
         self.setRowCount(self.rowCount() + 1)
         rowIndex, columnIndex = self.rowCount() - 1, 0
         for component in row.values():
@@ -94,37 +93,25 @@ class TableWidget(QtWidgets.QTableWidget):
                 columnIndex += 1
         self.rows[rowIndex] = row
         self.selectRow(rowIndex)
-        # self.blockSignals(False)
 
     def removeRow(self, rowIndex: int) -> None:
-        # self.blockSignals(True)
+        if rowIndex < 0 or rowIndex >= self.rowCount():
+            return
+        super().removeRow(rowIndex)
         self.rows.pop(rowIndex)
         self.rows = dict(zip(range(self.rowCount()), self.rows.values()))
-        super().removeRow(rowIndex)
-        # self.blockSignals(False)
 
     def getRow(self, rowIndex: int) -> dict:
         if rowIndex < 0 or rowIndex >= self.rowCount():
             return None
         return self.rows[rowIndex]
 
-    def getRowById(self, rowId: int) -> dict:
-        return next((d for d in self.rows.values() if d["rowId"] == rowId), None)
-
     def getCurrentRow(self) -> dict:
-        return self.rows[self.currentRow()]
-
-    def selectRowByID(self, rowId: int) -> None:
-        for rowIndex, row in self.rows.items():
-            if row["rowId"] == rowId:
-                self.selectRow(rowIndex)
-                break
+        return self.rows[self.currentRow()] if self.currentRow() != -1 else None
 
     def resetTable(self) -> None:
-        # self.blockSignals(True)
         self.setRowCount(0)
         self.rows.clear()
-        # self.blockSignals(False)
 
     def updateRow(self, rowIndex: int, row: dict) -> None:
         self.blockSignals(True)
