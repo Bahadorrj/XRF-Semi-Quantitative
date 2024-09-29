@@ -170,7 +170,7 @@ class CalibrationTrayWidget(TrayWidget):
         tableRow = self._tableWidget.getCurrentRow()
         tableRow["filename"].setText(self._calibration.filename)
         tableRow["element"].setText(self._calibration.element)
-        tableRow["concentration"].setText(str(self._calibration.concentration))
+        tableRow["concentration"].setText(f"{self._calibration.concentration:.1f}")
         tableRow["state"].setText(self._calibration.status())
 
     @QtCore.pyqtSlot()
