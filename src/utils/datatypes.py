@@ -108,8 +108,6 @@ class Analyse:
 
     def __post_init__(self) -> None:
         self.generalData = {
-            "Element": None,
-            "Concentration": None,
             "Type": None,
             "Area": None,
             "Mass": None,
@@ -316,16 +314,13 @@ class Analyse:
 class Calibration:
     calibrationId: int
     filename: str
-    element: str
-    concentration: float
+    concentrations: dict
     state: int = field(default=0)
     _analyse: Analyse | None = field(default=None)
-    _lines: pandas.DataFrame = field(
-        default_factory=lambda: getDataframe("Lines").iloc[:, 9:]
-    )
+    _lines: pandas.DataFrame = field(default_factory=lambda: getDataframe("Lines"))
     activeIntensities: dict = field(default_factory=dict)
-    coefficients: dict = field(default_factory=dict)
-    interferences: dict = field(default_factory=dict)
+    coefficients: dict = field(default_factory=lambda: defaultdict(dict))
+    interferences: dict = field(default_factory=lambda: defaultdict(dict))
 
     def __post_init__(self):
         df = getDataframe("Lines").copy()
@@ -349,8 +344,7 @@ class Calibration:
         return (
             self.calibrationId == other.calibrationId
             and self.filename == other.filename
-            and self.element == other.element
-            and self.concentration == other.concentration
+            and self.concentrations == other.concentrations
             and self.state == other.state
             and self._analyse == other._analyse
             and self._lines.equals(other._lines)
@@ -372,33 +366,37 @@ class Calibration:
         return self._lines
 
     def calculateCoefficients(self) -> None:
-        df = self._lines.query(f"symbol == '{self.element}' and active == 1")
-        for row in df.itertuples(index=False):
-            data = self.analyse.getDataByConditionId(row.condition_id)
-            if data is None:
-                continue
-            intensity = data.calculateIntensities(self.lines)[self.element][
-                row.radiation_type
-            ]
-            self.coefficients[row.radiation_type] = self.concentration / intensity
+        for element, concentration in self.concentrations.items():
+            df = self._lines.query(f"symbol == '{element}' and active == 1")
+            for row in df.itertuples(index=False):
+                data = self.analyse.getDataByConditionId(row.condition_id)
+                if data is None:
+                    continue
+                intensity = data.calculateIntensities(self.lines)[element][
+                    row.radiation_type
+                ]
+                self.coefficients[element][row.radiation_type] = (
+                    concentration / intensity
+                )
 
     def calculateInterferences(self) -> None:
-        if self.element in self.activeIntensities:
-            for activeRadiation, activeIntensity in self.activeIntensities[
-                self.element
-            ].items():
-                interferences = defaultdict(dict)
-                for symbol, values in self.activeIntensities.items():
-                    for radiation, intensity in values.items():
-                        if symbol == self.element and radiation == activeRadiation:
-                            interferences[symbol][radiation] = (
-                                self.concentration / intensity
-                            )
-                        else:
-                            interferences[symbol][radiation] = (
-                                intensity / activeIntensity
-                            )
-                self.interferences[activeRadiation] = interferences
+        for element, concentration in self.concentrations.items():
+            if element in self.activeIntensities:
+                for activeRadiation, activeIntensity in self.activeIntensities[
+                    element
+                ].items():
+                    interferences = defaultdict(dict)
+                    for symbol, values in self.activeIntensities.items():
+                        for radiation, intensity in values.items():
+                            if symbol == element and radiation == activeRadiation:
+                                interferences[symbol][radiation] = (
+                                    concentration / intensity
+                                )
+                            else:
+                                interferences[symbol][radiation] = (
+                                    intensity / activeIntensity
+                                )
+                    self.interferences[element][activeRadiation] = interferences
 
     def status(self) -> str:
         return self.convertStateToStatus(self.state)
@@ -407,8 +405,7 @@ class Calibration:
         return Calibration(
             self.calibrationId,
             self.filename,
-            self.element,
-            self.concentration,
+            self.concentrations,
             self.state,
             self._analyse.copy() if self._analyse else None,
             self._lines.copy(),
@@ -435,8 +432,7 @@ class Calibration:
         return {
             "calibrationId": self.calibrationId,
             "filename": self.filename,
-            "element": self.element,
-            "concentration": self.concentration,
+            "concentrations": self.concentrations,
             "state": self.state,
             "analyse": self._analyse.toHashableDict() if self.analyse else None,
             "lines": self._lines.to_dict(),
@@ -526,19 +522,73 @@ class Method:
         )
 
     def fillInterferences(self, calibrations: Sequence) -> None:
-        interferences = {}
+        interferences = defaultdict(dict)
+
+        # Collect interference data
         for calibration in calibrations:
-            for activeRadiation, values in calibration.interferences.items():
-                interferences[f"{calibration.element}-{activeRadiation}"] = {
-                    element: list(v.values())[0] for element, v in values.items()
-                }
+            concentrations = (
+                calibration.concentrations
+            )  # Cache reference to avoid repeated access
+            for element, radiationDict in calibration.interferences.items():
+                for activeRadiation, values in radiationDict.items():
+                    key = f"{element}-{activeRadiation}"
+                    interferences[key][concentrations[element]] = {
+                        e: list(v.values())[0] for e, v in values.items()
+                    }
+
+        # Perform the linear regression for each interference
+        for k, data in interferences.items():
+            # Extract the x values (concentrations) and corresponding y-values (element values)
+            x = np.array(list(data.keys()))
+
+            # Prepare a dictionary to store slopes
+            slopes = {}
+
+            # Transpose the data to get y-values for each element
+            elements = list(data[x[0]].keys())
+            y_values = {
+                element: np.array([data[concentration][element] for concentration in x])
+                for element in elements
+            }
+
+            # Perform zero-intercept linear regression for each element
+            for element, y in y_values.items():
+                # Use vectorized slope calculation
+                slope = np.sum(x * y) / np.sum(x**2)
+                slopes[element] = slope
+
+            # Replace the interferences data with the slopes for each element
+            interferences[k] = slopes
+
+        # Convert the final interferences dictionary into a pandas DataFrame
         self.interferences = pandas.DataFrame.from_dict(interferences, orient="index")
 
     def fillCoefficients(self, calibrations: Sequence) -> None:
-        coefficients = {}
+        coefficients = defaultdict(dict)
+
+        # Collect coefficient data efficiently
         for calibration in calibrations:
-            for radiation, coefficient in calibration.coefficients.items():
-                coefficients[f"{calibration.element}-{radiation}"] = coefficient
+            concentrations = (
+                calibration.concentrations
+            )  # Cache reference to avoid repeated access
+            for element, radiationDict in calibration.coefficients.items():
+                for radiation, coefficient in radiationDict.items():
+                    key = f"{element}-{radiation}"
+                    coefficients[key][concentrations[element]] = coefficient
+
+        # Perform linear regression for each entry in coefficients
+        for k, data in coefficients.items():
+            # Prepare the x and y values
+            x = np.array(list(data.keys()))
+            y = np.array(list(data.values()))
+
+            # Perform linear regression
+            slope = np.sum(x * y) / np.sum(x**2)
+
+            # Store the slope as the result in coefficients
+            coefficients[k] = slope
+
+        # Convert coefficients dictionary to pandas DataFrame
         self.coefficients = pandas.DataFrame.from_dict(coefficients, orient="index")
 
     def status(self) -> str:
