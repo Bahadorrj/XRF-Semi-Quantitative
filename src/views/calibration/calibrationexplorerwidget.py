@@ -1,7 +1,7 @@
 from PyQt6 import QtCore, QtGui, QtWidgets
 
 from src.utils import datatypes
-from src.utils.database import getDatabase
+from src.utils.database import getDatabase, reloadDataframes
 from src.utils.paths import resourcePath
 
 from src.views.base.explorerwidget import ExplorerWidget
@@ -73,15 +73,23 @@ class CalibrationExplorerWidget(ExplorerWidget):
             return
         self._calibration.state = 2
         self._calibration.save()
-        self._initCalibration = self._calibration.copy()
         getDatabase().executeQuery(
             "UPDATE Calibrations "
             f"SET filename = '{self._calibration.filename}', "
             f"element = '{self._calibration.element}', "
             f"concentration = '{self._calibration.concentration}', "
             f"state = {self._calibration.state} "
-            f"WHERE calibration_id = {self._calibration.calibrationId}"
+            f"WHERE calibration_id = {self._calibration.calibrationId};"
         )
+        for row in self._calibration.lines.itertuples(index=False):
+            getDatabase().executeQuery(
+                "UpDATE Lines "
+                f"SET low_kiloelectron_volt = {row.low_kiloelectron_volt}, "
+                f"high_kiloelectron_volt = {row.high_kiloelectron_volt} "
+                f"WHERE line_id = {row.line_id};"
+            )
+        reloadDataframes()
+        self._initCalibration = self._calibration.copy()
         self.saved.emit(self._calibration)
 
     def openCalibration(self):
@@ -115,9 +123,10 @@ class CalibrationExplorerWidget(ExplorerWidget):
             if "Condition" in label:
                 newWidget = self._widgets["Peak Search"]
                 newWidget.displayAnalyseData(int(label.split(" ")[-1]))
+                newWidget.supply(self._calibration.analyse, self._calibration.lines)
             else:
                 newWidget = self._widgets[label]
-            newWidget.supply(self._calibration)
+                newWidget.supply(self._calibration)
             newWidget.setContentsMargins(20, 20, 20, 20)
             self.mainLayout.replaceWidget(oldWidget, newWidget)
             newWidget.show()
@@ -137,7 +146,10 @@ class CalibrationExplorerWidget(ExplorerWidget):
 
     def _supplyWidgets(self) -> None:
         for widget in self._widgets.values():
-            widget.supply(self._calibration)
+            if isinstance(widget, PeakSearchWidget):
+                widget.supply(self._calibration.analyse, self._calibration.lines)
+            else:
+                widget.supply(self._calibration)
 
     def supply(self, calibration: datatypes.Calibration):
         if calibration is None:
@@ -153,6 +165,7 @@ class CalibrationExplorerWidget(ExplorerWidget):
         self._treeWidget.setCurrentItem(self._treeWidget.topLevelItem(0))
 
     def closeEvent(self, a0: QtGui.QCloseEvent | None) -> None:
+        print(self._calibration == self._initCalibration)
         if self._calibration != self._initCalibration:
             messageBox = QtWidgets.QMessageBox(self)
             messageBox.setIcon(QtWidgets.QMessageBox.Icon.Question)
@@ -165,6 +178,9 @@ class CalibrationExplorerWidget(ExplorerWidget):
                 | QtWidgets.QMessageBox.StandardButton.No
             )
             messageBox.setDefaultButton(QtWidgets.QMessageBox.StandardButton.Yes)
+
             if messageBox.exec() == QtWidgets.QMessageBox.StandardButton.Yes:
                 self.saveCalibration()
-        return super().closeEvent(a0)
+            a0.accept()  # Accept the close event
+        else:
+            super().closeEvent(a0)  # Proceed with closing if no changes were made

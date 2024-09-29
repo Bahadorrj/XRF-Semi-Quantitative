@@ -23,10 +23,12 @@ from src.utils.paths import resourcePath
 class AnalyseData:
     conditionId: int
     y: np.ndarray
+    optimalY: np.ndarray = field(init=False)
     x: np.ndarray = field(init=False)
 
     def __post_init__(self):
         self.x = np.arange(0, len(self.y))
+        self.optimalY = self.y.copy()
 
     def __eq__(self, others) -> bool:
         assert isinstance(others, AnalyseData), "Comparison Error"
@@ -45,18 +47,13 @@ class AnalyseData:
                 )
                 intensities[row.symbol][row.radiation_type] = intensity
             except ValueError:
-                logging.error(
-                    f"ValueError while calculating intensities failed for {row}"
-                )
+                logging.error(f"ValueError while calculating intensities for {row}")
         return intensities
 
     def applyBackgroundProfile(self, profile: "BackgroundProfile") -> None:
-        self.y = self.calculateOptimalY(profile)
-
-    def calculateOptimalY(self, profile: "BackgroundProfile") -> np.ndarray:
+        self.optimalY = self.y.copy()
         if not profile:
-            return self.y
-        optimalY = self.y.copy()
+            return
         xSmooth, ySmooth = self.smooth(self.x, self.y, profile.smoothness)
         if kwargs := profile.peakKwargs():
             peaks, _ = find_peaks(-ySmooth, **kwargs)
@@ -64,10 +61,7 @@ class AnalyseData:
             peaks, _ = find_peaks(-ySmooth)
         if peaks.size != 0:
             regressionCurve = np.interp(self.x, xSmooth[peaks], ySmooth[peaks])
-            optimalY = (self.y - regressionCurve).clip(0)
-        if len(optimalY) > len(self.x):
-            optimalY = optimalY[: len(self.x)]
-        return optimalY
+            self.optimalY = (self.y - regressionCurve).clip(0)
 
     @staticmethod
     def smooth(
@@ -82,13 +76,13 @@ class AnalyseData:
 
     def toHashableDict(self) -> dict:
         return {
-            "condition_id": self.conditionId,
+            "conditionId": self.conditionId,
             "y": self.y.tolist(),
         }
 
     @classmethod
     def fromHashableDict(cls, data: dict) -> "AnalyseData":
-        return cls(data["condition_id"], np.array(data["y"]))
+        return cls(data["conditionId"], np.array(data["y"]))
 
     @classmethod
     def fromList(cls, data: list) -> "AnalyseData":
@@ -113,6 +107,17 @@ class Analyse:
     extension: str | None = field(default=None)
 
     def __post_init__(self) -> None:
+        self.generalData = {
+            "Element": None,
+            "Concentration": None,
+            "Type": None,
+            "Area": None,
+            "Mass": None,
+            "Rho": None,
+            "Background Profile": None,
+            "Rest": None,
+            "Diluent": None,
+        }
         if self.filePath:
             self.filename = Path(self.filePath).stem
             self.extension = self.filePath.split(".")[-1]
@@ -126,7 +131,7 @@ class Analyse:
         self._backgroundProfile = profile
         for d in self.data:
             d.applyBackgroundProfile(profile)
-        self.generalData["background profile"] = profile.filename
+        self.generalData["Background Profile"] = profile.filename
 
     def __eq__(self, other) -> bool:
         if other is None:
@@ -154,25 +159,23 @@ class Analyse:
             self.conditions.copy(),
             self.backgroundProfile.copy() if self.backgroundProfile else None,
             self.generalData.copy(),
+            self.filename or None,
+            self.extension or None,
         )
 
     def saveTo(self, filePath) -> None:
+        hashableDict = self.toHashableDict()
+        hashableDict["filePath"] = filePath
+        hashableDict["filename"] = Path(filePath).stem
+        hashableDict["extension"] = filePath.split(".")[-1]
         if filePath.endswith(".atx"):
             key = encryption.loadKey()
-            hashableDict = self.toHashableDict()
-            hashableDict["file_path"] = filePath
-            hashableDict["filename"] = Path(filePath).stem
-            hashableDict["extension"] = filePath.split(".")[-1]
             jsonText = dumps(hashableDict)
             encryptedText = encryption.encryptText(jsonText, key)
             with open(filePath, "wb") as f:
                 f.write(encryptedText + b"\n")
         elif filePath.endswith(".txt"):
             with open(filePath, "w") as f:
-                hashableDict = self.toHashableDict()
-                hashableDict["file_path"] = filePath
-                hashableDict["filename"] = Path(filePath).stem
-                hashableDict["extension"] = filePath.split(".")[-1]
                 dump(hashableDict, f, indent=4)
 
     def calculateActiveIntensities(self, lines: pandas.DataFrame) -> dict:
@@ -189,54 +192,69 @@ class Analyse:
 
     def calculateConcentrations(self, method: "Method") -> dict:
         concentrations = {}
-        interferences = method.interferences
-        coefficients = method.coefficients
-        lines = method.lines
-        activeIntensities = self.calculateActiveIntensities(lines)
+        activeIntensities = self.calculateActiveIntensities(method.lines)
         allIntensities = {
-            d.conditionId: d.calculateIntensities(lines) for d in self.data
+            d.conditionId: d.calculateIntensities(method.lines) for d in self.data
         }
+
+        # Pre-filter method.lines for active elements
+        activeLines = method.lines[method.lines["active"] == 1]
+
         for activeElement, d in activeIntensities.items():
-            intensity = list(d.values())[0]
-            if (
-                activeElement not in interferences.index
-                or activeElement not in coefficients.columns
-            ):
+            if activeElement != "Sm":
                 continue
-            row = interferences.loc[activeElement]
-            for interfererElement, interference in row.items():
-                if interfererElement == activeElement:
-                    continue
-                interfererRow = lines.query(
-                    f"symbol == '{interfererElement}' and active == 1"
-                )
-                interfererRadiation = interfererRow["radiation_type"].values[0]
-                interfererConditionId = interfererRow["condition_id"].values[0]
-                interfererIntensity = allIntensities[int(interfererConditionId)][
-                    interfererElement
-                ][interfererRadiation]
-                intensity -= interfererIntensity * interference
-                if intensity < 0:
-                    intensity = 0
-                    break
-            concentrations[activeElement] = float(
-                intensity * coefficients[activeElement].values[0]
+            conditionId = int(
+                activeLines.query(f"symbol == '{activeElement}'")[
+                    "condition_id"
+                ].values[0]
             )
-        concentrations = {k: v for k, v in concentrations.items() if 0 < v <= 100}
-        concentrations["unknown"] = 100 - sum(list(concentrations.values()))
+            for activeRadiation, intensity in d.items():
+                key = f"{activeElement}-{activeRadiation}"
+                if (
+                    key not in method.interferences.index
+                    or key not in method.coefficients.index
+                ):
+                    continue
+                row = method.interferences.loc[key]
+                for interfererElement, interference in row.items():
+                    if interfererElement == activeElement:
+                        continue
+                    interfererRows = activeLines.query(
+                        f"symbol == '{interfererElement}'"
+                    )
+                    for interfererRow in interfererRows.itertuples(index=False):
+                        interfererRadiation = interfererRow.radiation_type
+                        interfererIntensity = allIntensities[conditionId][
+                            interfererElement
+                        ][interfererRadiation]
+                        intensity -= interfererIntensity * interference
+                        if intensity <= 0:
+                            break
+                    if intensity <= 0:
+                        break
+                if intensity <= 0:
+                    break
+                concentrations[activeElement] = {
+                    activeRadiation: float(
+                        intensity
+                        * method.coefficients.loc[
+                            f"{activeElement}-{activeRadiation}"
+                        ].values[0]
+                    )
+                }
         return concentrations
 
     def toHashableDict(self) -> dict:
         return {
-            "file_path": self.filePath,
+            "filePath": self.filePath,
             "data": [d.toHashableDict() for d in self.data],
             "conditions": self.conditions.to_dict(),
-            "background_profile": (
+            "backgroundProfile": (
                 self.backgroundProfile.toHashableDict()
                 if self.backgroundProfile
                 else None
             ),
-            "general_data": self.generalData.copy(),
+            "generalData": self.generalData.copy(),
         }
 
     @classmethod
@@ -244,22 +262,15 @@ class Analyse:
         analyseDict["data"] = [
             AnalyseData.fromHashableDict(dataDict) for dataDict in analyseDict["data"]
         ]
-        if "file_path" in analyseDict:
-            analyseDict["filePath"] = analyseDict.pop("file_path")
         if "conditions" in analyseDict:
             analyseDict["conditions"] = pandas.DataFrame(analyseDict.pop("conditions"))
             analyseDict["conditions"].reset_index(inplace=True, drop=True)
-        if "general_data" in analyseDict:
-            analyseDict["generalData"] = analyseDict.pop("general_data")
-        if "background_profile" in analyseDict:
-            if (profileDict := analyseDict.pop("background_profile", None)) is not None:
+        if "backgroundProfile" in analyseDict:
+            if (profileDict := analyseDict.pop("backgroundProfile", None)) is not None:
                 analyseDict["_backgroundProfile"] = BackgroundProfile.fromHashableDict(
                     profileDict
                 )
-        analyse = cls(**analyseDict)
-        if analyseDict.get("filename"):
-            analyse.filename = analyseDict["filename"]
-        return analyse
+        return cls(**analyseDict)
 
     @classmethod
     def fromTXTFile(cls, filePath: str) -> "Analyse":
@@ -310,13 +321,17 @@ class Calibration:
     state: int = field(default=0)
     _analyse: Analyse | None = field(default=None)
     _lines: pandas.DataFrame = field(
-        default_factory=lambda: getDataframe("Lines").copy()
+        default_factory=lambda: getDataframe("Lines").iloc[:, 9:]
     )
     activeIntensities: dict = field(default_factory=dict)
     coefficients: dict = field(default_factory=dict)
     interferences: dict = field(default_factory=dict)
 
     def __post_init__(self):
+        df = getDataframe("Lines").copy()
+        df[["condition_id", "active"]] = self._lines[["condition_id", "active"]]
+        df.reset_index(drop=True, inplace=True)
+        self._lines = df
         if self.analyse is None:
             return
         if not self.activeIntensities:
@@ -337,8 +352,8 @@ class Calibration:
             and self.element == other.element
             and self.concentration == other.concentration
             and self.state == other.state
-            and self.analyse == other.analyse
-            and self.lines.equals(other.lines)
+            and self._analyse == other._analyse
+            and self._lines.equals(other._lines)
         )
 
     @property
@@ -357,8 +372,7 @@ class Calibration:
         return self._lines
 
     def calculateCoefficients(self) -> None:
-        self.coefficients = defaultdict(dict)
-        df = self.lines.query(f"symbol == '{self.element}' and active == 1")
+        df = self._lines.query(f"symbol == '{self.element}' and active == 1")
         for row in df.itertuples(index=False):
             data = self.analyse.getDataByConditionId(row.condition_id)
             if data is None:
@@ -369,16 +383,22 @@ class Calibration:
             self.coefficients[row.radiation_type] = self.concentration / intensity
 
     def calculateInterferences(self) -> None:
-        self.interferences = defaultdict(dict)
-        tmp = self.activeIntensities.copy()
-        mainRadiation = self._lines.query(
-            f"symbol == '{self.element}' and active == 1"
-        )["radiation_type"].values[0]
-        if element := tmp.pop(self.element, None):
-            mainIntensity = element[mainRadiation]
-            for symbol, values in tmp.items():
-                for radiation, intensity in values.items():
-                    self.interferences[symbol][radiation] = intensity / mainIntensity
+        if self.element in self.activeIntensities:
+            for activeRadiation, activeIntensity in self.activeIntensities[
+                self.element
+            ].items():
+                interferences = defaultdict(dict)
+                for symbol, values in self.activeIntensities.items():
+                    for radiation, intensity in values.items():
+                        if symbol == self.element and radiation == activeRadiation:
+                            interferences[symbol][radiation] = (
+                                self.concentration / intensity
+                            )
+                        else:
+                            interferences[symbol][radiation] = (
+                                intensity / activeIntensity
+                            )
+                self.interferences[activeRadiation] = interferences
 
     def status(self) -> str:
         return self.convertStateToStatus(self.state)
@@ -390,11 +410,11 @@ class Calibration:
             self.element,
             self.concentration,
             self.state,
-            self.analyse.copy() if self.analyse else None,
-            self.lines.copy(),
+            self._analyse.copy() if self._analyse else None,
+            self._lines.copy(),
             self.activeIntensities.copy(),
-            self.coefficients.copy() if self.analyse else None,
-            self.interferences.copy() if self.analyse else None,
+            self.coefficients.copy() if self._analyse else None,
+            self.interferences.copy() if self._analyse else None,
         )
 
     def save(self) -> None:
@@ -418,8 +438,8 @@ class Calibration:
             "element": self.element,
             "concentration": self.concentration,
             "state": self.state,
-            "analyse": self.analyse.toHashableDict() if self.analyse else None,
-            "lines": self.lines.to_dict(),
+            "analyse": self._analyse.toHashableDict() if self.analyse else None,
+            "lines": self._lines.to_dict(),
             "activeIntensities": self.activeIntensities,
             "coefficients": self.coefficients,
             "interferences": self.interferences,
@@ -484,10 +504,10 @@ class Method:
                 Calibration.fromATXCFile(resourcePath(f"calibrations/{f}.atxc"))
                 for f in self.calibrations["filename"].values
             ]
-            if self.coefficients is None:
-                self.fillCoefficients(calibrations)
-            if self.interferences is None:
-                self.fillInterferences(calibrations)
+        if self.coefficients is None:
+            self.fillCoefficients(calibrations)
+        if self.interferences is None:
+            self.fillInterferences(calibrations)
 
     def __eq__(self, other: "Method"):
         if other is None:
@@ -506,42 +526,20 @@ class Method:
         )
 
     def fillInterferences(self, calibrations: Sequence) -> None:
-        if self.calibrations.empty:
-            self.interferences = pandas.DataFrame({})
-            return
-        self.interferences = pandas.DataFrame(
-            {
-                k: v
-                for k, v in zip(
-                    [calibration.element for calibration in calibrations],
-                    [
-                        {
-                            x: list(y.values())[0]
-                            for x, y in calibration.interferences.items()
-                        }
-                        for calibration in calibrations
-                    ],
-                )
-            }
-        )
+        interferences = {}
+        for calibration in calibrations:
+            for activeRadiation, values in calibration.interferences.items():
+                interferences[f"{calibration.element}-{activeRadiation}"] = {
+                    element: list(v.values())[0] for element, v in values.items()
+                }
+        self.interferences = pandas.DataFrame.from_dict(interferences, orient="index")
 
     def fillCoefficients(self, calibrations: Sequence) -> None:
-        if self.calibrations.empty:
-            self.coefficients = pandas.DataFrame({})
-            return
-        self.coefficients = pandas.DataFrame(
-            {
-                k: v
-                for k, v in zip(
-                    [calibration.element for calibration in calibrations],
-                    [
-                        list(calibration.coefficients.values())[0]
-                        for calibration in calibrations
-                    ],
-                )
-            },
-            index=[0],
-        )
+        coefficients = {}
+        for calibration in calibrations:
+            for radiation, coefficient in calibration.coefficients.items():
+                coefficients[f"{calibration.element}-{radiation}"] = coefficient
+        self.coefficients = pandas.DataFrame.from_dict(coefficients, orient="index")
 
     def status(self) -> str:
         return self.convertStateToStatus(self.state)
