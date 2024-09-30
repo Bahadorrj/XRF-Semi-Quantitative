@@ -327,6 +327,15 @@ class AnalytesAndConditionsWidget(QtWidgets.QWidget):
     def setFocus(self):
         self._conditionTable.setFocus()
 
+    def setEditable(self, editable: bool) -> None:
+        if self._editable == editable:
+            return
+        self._editable = editable
+        for actions in self._actionsMap.values():
+            actions.setDisabled(not self._editable)
+        for button in self._buttonsMap.values():
+            button.setDisabled(not self._editable)
+
     def supply(self, method: datatypes.Method) -> None:
         """Supply data to the widget from a given method.
 
