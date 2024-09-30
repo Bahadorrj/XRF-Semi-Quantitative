@@ -327,7 +327,9 @@ class Calibration:
     concentrations: dict
     state: int = field(default=0)
     _analyse: Analyse | None = field(default=None)
-    _lines: pandas.DataFrame = field(default_factory=lambda: getDataframe("Lines"))
+    _lines: pandas.DataFrame = field(
+        default_factory=lambda: getDataframe("Lines").iloc[:, -2:]
+    )
     activeIntensities: dict = field(default_factory=dict)
     coefficients: dict = field(default_factory=dict)
     interferences: dict = field(default_factory=dict)
@@ -450,7 +452,7 @@ class Calibration:
             "concentrations": self.concentrations,
             "state": self.state,
             "analyse": self._analyse.toHashableDict() if self.analyse else None,
-            "lines": self._lines.to_dict(),
+            "lines": self._lines.iloc[:, -2:].to_dict(),
             "activeIntensities": self.activeIntensities,
             "coefficients": self.coefficients,
             "interferences": self.interferences,
