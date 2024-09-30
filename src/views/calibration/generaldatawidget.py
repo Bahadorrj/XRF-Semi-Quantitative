@@ -8,6 +8,9 @@ from src.utils.database import getDataframe
 
 from src.views.base.generaldatawidget import GeneralDataWidget
 from src.utils.paths import resourcePath
+from src.views.calibration.elementsandconcentrationswidget import (
+    ElementsAndConcentrationsWidget,
+)
 
 pg.setConfigOptions(antialias=True)
 
@@ -43,6 +46,36 @@ class CalibrationGeneralDataWidget(GeneralDataWidget):
         if calibration is not None:
             self.supply(calibration)
         self.hide()
+
+    def _initializeUi(self) -> None:
+        self._createPlotWidget()
+        self._createCoordinateLabel()
+        self._createElementAndConcentrationGroupBox()
+        self._createGeneralDataGroupBox()
+        self._setUpView()
+
+    def _createElementAndConcentrationGroupBox(self) -> None:
+        self._elementsAndConcentrationsWidget = ElementsAndConcentrationsWidget(
+            self, editable=self._editable
+        )
+        self._elementsAndConcentrationsGroupBox = QtWidgets.QGroupBox("Concentrations")
+        layout = QtWidgets.QVBoxLayout()
+        layout.addWidget(self._elementsAndConcentrationsWidget)
+        self._elementsAndConcentrationsGroupBox.setLayout(layout)
+
+    def _setUpView(self) -> None:
+        self.mainLayout = QtWidgets.QGridLayout()
+        self.mainLayout.setSpacing(10)
+        self.mainLayout.addWidget(self._plotWidget, 0, 0)
+        self.mainLayout.addWidget(self._coordinateLabel, 1, 0)
+        vLayout = QtWidgets.QVBoxLayout()
+        vLayout.setSpacing(10)
+        vLayout.addWidget(self._elementsAndConcentrationsGroupBox)
+        vLayout.addWidget(self._generalDataGroupBox)
+        vLayout.setStretch(0, 0)
+        vLayout.setStretch(1, 1)
+        self.mainLayout.addLayout(vLayout, 0, 1, 1, 2)
+        self.setLayout(self.mainLayout)
 
     def _createWidgets(self) -> None:
         editable = self._editable
@@ -84,6 +117,8 @@ class CalibrationGeneralDataWidget(GeneralDataWidget):
                     resourcePath(f"backgrounds/{filename}.atxb")
                 )
                 self._calibration.analyse.backgroundProfile = profile
+            else:
+                self._calibration.analyse.backgroundProfile = None
         else:
             self._calibration.analyse.generalData[key] = (
                 widget.text()
@@ -94,7 +129,9 @@ class CalibrationGeneralDataWidget(GeneralDataWidget):
 
     def _fillWidgetsFromCalibration(self) -> None:
         for key, widget in self._generalDataWidgetsMap.items():
-            value = str(self._calibration.analyse.generalData.get(key, ""))
+            value = self._calibration.analyse.generalData.get(key)
+            if value is None and not self._editable:
+                value = "None"
             if isinstance(widget, (QtWidgets.QLineEdit, QtWidgets.QLabel)):
                 widget.setText(value)
             else:
@@ -104,7 +141,7 @@ class CalibrationGeneralDataWidget(GeneralDataWidget):
         self._plotWidget.clear()
         maxIntensity = 0
         for index, data in enumerate(self._calibration.analyse.data):
-            x, y = data.x, data.y
+            x, y = data.x, data.optimalY
             maxIntensity = max(maxIntensity, max(y))
             color = COLORS[index]
             self._plotWidget.plot(
@@ -143,5 +180,6 @@ class CalibrationGeneralDataWidget(GeneralDataWidget):
         self._calibration = calibration
         self._element = calibration.element
         self._drawCanvas()
+        self._elementsAndConcentrationsWidget.supply(self._calibration)
         self._fillWidgetsFromCalibration()
         self.blockSignals(False)

@@ -76,8 +76,8 @@ class CalibrationExplorerWidget(ExplorerWidget):
         getDatabase().executeQuery(
             "UPDATE Calibrations "
             f"SET filename = '{self._calibration.filename}', "
-            f"element = '{self._calibration.element}', "
-            f"concentration = '{self._calibration.concentration}', "
+            f"element = '{'/'.join(self._calibration.concentrations.keys())}', "
+            f"concentration = '{'/'.join(list(map(str,(self._calibration.concentrations.values()))))}', "
             f"state = {self._calibration.state} "
             f"WHERE calibration_id = {self._calibration.calibrationId};"
         )
@@ -165,7 +165,6 @@ class CalibrationExplorerWidget(ExplorerWidget):
         self._treeWidget.setCurrentItem(self._treeWidget.topLevelItem(0))
 
     def closeEvent(self, a0: QtGui.QCloseEvent | None) -> None:
-        print(self._calibration == self._initCalibration)
         if self._calibration != self._initCalibration:
             messageBox = QtWidgets.QMessageBox(self)
             messageBox.setIcon(QtWidgets.QMessageBox.Icon.Question)
@@ -176,11 +175,16 @@ class CalibrationExplorerWidget(ExplorerWidget):
             messageBox.setStandardButtons(
                 QtWidgets.QMessageBox.StandardButton.Yes
                 | QtWidgets.QMessageBox.StandardButton.No
+                | QtWidgets.QMessageBox.StandardButton.Cancel
             )
             messageBox.setDefaultButton(QtWidgets.QMessageBox.StandardButton.Yes)
-
-            if messageBox.exec() == QtWidgets.QMessageBox.StandardButton.Yes:
+            result = messageBox.exec()
+            if result == QtWidgets.QMessageBox.StandardButton.Yes:
                 self.saveCalibration()
-            a0.accept()  # Accept the close event
+                a0.accept()  # Accept the close event
+            elif result == QtWidgets.QMessageBox.StandardButton.No:
+                a0.accept()
+            else:
+                a0.ignore()
         else:
             super().closeEvent(a0)  # Proceed with closing if no changes were made

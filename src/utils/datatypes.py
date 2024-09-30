@@ -129,7 +129,7 @@ class Analyse:
         self._backgroundProfile = profile
         for d in self.data:
             d.applyBackgroundProfile(profile)
-        self.generalData["Background Profile"] = profile.filename
+        self.generalData["Background Profile"] = profile.filename if profile else None
 
     def __eq__(self, other) -> bool:
         if other is None:
@@ -195,52 +195,61 @@ class Analyse:
             d.conditionId: d.calculateIntensities(method.lines) for d in self.data
         }
 
-        # Pre-filter method.lines for active elements
+        # Pre-filter active elements and store as dictionaries
         activeLines = method.lines[method.lines["active"] == 1]
+        activeLinesDict = activeLines.set_index("symbol").to_dict(orient="index")
 
         for activeElement, d in activeIntensities.items():
-            if activeElement != "Sm":
+            # Pre-fetch conditionId and skip querying repeatedly
+            activeElementData = activeLinesDict.get(activeElement, None)
+            if not activeElementData:
                 continue
-            conditionId = int(
-                activeLines.query(f"symbol == '{activeElement}'")[
-                    "condition_id"
-                ].values[0]
-            )
+            conditionId = int(activeElementData["condition_id"])
+
             for activeRadiation, intensity in d.items():
                 key = f"{activeElement}-{activeRadiation}"
+                # Skip if key doesn't exist in both interferences and coefficients
                 if (
                     key not in method.interferences.index
                     or key not in method.coefficients.index
                 ):
                     continue
-                row = method.interferences.loc[key]
-                for interfererElement, interference in row.items():
+
+                interferenceRow = method.interferences.loc[key]
+                coefficient = method.coefficients.loc[key].values[0]
+
+                # Iterate over interferers once instead of nested queries
+                for interfererElement, interference in interferenceRow.items():
                     if interfererElement == activeElement:
                         continue
-                    interfererRows = activeLines.query(
-                        f"symbol == '{interfererElement}'"
-                    )
-                    for interfererRow in interfererRows.itertuples(index=False):
-                        interfererRadiation = interfererRow.radiation_type
-                        interfererIntensity = allIntensities[conditionId][
-                            interfererElement
-                        ][interfererRadiation]
-                        intensity -= interfererIntensity * interference
-                        if intensity <= 0:
-                            break
+
+                    # Fetch interferer rows from dictionary instead of querying DataFrame
+                    interfererData = activeLinesDict.get(interfererElement, None)
+                    if not interfererData:
+                        continue
+
+                    interfererRadiation = interfererData["radiation_type"]
+                    interfererIntensity = allIntensities[conditionId][
+                        interfererElement
+                    ][interfererRadiation]
+                    intensity -= interfererIntensity * interference
+
                     if intensity <= 0:
                         break
-                if intensity <= 0:
-                    break
-                concentrations[activeElement] = {
-                    activeRadiation: float(
-                        intensity
-                        * method.coefficients.loc[
-                            f"{activeElement}-{activeRadiation}"
-                        ].values[0]
-                    )
-                }
-        return concentrations
+
+                # Calculate concentration only if intensity remains positive
+                if intensity > 0:
+                    concentrations[activeElement] = {
+                        activeRadiation: float(intensity * coefficient)
+                    }
+
+        return dict(
+            sorted(
+                concentrations.items(),
+                key=lambda item: list(item[1].values())[0],
+                reverse=True,
+            )
+        )
 
     def toHashableDict(self) -> dict:
         return {
@@ -314,13 +323,14 @@ class Analyse:
 class Calibration:
     calibrationId: int
     filename: str
+    element: str
     concentrations: dict
     state: int = field(default=0)
     _analyse: Analyse | None = field(default=None)
     _lines: pandas.DataFrame = field(default_factory=lambda: getDataframe("Lines"))
     activeIntensities: dict = field(default_factory=dict)
-    coefficients: dict = field(default_factory=lambda: defaultdict(dict))
-    interferences: dict = field(default_factory=lambda: defaultdict(dict))
+    coefficients: dict = field(default_factory=dict)
+    interferences: dict = field(default_factory=dict)
 
     def __post_init__(self):
         df = getDataframe("Lines").copy()
@@ -344,6 +354,7 @@ class Calibration:
         return (
             self.calibrationId == other.calibrationId
             and self.filename == other.filename
+            and self.element == other.element
             and self.concentrations == other.concentrations
             and self.state == other.state
             and self._analyse == other._analyse
@@ -366,6 +377,7 @@ class Calibration:
         return self._lines
 
     def calculateCoefficients(self) -> None:
+        self.coefficients = defaultdict(dict)
         for element, concentration in self.concentrations.items():
             df = self._lines.query(f"symbol == '{element}' and active == 1")
             for row in df.itertuples(index=False):
@@ -380,6 +392,7 @@ class Calibration:
                 )
 
     def calculateInterferences(self) -> None:
+        self.interferences = defaultdict(dict)
         for element, concentration in self.concentrations.items():
             if element in self.activeIntensities:
                 for activeRadiation, activeIntensity in self.activeIntensities[
@@ -405,7 +418,8 @@ class Calibration:
         return Calibration(
             self.calibrationId,
             self.filename,
-            self.concentrations,
+            self.element,
+            self.concentrations.copy(),
             self.state,
             self._analyse.copy() if self._analyse else None,
             self._lines.copy(),
@@ -432,6 +446,7 @@ class Calibration:
         return {
             "calibrationId": self.calibrationId,
             "filename": self.filename,
+            "element": self.element,
             "concentrations": self.concentrations,
             "state": self.state,
             "analyse": self._analyse.toHashableDict() if self.analyse else None,
@@ -554,7 +569,7 @@ class Method:
             # Perform zero-intercept linear regression for each element
             for element, y in y_values.items():
                 # Use vectorized slope calculation
-                slope = np.sum(x * y) / np.sum(x**2)
+                slope = np.sum(x * y) / np.sum(x**2) * 100
                 slopes[element] = slope
 
             # Replace the interferences data with the slopes for each element
@@ -583,7 +598,7 @@ class Method:
             y = np.array(list(data.values()))
 
             # Perform linear regression
-            slope = np.sum(x * y) / np.sum(x**2)
+            slope = np.sum(x * y) / np.sum(x**2) * 100
 
             # Store the slope as the result in coefficients
             coefficients[k] = slope

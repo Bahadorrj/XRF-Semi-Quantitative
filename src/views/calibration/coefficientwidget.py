@@ -1,41 +1,11 @@
 import numpy as np
 import pyqtgraph as pg
 
-from PyQt6 import QtWidgets
+from PyQt6 import QtWidgets, QtCore
 from src.utils import datatypes
 
 
 class CoefficientWidget(QtWidgets.QWidget):
-    """
-    CoefficientWidget is a custom QWidget designed to display and manage calibration coefficients and their corresponding plots. It provides an interface for selecting active lines and visualizing their intensity data through a graphical plot.
-
-    Args:
-        parent (QWidget | None): Optional parent widget for the coefficient widget.
-        calibration (Calibration | None): Optional calibration data to initialize the widget with.
-
-    Methods:
-        _initializeUi() -> None:
-            Sets up the user interface components for the widget.
-
-        _createLineSelectionLayout() -> None:
-            Creates the layout for selecting active lines and displaying slope information.
-
-        _createPlotWidget() -> None:
-            Initializes the plot widget for visualizing intensity data.
-
-        _setUpView() -> None:
-            Configures the main layout of the widget, combining line selection and the plot.
-
-        _drawCanvas() -> None:
-            Clears the plot and draws the intensity line based on the selected radiation type.
-
-        _initializeRadiations() -> None:
-            Populates the combo box with available radiation types from the calibration data.
-
-        supply(calibration: Calibration) -> None:
-            Updates the widget with new calibration data and refreshes the available radiation types.
-    """
-
     def __init__(
         self,
         parent: QtWidgets.QWidget | None = None,
@@ -54,16 +24,37 @@ class CoefficientWidget(QtWidgets.QWidget):
         self._setUpView()
 
     def _createLineSelectionLayout(self) -> None:
+        # sourcery skip: extract-duplicate-method
         self._lineSelectLayout = QtWidgets.QHBoxLayout()
-        self._lineSelectLayout.addWidget(QtWidgets.QLabel("Active Lines:"))
-        self._searchComboBox = QtWidgets.QComboBox(self)
-        self._searchComboBox.setObjectName("search-combo-box")
-        self._searchComboBox.currentTextChanged.connect(self._drawCanvas)
-        self._lineSelectLayout.addWidget(self._searchComboBox)
+        self._lineSelectLayout.addWidget(QtWidgets.QLabel("Element:"))
+        self._elementSearchComboBox = QtWidgets.QComboBox(self)
+        self._elementSearchComboBox.setObjectName("search-combo-box")
+        self._elementSearchComboBox.currentTextChanged.connect(self._elementChanged)
+        self._lineSelectLayout.addWidget(self._elementSearchComboBox)
+        self._lineSelectLayout.addWidget(QtWidgets.QLabel("Active Line:"))
+        self._lineSearchComboBox = QtWidgets.QComboBox(self)
+        self._lineSearchComboBox.setObjectName("search-combo-box")
+        self._lineSearchComboBox.currentTextChanged.connect(self._drawCanvas)
+        self._lineSelectLayout.addWidget(self._lineSearchComboBox)
         self._lineSelectLayout.addStretch()
         self._slopeLabel = QtWidgets.QLabel("Slope:", self)
         self._lineSelectLayout.addWidget(self._slopeLabel)
         self._lineSelectLayout.addStretch()
+
+    @QtCore.pyqtSlot(str)
+    def _elementChanged(self, text: str) -> None:
+        self._lineSearchComboBox.clear()
+        try:
+            items = (
+                self._calibration.lines.query(f"symbol == '{text}' and active == 1")[
+                    "radiation_type"
+                ]
+                .unique()
+                .tolist()
+            )
+        except IndexError:
+            items = [""]
+        self._lineSearchComboBox.addItems(items)
 
     def _createPlotWidget(self) -> None:
         self._plotWidget = pg.PlotWidget(self)
@@ -82,42 +73,36 @@ class CoefficientWidget(QtWidgets.QWidget):
 
     def _drawCanvas(self) -> None:
         self._plotWidget.clear()
-        self._calibration.calculateCoefficients()
-        if currentRadiationType := self._searchComboBox.currentText():
-            conditionId = self._calibration.lines.query(
-                f"symbol == '{self._calibration.element}' and radiation_type == '{currentRadiationType}'"
+        currentElement = self._elementSearchComboBox.currentText()
+        if currentElement == "":
+            return
+        currentRadiationType = self._lineSearchComboBox.currentText()
+        if currentRadiationType == "":
+            return
+        conditionId = int(
+            self._calibration.lines.query(
+                f"symbol == '{currentElement}' and radiation_type == '{currentRadiationType}'"
             )["condition_id"].values[0]
-            if data := self._calibration.analyse.getDataByConditionId(conditionId):
-                intensity = data.calculateIntensities(self._calibration.lines)[
-                    self._calibration.element
-                ][currentRadiationType]
+        )
 
-                # Calculate the line points
-                x = np.arange(0, intensity, 1)
-                y = np.linspace(0, 100, x.size)
+        if data := self._calibration.analyse.getDataByConditionId(conditionId):
+            intensity = data.calculateIntensities(self._calibration.lines)[
+                currentElement
+            ][currentRadiationType]
 
-                # Plot the line
-                self._plotWidget.plot(x=x, y=y, pen=pg.mkPen(color="r", width=2))
-                slope = self._calibration.coefficients[currentRadiationType]
-                self._slopeLabel.setText(f"Slope: {slope:.5f}")
+            # Calculate the line points
+            x = np.arange(0, intensity, 1)
+            y = np.linspace(0, 100, x.size)
 
-    def _initializeRadiations(self) -> None:
-        self._searchComboBox.blockSignals(True)
-        self._searchComboBox.clear()
-        if self._calibration.analyse.data:
-            try:
-                items = (
-                    self._calibration.lines.query(
-                        f"symbol == '{self._calibration.analyse.filename}' and active == 1"
-                    )["radiation_type"]
-                    .unique()
-                    .tolist()
-                )
-                items = list(map(str, items))
-            except IndexError:
-                items = [""]
-            self._searchComboBox.addItems(items)
-        self._searchComboBox.blockSignals(False)
+            # Plot the line
+            self._plotWidget.plot(x=x, y=y, pen=pg.mkPen(color="r", width=2))
+            slope = self._calibration.coefficients[currentElement][currentRadiationType]
+            self._slopeLabel.setText(f"Slope: {slope:.5f}")
+
+    def _initializeComboBoxes(self) -> None:
+        self._elementSearchComboBox.clear()
+        elements = list(self._calibration.concentrations.keys())
+        self._elementSearchComboBox.addItems(elements)
 
     def supply(self, calibration: datatypes.Calibration):
         """Updates the widget with the provided calibration data.
@@ -138,6 +123,5 @@ class CoefficientWidget(QtWidgets.QWidget):
             return
         self.blockSignals(True)
         self._calibration = calibration
-        self._initializeRadiations()
-        self._drawCanvas()
+        self._initializeComboBoxes()
         self.blockSignals(False)

@@ -83,7 +83,7 @@ class CalibrationTrayWidget(TrayWidget):
         if addDialog.exec():
             filename = addDialog.fields["filename"]
             element = addDialog.fields["element"]
-            concentration = float(addDialog.fields["concentration"])
+            concentration = addDialog.fields["concentration"]
             getDatabase().executeQuery(
                 "INSERT INTO Calibrations (filename, element, concentration, state) VALUES (?, ?, ?, ?)",
                 (filename, element, concentration, 0),
@@ -92,7 +92,7 @@ class CalibrationTrayWidget(TrayWidget):
             self._df = getDataframe("Calibrations")
             calibrationId = int(self._df.iloc[-1].values[0])
             self._calibration = Calibration(
-                calibrationId, filename, {element: concentration}
+                calibrationId, filename, element, {element: float(concentration)}
             )
             self._calibration.save()
             self._insertCalibration()
@@ -101,12 +101,12 @@ class CalibrationTrayWidget(TrayWidget):
     def _insertCalibration(self) -> None:
         filename = self._calibration.filename
         element = self._calibration.element
-        concentration = self._calibration.concentration
+        concentration = self._calibration.concentrations[self._calibration.element]
         status = self._calibration.status()
         items = {
             "filename": TableItem(filename),
             "element": TableItem(element),
-            "concentration": TableItem(f"{concentration:.1f}"),
+            "concentration": TableItem(f"{concentration}"),
             "state": TableItem(status),
         }
         self._tableWidget.addRow(items)
@@ -134,17 +134,17 @@ class CalibrationTrayWidget(TrayWidget):
             os.remove(resourcePath(f"calibrations/{previousFilename}.atxc"))
             filename = editDialog.fields["filename"]
             element = editDialog.fields["element"]
-            concentration = float(editDialog.fields["concentration"])
+            concentration = editDialog.fields["concentration"]
             self._calibration.filename = filename
             self._calibration.element = element
-            self._calibration.concentration = concentration
+            self._calibration.concentrations[element] = float(concentration)
             self._calibration.save()
             currentRow["filename"].setText(filename)
             currentRow["element"].setText(element)
-            currentRow["concentration"].setText(f"{concentration:.1f}")
+            currentRow["concentration"].setText(concentration)
             getDatabase().executeQuery(
                 "UPDATE Calibrations "
-                f"SET filename = '{filename}', element = '{element}', concentration = {concentration} "
+                f"SET filename = '{filename}', element = '{element}', concentration = '{concentration}' "
                 f"WHERE filename = '{previousFilename}'"
             )
             reloadDataframes()
@@ -165,12 +165,19 @@ class CalibrationTrayWidget(TrayWidget):
         self._calibration = calibration
         self._supplyWidgets()
         self._updateCurrentRow()
+        # row = self._tableWidget.currentRow()
+        # self._tableWidget.clearSelection()
+        # self._tableWidget.selectRow(row)
 
     def _updateCurrentRow(self) -> None:
         tableRow = self._tableWidget.getCurrentRow()
         tableRow["filename"].setText(self._calibration.filename)
-        tableRow["element"].setText(self._calibration.element)
-        tableRow["concentration"].setText(f"{self._calibration.concentration:.1f}")
+        tableRow["element"].setText(
+            f"{'/'.join(self._calibration.concentrations.keys())}"
+        )
+        tableRow["concentration"].setText(
+            f"{'/'.join(list(map(str,(self._calibration.concentrations.values()))))}"
+        )
         tableRow["state"].setText(self._calibration.status())
 
     @QtCore.pyqtSlot()

@@ -67,12 +67,13 @@ class MethodCalibrationTrayWidget(CalibrationTrayWidget):
                 self._calibration = datatypes.Calibration.fromATXCFile(filePath)
                 row = pandas.DataFrame(
                     {
-                        "calibration_id": [self._calibration.calibrationId],
-                        "filename": [self._calibration.filename],
-                        "element": [self._calibration.element],
-                        "concentration": [self._calibration.concentration],
-                        "state": [self._calibration.state],
-                    }
+                        "calibration_id": self._calibration.calibrationId,
+                        "filename": self._calibration.filename,
+                        "element": f"{'/'.join(self._calibration.concentrations.keys())}",
+                        "concentration": f"{'/'.join(list(map(str,(self._calibration.concentrations.values()))))}",
+                        "state": self._calibration.state,
+                    },
+                    index=[0],
                 )
                 self._df.loc[len(self._df)] = row.iloc[0]
                 self._insertCalibration()
