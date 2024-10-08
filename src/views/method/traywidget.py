@@ -29,8 +29,10 @@ class MethodTrayWidget(TrayWidget):
         self._df = None
         self._method = None
         self._widgets = {
-            "Analytes And Conditions": AnalytesAndConditionsWidget(self),
             "Calibrations": CalibrationsTableWidget(self),
+            "Analytes And Conditions": AnalytesAndConditionsWidget(
+                self, editable=False
+            ),
             "Interferences": InterferencesTableWidget(self),
         }
         self._methodExplorer = None
@@ -110,9 +112,13 @@ class MethodTrayWidget(TrayWidget):
                 self._methodExplorer.saved.connect(self._saveSignalArrived)
                 self._methodExplorer.requestNewMethod.connect(self._requestNewMethod)
 
-    def _saveSignalArrived(self) -> None:
+    def _saveSignalArrived(self, method: Method) -> None:
+        self._method = method
         self._supplyWidgets()
         self._updateCurrentRow()
+        row = self._tableWidget.currentRow()
+        self._tableWidget.clearSelection()
+        self._tableWidget.selectRow(row)
 
     def _updateCurrentRow(self) -> None:
         tableRow = self._tableWidget.getCurrentRow()

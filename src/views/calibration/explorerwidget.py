@@ -6,7 +6,6 @@ from src.utils.paths import resourcePath
 
 from src.views.base.explorerwidget import ExplorerWidget
 
-from src.views.calibration.coefficientwidget import CoefficientWidget
 from src.views.calibration.generaldatawidget import (
     CalibrationGeneralDataWidget,
 )
@@ -169,9 +168,9 @@ class CalibrationExplorerWidget(ExplorerWidget):
             messageBox = QtWidgets.QMessageBox(self)
             messageBox.setIcon(QtWidgets.QMessageBox.Icon.Question)
             messageBox.setText(
-                "Do you want to save the changes before closing the calibration edit?"
+                "Do you want to save the changes before exiting the calibration edit?"
             )
-            messageBox.setWindowTitle("Close calibration edit")
+            messageBox.setWindowTitle("Exit")
             messageBox.setStandardButtons(
                 QtWidgets.QMessageBox.StandardButton.Yes
                 | QtWidgets.QMessageBox.StandardButton.No

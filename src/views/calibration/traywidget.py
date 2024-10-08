@@ -165,9 +165,9 @@ class CalibrationTrayWidget(TrayWidget):
         self._calibration = calibration
         self._supplyWidgets()
         self._updateCurrentRow()
-        # row = self._tableWidget.currentRow()
-        # self._tableWidget.clearSelection()
-        # self._tableWidget.selectRow(row)
+        row = self._tableWidget.currentRow()
+        self._tableWidget.clearSelection()
+        self._tableWidget.selectRow(row)
 
     def _updateCurrentRow(self) -> None:
         tableRow = self._tableWidget.getCurrentRow()

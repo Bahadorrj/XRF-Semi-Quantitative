@@ -21,8 +21,8 @@ class MethodExplorer(ExplorerWidget):
         self._method = None
         self._initMethod = None
         self._widgets = {
-            "Analytes And Conditions": AnalytesAndConditionsWidget(self, editable=True),
             "Calibrations": MethodCalibrationTrayWidget(self),
+            "Analytes And Conditions": AnalytesAndConditionsWidget(self, editable=True),
         }
         self._initializeUi()
         if method is not None:
@@ -64,16 +64,14 @@ class MethodExplorer(ExplorerWidget):
             self.requestNewMethod.emit()
 
     def saveMethod(self) -> None:
-        if self._method == self._initMethod:
-            return
+        # if self._method == self._initMethod:
+        #     return
         self._method.state = 1
         self._method.save()
         self._initMethod = self._method.copy()
         getDatabase().executeQuery(
             "UPDATE Methods "
-            f"SET filename = '{self._method.filename}', "
-            f"description = '{self._method.description}', "
-            f"state = {self._method.state} "
+            f"SET state = {self._method.state} "
             f"WHERE method_id = {self._method.methodId}"
         )
         self.saved.emit(self._method)
@@ -107,7 +105,7 @@ class MethodExplorer(ExplorerWidget):
             newWidget = self._widgets[label]
             newWidget.setContentsMargins(20, 20, 20, 20)
             if isinstance(newWidget, AnalytesAndConditionsWidget):
-                newWidget.setEditable(self._method.calibrations.empty)
+                newWidget.setConditionsEditable(self._method.calibrations.empty)
             self.mainLayout.replaceWidget(oldWidget, newWidget)
             newWidget.show()
             newWidget.setFocus()
@@ -133,16 +131,22 @@ class MethodExplorer(ExplorerWidget):
             messageBox = QtWidgets.QMessageBox(self)
             messageBox.setIcon(QtWidgets.QMessageBox.Icon.Question)
             messageBox.setText(
-                "Do you want to save the changes before closing the method edit?"
+                "Do you want to save the changes before exiting the method edit?"
             )
-            messageBox.setWindowTitle("Close method edit")
+            messageBox.setWindowTitle("Exit")
             messageBox.setStandardButtons(
                 QtWidgets.QMessageBox.StandardButton.Yes
                 | QtWidgets.QMessageBox.StandardButton.No
+                | QtWidgets.QMessageBox.StandardButton.Cancel
             )
             messageBox.setDefaultButton(QtWidgets.QMessageBox.StandardButton.Yes)
-            if messageBox.exec() == QtWidgets.QMessageBox.StandardButton.Yes:
+            result = messageBox.exec()
+            if result == QtWidgets.QMessageBox.StandardButton.Yes:
                 self.saveMethod()
-            a0.accept()
+                a0.accept()  # Accept the close event
+            elif result == QtWidgets.QMessageBox.StandardButton.No:
+                a0.accept()
+            else:
+                a0.ignore()
         else:
-            return super().closeEvent(a0)
+            super().closeEvent(a0)  # Proceed with closing if no changes were made
