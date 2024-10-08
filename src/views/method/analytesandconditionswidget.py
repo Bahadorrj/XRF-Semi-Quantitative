@@ -167,26 +167,21 @@ class AnalytesAndConditionsWidget(QtWidgets.QWidget):
             for symbol in row:
                 if symbol:
                     button = QtWidgets.QPushButton(symbol, self)
-                    button.setObjectName("periodic-button")
-                    button.setCheckable(True)
-                    if self._editable is False:
-                        button.setDisabled(True)
+                    if symbol not in ["L", "A"]:
+                        button.setObjectName("periodic-button")
                     else:
-                        button.toggled.connect(
-                            partial(self._addElementToCondition, symbol)
-                        )
+                        button.setObjectName("not-selectable-periodic-button")
+                    button.setCheckable(True)   
+                    button.setDisabled(not self._editable)
                     button.setSizePolicy(
                         QtWidgets.QSizePolicy.Policy.Fixed,
                         QtWidgets.QSizePolicy.Policy.Fixed,
                     )
+                    button.toggled.connect(
+                        partial(self._addElementToCondition, symbol)
+                    )
+                    self._buttonsMap[symbol] = button
                     layout.addWidget(button)
-                    if symbol not in ["L", "A"]:
-                        self._buttonsMap[symbol] = button
-                    else:
-                        button.setDisabled(True)
-                        button.setStyleSheet(
-                            "background-color: #F5F5F5; color: #FE7099; border: 2px inset #CB0E44; font-weight: bold"
-                        )
                 else:
                     layout.addStretch() if len(row) > 1 else vLayout.addSpacing(30)
             vLayout.addLayout(layout)
@@ -199,18 +194,16 @@ class AnalytesAndConditionsWidget(QtWidgets.QWidget):
 
     @QtCore.pyqtSlot(bool)
     def _addElementToCondition(self, symbol: str, checked: bool) -> None:
-        index = self._method.elements.query(f"symbol == '{symbol}'").index
+        conditionId = int(
+            self._conditionTable.item(self._conditionTable.currentRow(), 0)
+            .text()
+            .split(" ")[-1]
+        )
+        index = self._method.lines.query(
+            f"symbol == '{symbol}' and  condition_id == {conditionId}"
+        ).index
         for i in index:
-            self._method.elements.at[i, "active"] = int(checked)
-            self._method.elements.at[i, "condition_id"] = (
-                int(
-                    self._conditionTable.item(self._conditionTable.currentRow(), 0)
-                    .text()
-                    .split(" ")[-1]
-                )
-                if checked
-                else nan
-            )
+            self._method.lines.at[i, "active"] = int(checked)
 
     def _createToolBar(self) -> None:
         self._toolBar = QtWidgets.QToolBar(self)
@@ -237,16 +230,11 @@ class AnalytesAndConditionsWidget(QtWidgets.QWidget):
 
     @QtCore.pyqtSlot()
     def _itemSelectionChanged(self) -> None:
-        row = self._conditionTable.currentRow()
-        if (
-            df := (
-                self._conditions.query(
-                    f"name == '{self._conditionTable.item(row, 0).text()}'"
-                )
-            )
-        ).empty is False:
-            conditionId = df["condition_id"].values[0]
-            self._toggleConditionElements(conditionId)
+        row = self._conditionTable.getCurrentRow()
+        conditionId = self._conditions.query(f"name == '{row['name'].text()}'")[
+            "condition_id"
+        ].values[0]
+        self._toggleConditionElements(conditionId)
 
     def _isItemValid(self, item) -> tuple:
         value = item.text()
@@ -303,13 +291,21 @@ class AnalytesAndConditionsWidget(QtWidgets.QWidget):
             return False
 
     def _toggleConditionElements(self, conditionId: int) -> None:
-        symbols = self._method.elements.query(
-            f"condition_id == {conditionId} and active == 1"
-        )["symbol"].values
+        df = self._method.lines.query(f"condition_id == {conditionId}")
+        symbols = df["symbol"].values
+        active = df["active"].values
+        activeStatus = dict(zip(symbols, active))
         for symbol, button in self._buttonsMap.items():
-            button.blockSignals(True)
-            button.setChecked(symbol in symbols)
-            button.blockSignals(False)
+            if symbol in symbols:
+                button.setObjectName("selectable-periodic-button")
+                button.blockSignals(True)
+                button.setChecked(bool(activeStatus[symbol]))
+                button.blockSignals(False)
+            else:
+                button.setObjectName("periodic-button")
+            # Reapply stylesheet
+            button.style().unpolish(button)
+            button.style().polish(button)
 
     def _setUpView(self) -> None:
         self.mainLayout = QtWidgets.QVBoxLayout()
@@ -327,14 +323,9 @@ class AnalytesAndConditionsWidget(QtWidgets.QWidget):
     def setFocus(self):
         self._conditionTable.setFocus()
 
-    def setEditable(self, editable: bool) -> None:
-        if self._editable == editable:
-            return
-        self._editable = editable
+    def setConditionsEditable(self, editable: bool) -> None:
         for actions in self._actionsMap.values():
-            actions.setDisabled(not self._editable)
-        for button in self._buttonsMap.values():
-            button.setDisabled(not self._editable)
+            actions.setDisabled(not editable)
 
     def supply(self, method: datatypes.Method) -> None:
         """Supply data to the widget from a given method.
@@ -352,9 +343,6 @@ class AnalytesAndConditionsWidget(QtWidgets.QWidget):
             return
         if self._method and self._method == method:
             return
-        if self._editable:
-            self._actionsMap["edit"].setDisabled(False)
-            self._actionsMap["remove"].setDisabled(False)
         self.blockSignals(True)
         self._method = method
         self._conditions = self._method.conditions
