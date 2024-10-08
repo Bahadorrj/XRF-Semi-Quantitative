@@ -13,7 +13,6 @@ from src.views.base.tablewidget import TableWidget
 from src.views.calibration.traywidget import CalibrationTrayWidget
 from src.views.method.traywidget import MethodTrayWidget
 from src.views.background.traywidget import BackgroundTrayWidget
-from src.views.base.generaldatawidget import GeneralDataWidget
 
 pg.setConfigOptions(antialias=False)
 
@@ -35,18 +34,109 @@ COLORS = [
 ]
 
 
-# class AnalyseGeneralDataGroupBox(QtWidgets.QGroupBox):
-#     def __init__(self, parent: QtWidgets.QWidget | None = None, analyse: datatypes.Analyse | None = None):
-#         super().__init__(parent)
-#         self.setTitle("General Data")
-#         self._analyse = None
-#         self._generalDataWidgetsMap = None
-#         self._initializeUi()
-#         if analyse is not None:
-#             self.supply(analyse)
-#         self.hide()
+class AnalyseGeneralDataGroupBox(QtWidgets.QGroupBox):
+    resetCanvas = QtCore.pyqtSignal()
 
-#     def _initializeUi(self) -> None:
+    def __init__(
+        self,
+        parent: QtWidgets.QWidget | None = None,
+        analyse: datatypes.Analyse | None = None,
+    ):
+        super().__init__(parent)
+        self.setTitle("General Data")
+        self._analyse = None
+        self._generalDataWidgetsMap = dict()
+        self._initializeUi()
+        if analyse is not None:
+            self.supply(analyse)
+        self.hide()
+
+    def _initializeUi(self) -> None:
+        self._createWidgets()
+        self._fillGeneralDataGroupBox()
+
+    def _createWidgets(self) -> None:
+        keys = [
+            "Type",
+            "Area",
+            "Mass",
+            "Rho",
+            "Background Profile",
+            "Rest",
+            "Diluent",
+        ]
+        for key in keys:
+            if key == "Background Profile":
+                widget = QtWidgets.QComboBox(self)
+                items = getDataframe("BackgroundProfiles")["filename"].to_list()
+                items.insert(0, "")
+                widget.addItems(items)
+                widget.currentTextChanged.connect(
+                    partial(self._generalDataChanged, key, widget)
+                )
+            else:
+                widget = QtWidgets.QLineEdit(self)
+                widget.textEdited.connect(
+                    partial(self._generalDataChanged, key, widget)
+                )
+            self._generalDataWidgetsMap[key] = widget
+
+    def _fillGeneralDataGroupBox(self) -> None:
+        self._generalDataLayout = QtWidgets.QVBoxLayout()
+        self._generalDataLayout.setSpacing(25)
+        for label, widget in self._generalDataWidgetsMap.items():
+            self._addWidgetToLayout(label, widget)
+        self.setLayout(self._generalDataLayout)
+
+    def _addWidgetToLayout(self, key: str, widget: QtWidgets.QWidget) -> None:
+        widget.setFixedSize(100, 25)
+        widget.setSizePolicy(
+            QtWidgets.QSizePolicy.Policy.Expanding,
+            QtWidgets.QSizePolicy.Policy.Fixed,
+        )
+        hLayout = QtWidgets.QHBoxLayout()
+        hLayout.addWidget(QtWidgets.QLabel(f"{key}:"))
+        hLayout.addWidget(widget)
+        self._generalDataLayout.addLayout(hLayout)
+        if isinstance(widget, QtWidgets.QLineEdit):
+            widget.editingFinished.connect(
+                partial(self._generalDataChanged, key, widget)
+            )
+        elif isinstance(widget, QtWidgets.QComboBox):
+            widget.currentTextChanged.connect(
+                partial(self._generalDataChanged, key, widget)
+            )
+
+    def _generalDataChanged(self, key, widget) -> None:
+        if key == "Background Profile":
+            if filename := widget.currentText():
+                profile = datatypes.BackgroundProfile.fromATXBFile(
+                    resourcePath(f"backgrounds/{filename}.atxb")
+                )
+                self._analyse.backgroundProfile = profile
+            else:
+                self._analyse.backgroundProfile = None
+        self.resetCanvas.emit()
+
+    def _fillWidgetsFromAnalyse(self) -> None:
+        for key, widget in self._generalDataWidgetsMap.items():
+            value = self._analyse.generalData.get(key)
+            if isinstance(widget, (QtWidgets.QLineEdit, QtWidgets.QLabel)):
+                widget.setText(value)
+            else:
+                widget.setCurrentText(value)
+
+    def setDisabled(self, a0):
+        for widget in self._generalDataWidgetsMap.values():
+            widget.setDisabled(a0)
+
+    def supply(self, analyse: datatypes.Analyse) -> None:
+        self.blockSignals(True)
+        if analyse == self._analyse:
+            return
+        self._analyse = analyse
+        self._fillWidgetsFromAnalyse()
+        self.blockSignals(False)
 
 
 class ResultDialog(QtWidgets.QDialog):
@@ -187,6 +277,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self._createToolBar()
         self._createPlotWidget()
         self._createTreeWidget()
+        self._createGeneralDataGroupBox()
         self._createConditionFormWidget()
         self._createCoordinateLabel()
         self._setUpView()
@@ -326,7 +417,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self._treeWidget.setFixedWidth(400)
         self._treeWidget.setColumnWidth(0, int(self._treeWidget.size().width() * 0.7))
         self._fillTreeWidget()
-        self._treeWidget.itemClicked.connect(self._itemClicked)
+        self._treeWidget.itemSelectionChanged.connect(self._itemSelectionChanged)
         self._treeWidget.itemChanged.connect(self._drawCanvas)
 
     def _fillTreeWidget(self) -> None:
@@ -335,6 +426,11 @@ class MainWindow(QtWidgets.QMainWindow):
             item = QtWidgets.QTreeWidgetItem(self._treeWidget)
             item.setText(0, label)
             self._treeWidget.addTopLevelItem(item)
+
+    def _createGeneralDataGroupBox(self) -> None:
+        self._generalDataGroupBox = AnalyseGeneralDataGroupBox(self)
+        self._generalDataGroupBox.setFixedWidth(300)
+        self._generalDataGroupBox.resetCanvas.connect(self._drawCanvas)
 
     def _createConditionFormWidget(self) -> None:
         self._conditionFormWidget = ConditionFormWidget(self)
@@ -356,6 +452,7 @@ class MainWindow(QtWidgets.QMainWindow):
         secondSplitter.addWidget(self._conditionFormWidget)
         secondSplitter.setChildrenCollapsible(False)
         splitter.addWidget(secondSplitter)
+        splitter.addWidget(self._generalDataGroupBox)
         self.mainLayout = QtWidgets.QVBoxLayout()
         self.mainLayout.addWidget(splitter)
         self.mainLayout.addWidget(self._coordinateLabel)
@@ -463,9 +560,6 @@ class MainWindow(QtWidgets.QMainWindow):
         self._backgroundTray.showMaximized()
 
     def _openResultsWidget(self):
-        self._analyse.backgroundProfile = datatypes.BackgroundProfile.fromATXBFile(
-            "backgrounds/PROFILE1.atxb"
-        )
         self._resultDialog = ResultDialog(
             self,
             self._analyse.calculateConcentrations(
@@ -489,17 +583,21 @@ class MainWindow(QtWidgets.QMainWindow):
                         )
         return activePlotAttrs
 
-    def _itemClicked(self, item: QtWidgets.QTreeWidgetItem, column: int) -> None:
+    def _itemSelectionChanged(self) -> None:
+        item = self._treeWidget.currentItem()
         if self._treeWidget.indexOfTopLevelItem(item.parent()) == -1:
+            self._conditionFormWidget.hide()
+            self._generalDataGroupBox.hide()
             return
+        self._conditionFormWidget.show()
+        self._generalDataGroupBox.show()
         tmp = self._analyse
         self._analyse = next(
             a for a in self._analyseFiles if a.filename == item.text(0)
         )
         if self._analyse and self._analyse != tmp:
-            if self._conditionFormWidget.isVisible() is False:
-                self._conditionFormWidget.show()
             self._conditionFormWidget.supply(self._analyse.conditions)
+            self._generalDataGroupBox.supply(self._analyse)
             self._actionsMap["save-as"].setDisabled(False)
             self._actionsMap["results"].setDisabled(False)
 
@@ -510,20 +608,18 @@ class MainWindow(QtWidgets.QMainWindow):
         for attr in attrs:
             extensionIndex, analyseIndex, dataIndex, color = attr
             data = self._getDataFromIndex(extensionIndex, analyseIndex, dataIndex)
-            x, y = data.x, data.y
+            x, y = data.x, data.optimalY
             temp = max(y)
             if temp > maxIntensity:
                 maxIntensity = temp
                 self._setPlotLimits(maxIntensity)
             self._plot(x, y, pg.mkPen(color=color, width=2))
 
-    @cache
     def _getDataFromIndex(
         self, extensionIndex: int, analyseIndex: int, dataIndex: int
     ) -> datatypes.AnalyseData:
         return self._getAnalyseFromIndex(extensionIndex, analyseIndex).data[dataIndex]
 
-    @cache
     def _getAnalyseFromIndex(
         self, extensionIndex: int, analyseIndex: int
     ) -> datatypes.Analyse:
