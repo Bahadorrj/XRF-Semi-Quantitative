@@ -225,27 +225,49 @@ QLineEdit {
 #periodic-button {
     width: 30px;
     height: 30px;
-    border: 2px inset #696969;
     border-radius: 5px;
     background-color: #F5F5F5;
+    border: 2px solid #696969;
     color: #9C9FA3;
 }
 
-#periodic-button::hover {
-    background-color: #C0C0C0;
+#selectable-periodic-button {
+    width: 30px;
+    height: 30px;
+    border-radius: 5px;
+    background-color: #F5F5F5;
+    border: 2px solid #33BDC4;
+    color: #33BDC4;
+}
+
+#selectable-periodic-button::hover {
+    border: 2px solid #004548;
+    color: #004548;
+    font-weight: bold;
+}
+
+#selectable-periodic-button::pressed:checked,
+#selectable-periodic-button::pressed:!checked  {
+    background-color: #004548;
+    border: 2px solid #004548;
     color: #F5F5F5;
     font-weight: bold;
 }
 
-#periodic-button::pressed  {
-    background-color: #696969;
+#selectable-periodic-button::checked {
+    background-color: #00ADB5;
+    border: 2px solid #004548;
     color: #F5F5F5;
     font-weight: bold;
 }
 
-#periodic-button::checked {
-    background-color: #33BDC4;
-    color: #F5F5F5;
+#not-selectable-periodic-button {
+    width: 30px;
+    height: 30px;
+    border-radius: 5px;
+    background-color: #F5F5F5; 
+    color: #FE7099; 
+    border: 2px solid #CB0E44; 
     font-weight: bold;
 }
 
