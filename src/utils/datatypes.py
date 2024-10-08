@@ -39,7 +39,7 @@ class AnalyseData:
         for row in lines.itertuples():
             try:
                 intensity = int(
-                    self.y[
+                    self.optimalY[
                         round(calculation.evToPx(row.low_kiloelectron_volt)) : round(
                             calculation.evToPx(row.high_kiloelectron_volt)
                         )
@@ -107,15 +107,16 @@ class Analyse:
     extension: str | None = field(default=None)
 
     def __post_init__(self) -> None:
-        self.generalData = {
-            "Type": None,
-            "Area": None,
-            "Mass": None,
-            "Rho": None,
-            "Background Profile": None,
-            "Rest": None,
-            "Diluent": None,
-        }
+        if not self.generalData:
+            self.generalData = {
+                "Type": None,
+                "Area": None,
+                "Mass": None,
+                "Rho": None,
+                "Background Profile": None,
+                "Rest": None,
+                "Diluent": None,
+            }
         if self.filePath:
             self.filename = Path(self.filePath).stem
             self.extension = self.filePath.split(".")[-1]
@@ -181,68 +182,59 @@ class Analyse:
         intensities = defaultdict(dict)
         for row in lines.query("active == 1").itertuples(index=False):
             if row.condition_id in [data.conditionId for data in self.data]:
-                intensities[row.symbol] = {
-                    row.radiation_type: allIntensities[int(row.condition_id) - 1][
-                        row.symbol
-                    ][row.radiation_type]
-                }
+                intensities[row.symbol][row.radiation_type] = allIntensities[
+                    int(row.condition_id) - 1
+                ][row.symbol][row.radiation_type]
         return intensities
 
     def calculateConcentrations(self, method: "Method") -> dict:
-        concentrations = {}
+        concentrations = defaultdict(dict)
         activeIntensities = self.calculateActiveIntensities(method.lines)
         allIntensities = {
             d.conditionId: d.calculateIntensities(method.lines) for d in self.data
         }
-
         # Pre-filter active elements and store as dictionaries
         activeLines = method.lines[method.lines["active"] == 1]
-        activeLinesDict = activeLines.set_index("symbol").to_dict(orient="index")
-
         for activeElement, d in activeIntensities.items():
             # Pre-fetch conditionId and skip querying repeatedly
-            activeElementData = activeLinesDict.get(activeElement, None)
-            if not activeElementData:
+            activeElementData = activeLines.query(f"symbol == '{activeElement}'")
+            if activeElementData.empty:
                 continue
-            conditionId = int(activeElementData["condition_id"])
-
-            for activeRadiation, intensity in d.items():
-                key = f"{activeElement}-{activeRadiation}"
-                # Skip if key doesn't exist in both interferences and coefficients
-                if (
-                    key not in method.interferences.index
-                    or key not in method.coefficients.index
-                ):
-                    continue
-
-                interferenceRow = method.interferences.loc[key]
-                coefficient = method.coefficients.loc[key].values[0]
-
-                # Iterate over interferers once instead of nested queries
-                for interfererElement, interference in interferenceRow.items():
-                    if interfererElement == activeElement:
+            for activeData in activeElementData.itertuples(index=False):
+                conditionId = int(activeData.condition_id)
+                for activeRadiation, intensity in d.items():
+                    key = f"{activeElement}-{activeRadiation}"
+                    # Skip if key doesn't exist in both interferences and coefficients
+                    if (
+                        key not in method.interferences.index
+                        or key not in method.coefficients.index
+                    ):
                         continue
-
-                    # Fetch interferer rows from dictionary instead of querying DataFrame
-                    interfererData = activeLinesDict.get(interfererElement, None)
-                    if not interfererData:
-                        continue
-
-                    interfererRadiation = interfererData["radiation_type"]
-                    interfererIntensity = allIntensities[conditionId][
-                        interfererElement
-                    ][interfererRadiation]
-                    intensity -= interfererIntensity * interference
-
-                    if intensity <= 0:
-                        break
-
-                # Calculate concentration only if intensity remains positive
-                if intensity > 0:
-                    concentrations[activeElement] = {
-                        activeRadiation: float(intensity * coefficient)
-                    }
-
+                    interferenceRow = method.interferences.loc[key]
+                    coefficient = method.coefficients.loc[key].values[0]
+                    # Iterate over interferers once instead of nested queries
+                    for interfererElement, interference in interferenceRow.items():
+                        if interfererElement == activeElement:
+                            continue
+                        # Fetch interferer rows from dictionary instead of querying DataFrame
+                        interfererData = activeLines.query(
+                            f"symbol == '{interfererElement}'"
+                        )
+                        if interfererData.empty:
+                            continue
+                        for data in interfererData.itertuples(index=False):
+                            interfererRadiation = data.radiation_type
+                            interfererIntensity = allIntensities[conditionId][
+                                interfererElement
+                            ][interfererRadiation]
+                            intensity -= interfererIntensity * interference
+                        if intensity <= 0:
+                            break
+                    # Calculate concentration only if intensity remains positive
+                    if intensity > 0:
+                        concentrations[activeElement][activeRadiation] = float(
+                            intensity * coefficient
+                        )
         return dict(
             sorted(
                 concentrations.items(),
@@ -500,23 +492,19 @@ class Method:
     conditions: pandas.DataFrame = field(
         default_factory=lambda: getDataframe("Conditions").copy()
     )
-    elements: pandas.DataFrame = field(
-        default_factory=lambda: getDataframe("Elements").copy()
-    )
-    lines: pandas.DataFrame = field(
-        default_factory=lambda: getDataframe("Lines").copy()
-    )
+    lines: pandas.DataFrame | None = field(default=None)
     coefficients: pandas.DataFrame | None = field(default=None)
     interferences: pandas.DataFrame | None = field(default=None)
 
     def __post_init__(self):
         if self.calibrations.empty:
             return
-        if self.coefficients is None or self.interferences is None:
-            calibrations = [
-                Calibration.fromATXCFile(resourcePath(f"calibrations/{f}.atxc"))
-                for f in self.calibrations["filename"].values
-            ]
+        calibrations = [
+            Calibration.fromATXCFile(resourcePath(f"calibrations/{f}.atxc"))
+            for f in self.calibrations["filename"].values
+        ]
+        if self.lines is None:
+            self.fillLines(calibrations)
         if self.coefficients is None:
             self.fillCoefficients(calibrations)
         if self.interferences is None:
@@ -532,11 +520,22 @@ class Method:
             and self.state == other.state
             and self.calibrations.equals(other.calibrations)
             and self.conditions.equals(other.conditions)
-            and self.elements.equals(other.elements)
             and self.lines.equals(other.lines)
             and self.coefficients.equals(other.coefficients)
             and self.interferences.equals(other.interferences)
         )
+
+    def fillLines(self, calibrations: Sequence) -> None:
+        self.lines = getDataframe("Lines").copy()
+        self.lines["condition_id"] = np.nan
+        self.lines["active"] = 0
+        for calibration in calibrations:
+            indexes = self.lines[
+                self.lines["symbol"].isin(calibration.concentrations)
+            ].index
+            self.lines.loc[indexes, "condition_id"] = calibration.lines.loc[
+                indexes, "condition_id"
+            ]
 
     def fillInterferences(self, calibrations: Sequence) -> None:
         interferences = defaultdict(dict)
@@ -548,6 +547,10 @@ class Method:
             )  # Cache reference to avoid repeated access
             for element, radiationDict in calibration.interferences.items():
                 for activeRadiation, values in radiationDict.items():
+                    if self.lines.query(
+                        f"symbol == '{element}' and radiation_type == '{activeRadiation}' and active == 1"
+                    ).empty:
+                        continue
                     key = f"{element}-{activeRadiation}"
                     interferences[key][concentrations[element]] = {
                         e: list(v.values())[0] for e, v in values.items()
@@ -590,6 +593,10 @@ class Method:
             )  # Cache reference to avoid repeated access
             for element, radiationDict in calibration.coefficients.items():
                 for radiation, coefficient in radiationDict.items():
+                    if self.lines.query(
+                        f"symbol == '{element}' and radiation_type == '{radiation}' and active == 1"
+                    ).empty:
+                        continue
                     key = f"{element}-{radiation}"
                     coefficients[key][concentrations[element]] = coefficient
 
@@ -619,7 +626,6 @@ class Method:
             self.state,
             self.calibrations.copy(),
             self.conditions.copy(),
-            self.elements.copy(),
             self.lines.copy(),
             self.coefficients.copy() if self.coefficients is not None else None,
             self.interferences.copy() if self.interferences is not None else None,
@@ -632,15 +638,6 @@ class Method:
         ]
         self.fillInterferences(calibrations)
         self.fillCoefficients(calibrations)
-        for row in self.elements.itertuples():
-            if (
-                df := self.lines.query(f"symbol == '{row.symbol}' and active == 1")
-            ).empty is False:
-                index = int(df.index.values[0])
-                try:
-                    self.lines.at[index, "conditions_id"] = int(row.condition_id)
-                except ValueError:
-                    self.lines.at[index, "conditions_id"] = np.nan
         methodPath = resourcePath(f"methods/{self.filename}.atxm")
         key = encryption.loadKey()
         jsonText = dumps(self.toHashableDict())
@@ -668,7 +665,6 @@ class Method:
             "state": self.state,
             "calibrations": self.calibrations.to_dict(),
             "conditions": self.conditions.to_dict(),
-            "elements": self.elements.to_dict(),
             "lines": self.lines.to_dict(),
             "coefficients": self.coefficients.to_dict(),
             "interferences": self.interferences.to_dict(),
@@ -678,8 +674,6 @@ class Method:
     def fromHashableDict(cls, kwargs: dict):
         kwargs["conditions"] = pandas.DataFrame(kwargs["conditions"])
         kwargs["conditions"].reset_index(drop=True, inplace=True)
-        kwargs["elements"] = pandas.DataFrame(kwargs["elements"])
-        kwargs["elements"].reset_index(drop=True, inplace=True)
         kwargs["lines"] = pandas.DataFrame(kwargs["lines"])
         kwargs["lines"].reset_index(drop=True, inplace=True)
         kwargs["calibrations"] = pandas.DataFrame(kwargs["calibrations"])
