@@ -323,7 +323,7 @@ class AnalytesAndConditionsWidget(QtWidgets.QWidget):
     def setFocus(self):
         self._conditionTable.setFocus()
 
-    def setConditionsEditable(self, editable: bool) -> None:
+    def _setConditionsEditable(self, editable: bool) -> None:
         for actions in self._actionsMap.values():
             actions.setDisabled(not editable)
 
@@ -342,9 +342,13 @@ class AnalytesAndConditionsWidget(QtWidgets.QWidget):
         if method is None:
             return
         if self._method and self._method == method:
+            self._conditionTable.clearSelection()
+            self._conditionTable.selectRow(0)
             return
         self.blockSignals(True)
         self._method = method
+        if self._editable and self._method.calibrations.empty is False:
+            self._setConditionsEditable(False)
         self._conditions = self._method.conditions
         self._conditionTable.supply(self._conditions.drop("condition_id", axis=1))
         self._conditionTable.clearSelection()

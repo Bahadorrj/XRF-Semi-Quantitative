@@ -496,7 +496,6 @@ class PeakSearchWidget(QtWidgets.QWidget):
         self._spectrumPlot = self._graphicsLayoutWidget.addPlot(row=1, col=0)
         self._spectrumPlot.setMouseEnabled(x=False, y=False)
         self._spectrumPlot.showGrid(x=True, y=True)
-        self._spectrumPlot.showGrid(x=True, y=True)
         self._zoomRegion = pg.LinearRegionItem(clipItem=self._spectrumPlot)
         self._zoomRegion.sigRegionChanged.connect(self._showZoomedRegion)
 
@@ -687,7 +686,9 @@ class PeakSearchWidget(QtWidgets.QWidget):
         self._zoomRegion.setRegion((0, 100))
         self._setCoordinate(0, 0)
 
-    def supply(self, analyse: datatypes.Analyse, dataframe: pd.DataFrame) -> None:
+    def supply(self, calibration: datatypes.Calibration) -> None:
+        analyse = calibration.analyse
+        dataframe = calibration.lines
         if (
             self._analyse
             and self._analyse == analyse

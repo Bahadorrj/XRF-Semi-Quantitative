@@ -75,6 +75,9 @@ class ElementAndConcentrationFormDialog(FormDialog):
 
 
 class ElementsAndConcentrationsWidget(QtWidgets.QWidget):
+    concentrationAdded = QtCore.pyqtSignal(str)
+    concentrationRemoved = QtCore.pyqtSignal(str)
+
     def __init__(
         self,
         parent: QtWidgets.QWidget | None = None,
@@ -135,6 +138,7 @@ class ElementsAndConcentrationsWidget(QtWidgets.QWidget):
             concentration = round(float(addDialog.fields["concentration"]), 1)
             self._calibration.concentrations[element] = concentration
             self._insertConcentration(element, concentration)
+            self.concentrationAdded.emit(element)
 
     def _editCurrentConcentration(self) -> None:
         currentRow = self._tableWidget.getCurrentRow()
@@ -168,9 +172,10 @@ class ElementsAndConcentrationsWidget(QtWidgets.QWidget):
         )
         messageBox.setDefaultButton(QtWidgets.QMessageBox.StandardButton.No)
         if messageBox.exec() == QtWidgets.QMessageBox.StandardButton.Yes:
-            tableRow = self._tableWidget.getCurrentRow()
-            self._calibration.concentrations.pop(tableRow["element"].text())
+            element = self._tableWidget.getCurrentRow()["element"].text()
+            self._calibration.concentrations.pop(element)
             self._tableWidget.removeRow(self._tableWidget.currentRow())
+            self.concentrationRemoved.emit(element)
 
     def _insertConcentration(self, element: str, concentration: float) -> None:
         items = {

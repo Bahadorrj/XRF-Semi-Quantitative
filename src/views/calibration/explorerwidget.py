@@ -122,7 +122,7 @@ class CalibrationExplorerWidget(ExplorerWidget):
             if "Condition" in label:
                 newWidget = self._widgets["Peak Search"]
                 newWidget.displayAnalyseData(int(label.split(" ")[-1]))
-                newWidget.supply(self._calibration.analyse, self._calibration.lines)
+                newWidget.supply(self._calibration)
             else:
                 newWidget = self._widgets[label]
                 newWidget.supply(self._calibration)
@@ -145,10 +145,7 @@ class CalibrationExplorerWidget(ExplorerWidget):
 
     def _supplyWidgets(self) -> None:
         for widget in self._widgets.values():
-            if isinstance(widget, PeakSearchWidget):
-                widget.supply(self._calibration.analyse, self._calibration.lines)
-            else:
-                widget.supply(self._calibration)
+            widget.supply(self._calibration)
 
     def supply(self, calibration: datatypes.Calibration):
         if calibration is None:

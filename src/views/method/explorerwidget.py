@@ -104,8 +104,7 @@ class MethodExplorer(ExplorerWidget):
             oldWidget.hide()
             newWidget = self._widgets[label]
             newWidget.setContentsMargins(20, 20, 20, 20)
-            if isinstance(newWidget, AnalytesAndConditionsWidget):
-                newWidget.setConditionsEditable(self._method.calibrations.empty)
+            newWidget.supply(self._method)
             self.mainLayout.replaceWidget(oldWidget, newWidget)
             newWidget.show()
             newWidget.setFocus()
