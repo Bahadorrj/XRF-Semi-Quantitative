@@ -1,7 +1,6 @@
-from functools import partial, cache
+from functools import partial
 from typing import Optional
 
-import numpy as np
 import pandas
 import pyqtgraph as pg
 from PyQt6 import QtCore, QtGui, QtWidgets
@@ -35,7 +34,7 @@ COLORS = [
 
 
 class AnalyseGeneralDataGroupBox(QtWidgets.QGroupBox):
-    resetCanvas = QtCore.pyqtSignal()
+    backgroundChanged = QtCore.pyqtSignal()
 
     def __init__(
         self,
@@ -45,7 +44,7 @@ class AnalyseGeneralDataGroupBox(QtWidgets.QGroupBox):
         super().__init__(parent)
         self.setTitle("General Data")
         self._analyse = None
-        self._generalDataWidgetsMap = dict()
+        self._generalDataWidgetsMap = {}
         self._initializeUi()
         if analyse is not None:
             self.supply(analyse)
@@ -98,14 +97,6 @@ class AnalyseGeneralDataGroupBox(QtWidgets.QGroupBox):
         hLayout.addWidget(QtWidgets.QLabel(f"{key}:"))
         hLayout.addWidget(widget)
         self._generalDataLayout.addLayout(hLayout)
-        if isinstance(widget, QtWidgets.QLineEdit):
-            widget.editingFinished.connect(
-                partial(self._generalDataChanged, key, widget)
-            )
-        elif isinstance(widget, QtWidgets.QComboBox):
-            widget.currentTextChanged.connect(
-                partial(self._generalDataChanged, key, widget)
-            )
 
     def _generalDataChanged(self, key, widget) -> None:
         if key == "Background Profile":
@@ -116,7 +107,7 @@ class AnalyseGeneralDataGroupBox(QtWidgets.QGroupBox):
                 self._analyse.backgroundProfile = profile
             else:
                 self._analyse.backgroundProfile = None
-        self.resetCanvas.emit()
+            self.backgroundChanged.emit()
 
     def _fillWidgetsFromAnalyse(self) -> None:
         for key, widget in self._generalDataWidgetsMap.items():
@@ -262,7 +253,6 @@ class MainWindow(QtWidgets.QMainWindow):
         super().__init__()
         self._bundleType = bundleType
         self._analyse = None
-        self._analyseFiles = []
         self._methodTray = None
         self._calibrationTray = None
         self._backgroundTray = None
@@ -356,11 +346,8 @@ class MainWindow(QtWidgets.QMainWindow):
             self._menusMap["file"].addAction(self._actionsMap[action])
             if action in ["new", "save-as", "print-setup"]:
                 self._menusMap["file"].addSeparator()
-
         self._menusMap["calibration"].addAction(self._actionsMap["standards-tray-list"])
-
         self._menusMap["method"].addAction(self._actionsMap["methods-tray-list"])
-
         self._menusMap["background"].addAction(self._actionsMap["background-tray-list"])
 
     def _createMenuBar(self) -> None:
@@ -388,9 +375,18 @@ class MainWindow(QtWidgets.QMainWindow):
         plotItem.setContentsMargins(10, 10, 10, 10)
         self._plotWidget.showGrid(x=True, y=True)
         self._plotWidget.setFrameShape(QtWidgets.QFrame.Shape.NoFrame)
-        self._plotWidget.setMinimumWidth(500)
-        self._plotWidget.setMinimumHeight(500)
+        self._plotWidget.setMinimumSize(500, 500)
+        self._plotWidget.setXRange(0, 2048)
+        self._plotWidget.setLimits(xMin=-100, xMax=2148, yMax=1)
+        self._backgroundRegion = pg.LinearRegionItem(
+            pen=pg.mkPen(color="#330311", width=2),
+            brush=pg.mkBrush(192, 192, 192, 100),
+            hoverBrush=pg.mkBrush(169, 169, 169, 100),
+            bounds=(0, 2048),
+        )
+        self._backgroundRegion.setZValue(10)
         self._plotWidget.scene().sigMouseMoved.connect(self._mouseMoved)
+        self._backgroundRegion.sigRegionChanged.connect(self._backgroundRegionChanged)
 
     def _mouseMoved(self, pos: QtCore.QPointF) -> None:
         if self._plotWidget.sceneBoundingRect().contains(pos):
@@ -399,6 +395,14 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def _setCoordinate(self, x: float, y: float) -> None:
         self._coordinateLabel.setText(f"x = {round(x, 2)} y = {round(y, 2)}")
+
+    def _backgroundRegionChanged(self) -> None:
+        self._analyse.backgroundRegion = self._backgroundRegion.getRegion()
+        item = self._treeWidget.currentItem()
+        for i in range(item.childCount()):
+            item.child(i).plotDataItem.setData(
+                self._analyse.data[i].x, self._analyse.data[i].optimalY
+            )
 
     def _createTreeWidget(self) -> None:
         self._treeWidget = QtWidgets.QTreeWidget(self)
@@ -418,7 +422,42 @@ class MainWindow(QtWidgets.QMainWindow):
         self._treeWidget.setColumnWidth(0, int(self._treeWidget.size().width() * 0.7))
         self._fillTreeWidget()
         self._treeWidget.itemSelectionChanged.connect(self._itemSelectionChanged)
-        self._treeWidget.itemChanged.connect(self._drawCanvas)
+        self._treeWidget.itemChanged.connect(self._itemChanged)
+
+    @QtCore.pyqtSlot()
+    def _itemSelectionChanged(self) -> None:
+        item = self._treeWidget.currentItem()
+        if getattr(item, "analyse", None) is None:
+            self._conditionFormWidget.hide()
+            self._generalDataGroupBox.hide()
+            return
+        self._analyse = item.analyse
+        self._conditionFormWidget.show()
+        self._generalDataGroupBox.show()
+        self._conditionFormWidget.supply(self._analyse.conditions)
+        self._generalDataGroupBox.supply(self._analyse)
+        self._actionsMap["save-as"].setDisabled(False)
+        self._actionsMap["results"].setDisabled(False)
+        if self._analyse.generalData["Background Profile"]:
+            if self._backgroundRegion not in self._plotWidget.plotItem.items:
+                self._backgroundRegion.setRegion(self._analyse.backgroundRegion)
+                self._plotWidget.addItem(self._backgroundRegion)
+        elif self._backgroundRegion in self._plotWidget.plotItem.items:
+            self._plotWidget.removeItem(self._backgroundRegion)
+
+    @QtCore.pyqtSlot(QtWidgets.QTreeWidgetItem, int)
+    def _itemChanged(self, item: QtWidgets.QTreeWidgetItem, column: int) -> None:
+        if getattr(item, "plotDataItem", None) is None:
+            return
+        if item.checkState(column) == QtCore.Qt.CheckState.Checked:
+            if item.plotDataItem not in self._plotWidget.plotItem.items:
+                self._plotWidget.addItem(item.plotDataItem)
+                if (
+                    yMax := max(item.plotDataItem.getData()[1])
+                ) * 1.1 > self._plotWidget.getViewBox().state["limits"]["yLimits"][1]:
+                    self._plotWidget.setLimits(yMin=-0.1 * yMax, yMax=yMax * 1.1)
+        else:
+            self._plotWidget.removeItem(item.plotDataItem)
 
     def _fillTreeWidget(self) -> None:
         items = ["Text Files", "Antique'X Files", "Packet Files"]
@@ -430,7 +469,21 @@ class MainWindow(QtWidgets.QMainWindow):
     def _createGeneralDataGroupBox(self) -> None:
         self._generalDataGroupBox = AnalyseGeneralDataGroupBox(self)
         self._generalDataGroupBox.setFixedWidth(300)
-        self._generalDataGroupBox.resetCanvas.connect(self._drawCanvas)
+        self._generalDataGroupBox.backgroundChanged.connect(self._backgroundChanged)
+
+    def _backgroundChanged(self) -> None:
+        if self._analyse:
+            if self._analyse.generalData["Background Profile"]:
+                if self._backgroundRegion not in self._plotWidget.plotItem.items:
+                    self._backgroundRegion.setRegion(self._analyse.backgroundRegion)
+                    self._plotWidget.addItem(self._backgroundRegion)
+                    if (item := self._treeWidget.currentItem()).checkState(
+                        0
+                    ) == QtCore.Qt.CheckState.Unchecked:
+                        item.setCheckState(0, QtCore.Qt.CheckState.Checked)
+            else:
+                if self._backgroundRegion in self._plotWidget.plotItem.items:
+                    self._plotWidget.removeItem(self._backgroundRegion)
 
     def _createConditionFormWidget(self) -> None:
         self._conditionFormWidget = ConditionFormWidget(self)
@@ -460,6 +513,21 @@ class MainWindow(QtWidgets.QMainWindow):
         mainWidget.setLayout(self.mainLayout)
         self.setCentralWidget(mainWidget)
 
+    def _openAnalyse(self) -> None:
+        fileNames, filters = QtWidgets.QFileDialog.getOpenFileNames(
+            self,
+            "Open File",
+            "./",
+            "Antique'X Spectrum (*.atx);;Text Spectrum (*.txt)",
+        )
+        if fileNames:
+            for fileName in fileNames:
+                self._addAnalyseFromFileName(fileName)
+            mapper = {"Text Spectrum (*.txt)": 0, "Antique'X Spectrum (*.atx)": 1}
+            topLevelItem = self._treeWidget.topLevelItem(mapper[filters])
+            if not topLevelItem.isExpanded():
+                self._treeWidget.expandItem(topLevelItem)
+
     def _addAnalyseFromFileName(self, filename: str) -> None:
         analyse = self._constructAnalyseFromFilename(filename)
         if analyse is not None and analyse.data:
@@ -483,11 +551,8 @@ class MainWindow(QtWidgets.QMainWindow):
         return analyse
 
     def addAnalyse(self, analyse: datatypes.Analyse) -> None:
-        self._analyseFiles.append(analyse)
-        self._addAnalyseToTree(analyse)
-
-    def _addAnalyseToTree(self, analyse: datatypes.Analyse) -> None:
         item = QtWidgets.QTreeWidgetItem()
+        item.analyse = analyse
         item.setCheckState(0, QtCore.Qt.CheckState.Unchecked)
         item.setText(0, analyse.filename)
         item.setFlags(
@@ -500,28 +565,25 @@ class MainWindow(QtWidgets.QMainWindow):
             child.setText(0, f"Condition {data.conditionId}")
             child.setFlags(child.flags() | QtCore.Qt.ItemFlag.ItemIsUserCheckable)
             child.setCheckState(0, QtCore.Qt.CheckState.Unchecked)
+            child.plotDataItem = pg.PlotDataItem(
+                x=data.x, y=data.optimalY, pen=pg.mkPen(color=COLORS[index], width=2)
+            )
             item.addChild(child)
             colorButton = pg.ColorButton()
             colorButton.setColor(COLORS[index])
-            colorButton.sigColorChanged.connect(self._drawCanvas)
+            colorButton.sigColorChanged.connect(
+                partial(self._colorChanged, child, colorButton)
+            )
             self._treeWidget.setItemWidget(child, 1, colorButton)
         mapper = {"txt": 0, "atx": 1, None: 2}
         self._treeWidget.topLevelItem(mapper[analyse.extension]).addChild(item)
 
-    def _openAnalyse(self) -> None:
-        fileNames, filters = QtWidgets.QFileDialog.getOpenFileNames(
-            self,
-            "Open File",
-            "./",
-            "Antique'X Spectrum (*.atx);;Text Spectrum (*.txt)",
-        )
-        if fileNames:
-            for fileName in fileNames:
-                self._addAnalyseFromFileName(fileName)
-            mapper = {"Text Spectrum (*.txt)": 0, "Antique'X Spectrum (*.atx)": 1}
-            topLevelItem = self._treeWidget.topLevelItem(mapper[filters])
-            if not topLevelItem.isExpanded():
-                self._treeWidget.expandItem(topLevelItem)
+    def _colorChanged(
+        self, item: QtWidgets.QTreeWidgetItem, colorButton: pg.ColorButton
+    ) -> None:
+        self._plotWidget.removeItem(item.plotDataItem)
+        item.plotDataItem.setPen(pg.mkPen(color=colorButton.color(), width=2))
+        self._plotWidget.addItem(item.plotDataItem)
 
     def resetWindow(self) -> None:
         messageBox = QtWidgets.QMessageBox(self)
@@ -534,7 +596,6 @@ class MainWindow(QtWidgets.QMainWindow):
         messageBox.setIcon(QtWidgets.QMessageBox.Icon.Question)
         result = messageBox.exec()
         if result == QtWidgets.QMessageBox.StandardButton.Yes:
-            self._analyseFiles.clear()
             for topLevelIndex in range(self._treeWidget.topLevelItemCount()):
                 item = self._treeWidget.topLevelItem(topLevelIndex)
                 while item.childCount() != 0:
@@ -567,76 +628,6 @@ class MainWindow(QtWidgets.QMainWindow):
             ),
         )
         self._resultDialog.exec()
-
-    def _findActivePlotAttrs(self) -> list:
-        activePlotAttrs = []
-        for extensionIndex in range(self._treeWidget.topLevelItemCount()):
-            extensionItem = self._treeWidget.topLevelItem(extensionIndex)
-            for analyseIndex in range(extensionItem.childCount()):
-                analyseItem = extensionItem.child(analyseIndex)
-                for dataIndex in range(analyseItem.childCount()):
-                    analyseDataItem = analyseItem.child(dataIndex)
-                    if analyseDataItem.checkState(0) == QtCore.Qt.CheckState.Checked:
-                        color = self._treeWidget.itemWidget(analyseDataItem, 1).color()
-                        activePlotAttrs.append(
-                            (extensionIndex, analyseIndex, dataIndex, color)
-                        )
-        return activePlotAttrs
-
-    def _itemSelectionChanged(self) -> None:
-        item = self._treeWidget.currentItem()
-        if self._treeWidget.indexOfTopLevelItem(item.parent()) == -1:
-            self._conditionFormWidget.hide()
-            self._generalDataGroupBox.hide()
-            return
-        self._conditionFormWidget.show()
-        self._generalDataGroupBox.show()
-        tmp = self._analyse
-        self._analyse = next(
-            a for a in self._analyseFiles if a.filename == item.text(0)
-        )
-        if self._analyse and self._analyse != tmp:
-            self._conditionFormWidget.supply(self._analyse.conditions)
-            self._generalDataGroupBox.supply(self._analyse)
-            self._actionsMap["save-as"].setDisabled(False)
-            self._actionsMap["results"].setDisabled(False)
-
-    def _drawCanvas(self) -> None:
-        self._plotWidget.clear()
-        attrs = self._findActivePlotAttrs()
-        maxIntensity = 0
-        for attr in attrs:
-            extensionIndex, analyseIndex, dataIndex, color = attr
-            data = self._getDataFromIndex(extensionIndex, analyseIndex, dataIndex)
-            x, y = data.x, data.optimalY
-            temp = max(y)
-            if temp > maxIntensity:
-                maxIntensity = temp
-                self._setPlotLimits(maxIntensity)
-            self._plot(x, y, pg.mkPen(color=color, width=2))
-
-    def _getDataFromIndex(
-        self, extensionIndex: int, analyseIndex: int, dataIndex: int
-    ) -> datatypes.AnalyseData:
-        return self._getAnalyseFromIndex(extensionIndex, analyseIndex).data[dataIndex]
-
-    def _getAnalyseFromIndex(
-        self, extensionIndex: int, analyseIndex: int
-    ) -> datatypes.Analyse:
-        mapper = {0: "txt", 1: "atx", 2: None}
-        return list(
-            filter(lambda a: a.extension == mapper[extensionIndex], self._analyseFiles)
-        )[analyseIndex]
-
-    def _setPlotLimits(self, maxIntensity: int) -> None:
-        xMin = -100
-        xMax = 2048 + 100
-        yMin = -maxIntensity * 0.1
-        yMax = maxIntensity * 1.1
-        self._plotWidget.setLimits(xMin=xMin, xMax=xMax, yMin=yMin, yMax=yMax)
-
-    def _plot(self, x: np.ndarray, y: np.ndarray, pen=pg.mkPen("red", width=2)) -> None:
-        self._plotWidget.plot(x, y, pen=pen)
 
     def saveFile(self) -> None:
         filepath, _ = QtWidgets.QFileDialog.getSaveFileName(
