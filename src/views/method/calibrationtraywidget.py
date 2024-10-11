@@ -22,6 +22,7 @@ class MethodCalibrationTrayWidget(CalibrationTrayWidget):
         method: datatypes.Method | None = None,
     ):
         super(CalibrationTrayWidget, self).__init__(parent)
+        self._method = None
         self._df = None
         self._calibration = None
         self._widgets = {
@@ -76,6 +77,7 @@ class MethodCalibrationTrayWidget(CalibrationTrayWidget):
                     index=[0],
                 )
                 self._df.loc[len(self._df)] = row.iloc[0]
+                self._method.addCalibrationLines(self._calibration)
                 self._insertCalibration()
             else:
                 messageBox = QtWidgets.QMessageBox()
@@ -104,11 +106,13 @@ class MethodCalibrationTrayWidget(CalibrationTrayWidget):
             filename = self._calibration.filename
             index = self._df.query(f"filename == '{filename}'").index
             self._df.drop(index, inplace=True)
+            self._method.removeCalibrationLines(self._calibration)
             self._tableWidget.removeRow(self._tableWidget.currentRow())
 
     def supply(self, method: datatypes.Method) -> None:
         if method is None:
             return
-        if self._df and self._df.equals(method.calibrations):
+        if self._method and self._method == method:
             return
+        self._method = method
         super().supply(method.calibrations)
