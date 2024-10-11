@@ -27,6 +27,7 @@ class GeneralDataWidget(QtWidgets.QWidget):
         # self._plotWidget.getPlotItem().setMouseEnabled(x=False, y=False)
         self._plotWidget.setBackground("#FFFFFF")
         self._plotWidget.setFrameShape(QtWidgets.QFrame.Shape.NoFrame)
+        self._plotWidget.setLimits(xMin=-100, xMax=2148, yMax=1)
         plotItem = self._plotWidget.getPlotItem()
         plotItem.setContentsMargins(10, 10, 10, 10)
         self._legend = plotItem.addLegend(

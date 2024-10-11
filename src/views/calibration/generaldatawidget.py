@@ -43,16 +43,36 @@ class CalibrationGeneralDataWidget(GeneralDataWidget):
         self._createWidgets()
         self._calibration = None
         self._element = None
+        self._plotDataItems = None
         if calibration is not None:
             self.supply(calibration)
         self.hide()
 
     def _initializeUi(self) -> None:
         self._createPlotWidget()
+        self._createBackgroundRegion()
         self._createCoordinateLabel()
         self._createElementAndConcentrationGroupBox()
         self._createGeneralDataGroupBox()
         self._setUpView()
+
+    def _createBackgroundRegion(self) -> None:
+        self._backgroundRegion = pg.LinearRegionItem(
+            pen=pg.mkPen(color="#330311", width=2),
+            brush=pg.mkBrush(192, 192, 192, 100),
+            hoverBrush=pg.mkBrush(169, 169, 169, 100),
+            bounds=(0, 2048),
+        )
+        self._backgroundRegion.setZValue(10)
+        self._backgroundRegion.sigRegionChanged.connect(self._backgroundRegionChanged)
+
+    def _backgroundRegionChanged(self) -> None:
+        self._calibration.analyse.backgroundRegion = self._backgroundRegion.getRegion()
+        for i, plotDataItem in enumerate(self._plotDataItems):
+            plotDataItem.setData(
+                self._calibration.analyse.data[i].x,
+                self._calibration.analyse.data[i].optimalY,
+            )
 
     def _createElementAndConcentrationGroupBox(self) -> None:
         self._elementsAndConcentrationsWidget = ElementsAndConcentrationsWidget(
@@ -62,6 +82,12 @@ class CalibrationGeneralDataWidget(GeneralDataWidget):
         layout = QtWidgets.QVBoxLayout()
         layout.addWidget(self._elementsAndConcentrationsWidget)
         self._elementsAndConcentrationsGroupBox.setLayout(layout)
+        self._elementsAndConcentrationsWidget.concentrationAdded.connect(
+            self._addInfiniteLine
+        )
+        self._elementsAndConcentrationsWidget.concentrationRemoved.connect(
+            self._removeInfiniteLine
+        )
 
     def _setUpView(self) -> None:
         self.mainLayout = QtWidgets.QGridLayout()
@@ -117,15 +143,19 @@ class CalibrationGeneralDataWidget(GeneralDataWidget):
                     resourcePath(f"backgrounds/{filename}.atxb")
                 )
                 self._calibration.analyse.backgroundProfile = profile
+                self._backgroundRegion.setRegion(
+                    self._calibration.analyse.backgroundRegion
+                )
+                self._plotWidget.addItem(self._backgroundRegion)
             else:
                 self._calibration.analyse.backgroundProfile = None
+                self._plotWidget.removeItem(self._backgroundRegion)
         else:
             self._calibration.analyse.generalData[key] = (
                 widget.text()
                 if isinstance(widget, QtWidgets.QLineEdit)
                 else widget.currentText()
             )
-        self._drawCanvas()
 
     def _fillWidgetsFromCalibration(self) -> None:
         for key, widget in self._generalDataWidgetsMap.items():
@@ -139,25 +169,21 @@ class CalibrationGeneralDataWidget(GeneralDataWidget):
 
     def _drawCanvas(self) -> None:
         self._plotWidget.clear()
-        maxIntensity = 0
-        for index, data in enumerate(self._calibration.analyse.data):
-            x, y = data.x, data.optimalY
-            maxIntensity = max(maxIntensity, max(y))
-            color = COLORS[index]
-            self._plotWidget.plot(
-                x,
-                y,
-                name=f"Condition {data.conditionId}",
-                pen=pg.mkPen(color=color, width=2),
-            )
-        self._setPlotLimits(maxIntensity)
-        if self._element is not None:
-            self._addInfiniteLines()
+        yMax = 0
+        for plotDataItem in self._plotDataItems:
+            self._plotWidget.addItem(plotDataItem)
+            yMax = max(max(plotDataItem.getData()[1]), yMax)
+        self._addInfiniteLines()
+        self._plotWidget.setLimits(yMin=-0.1 * yMax, yMax=1.1 * yMax)
 
     def _addInfiniteLines(self):
-        for row in self._calibration.lines.query(
-            f"symbol == '{self._element}'"
-        ).itertuples(index=False):
+        for element in self._calibration.concentrations:
+            self._addInfiniteLine(element)
+
+    def _addInfiniteLine(self, element: str) -> None:
+        for row in self._calibration.lines.query(f"symbol == '{element}'").itertuples(
+            index=False
+        ):
             kev = row.kiloelectron_volt
             radiationType = row.radiation_type
             value = calculation.evToPx(kev)
@@ -166,10 +192,20 @@ class CalibrationGeneralDataWidget(GeneralDataWidget):
                 angle=90,
                 pen=pg.mkPen(color="#000800", width=1),
                 movable=False,
-                label=radiationType,
+                label=f"{element}-{radiationType}",
                 labelOpts={"position": 0.98, "color": "#000800"},
             )
             self._plotWidget.addItem(infiniteLine)
+
+    def _removeInfiniteLine(self, element: str) -> None:
+        # Retrieve all items in the PlotWidget
+        allItems = self._plotWidget.plotItem.items
+        # Filter for InfiniteLine items
+        infiniteLines = [item for item in allItems if isinstance(item, pg.InfiniteLine)]
+        # Print the positions of the InfiniteLines
+        for line in infiniteLines:
+            if element in line.label.format:
+                self._plotWidget.removeItem(line)
 
     def supply(self, calibration: datatypes.Calibration) -> None:
         if calibration is None:
@@ -179,6 +215,15 @@ class CalibrationGeneralDataWidget(GeneralDataWidget):
         self.blockSignals(True)
         self._calibration = calibration
         self._element = calibration.element
+        self._plotDataItems = [
+            pg.PlotDataItem(
+                d.x,
+                d.optimalY,
+                pen=pg.mkPen(color=COLORS[i], width=2),
+                name=f"Condition {d.conditionId}",
+            )
+            for i, d in enumerate(self._calibration.analyse.data)
+        ]
         self._drawCanvas()
         self._elementsAndConcentrationsWidget.supply(self._calibration)
         self._fillWidgetsFromCalibration()
