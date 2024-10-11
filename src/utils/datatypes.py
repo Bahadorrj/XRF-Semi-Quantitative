@@ -105,6 +105,7 @@ class Analyse:
     generalData: dict = field(default_factory=dict)
     filename: str | None = field(default=None)
     extension: str | None = field(default=None)
+    _backgroundRegion: tuple = field(default=(0, 2048), init=False)
 
     def __post_init__(self) -> None:
         if not self.generalData:
@@ -131,6 +132,21 @@ class Analyse:
         for d in self.data:
             d.applyBackgroundProfile(profile)
         self.generalData["Background Profile"] = profile.filename if profile else None
+
+    @property
+    def backgroundRegion(self) -> tuple:
+        return self._backgroundRegion
+
+    @backgroundRegion.setter
+    def backgroundRegion(self, region: tuple) -> None:
+        self._backgroundRegion = region
+        minX, maxX = region
+        minX = int(minX)
+        maxX = int(maxX)
+        for data in self.data:
+            data.applyBackgroundProfile(self._backgroundProfile)
+            data.optimalY[:minX] = data.y[:minX]
+            data.optimalY[maxX:] = data.y[maxX:]
 
     def __eq__(self, other) -> bool:
         if other is None:
@@ -497,14 +513,17 @@ class Method:
     interferences: pandas.DataFrame | None = field(default=None)
 
     def __post_init__(self):
+        if self.lines is None:
+            self.lines = getDataframe("Lines").copy()
+            self.lines["active"] = 0
+            self.lines["condition_id"] = np.nan
         if self.calibrations.empty:
             return
         calibrations = [
             Calibration.fromATXCFile(resourcePath(f"calibrations/{f}.atxc"))
             for f in self.calibrations["filename"].values
         ]
-        if self.lines is None:
-            self.fillLines(calibrations)
+        self.fillLines(calibrations)
         if self.coefficients is None:
             self.fillCoefficients(calibrations)
         if self.interferences is None:
@@ -526,16 +545,22 @@ class Method:
         )
 
     def fillLines(self, calibrations: Sequence) -> None:
-        self.lines = getDataframe("Lines").copy()
-        self.lines["condition_id"] = np.nan
-        self.lines["active"] = 0
         for calibration in calibrations:
-            indexes = self.lines[
-                self.lines["symbol"].isin(calibration.concentrations)
-            ].index
-            self.lines.loc[indexes, "condition_id"] = calibration.lines.loc[
-                indexes, "condition_id"
-            ]
+            self.addCalibrationLines(calibration)
+
+    def addCalibrationLines(self, calibration: Calibration) -> None:
+        indexes = self.lines[
+            self.lines["symbol"].isin(calibration.concentrations)
+        ].index
+        self.lines.loc[indexes, "condition_id"] = calibration.lines.loc[
+            indexes, "condition_id"
+        ]
+
+    def removeCalibrationLines(self, calibration: Calibration) -> None:
+        indexes = self.lines[
+            self.lines["symbol"].isin(calibration.concentrations)
+        ].index
+        self.lines.loc[indexes, "condition_id"] = np.nan
 
     def fillInterferences(self, calibrations: Sequence) -> None:
         interferences = defaultdict(dict)
@@ -636,6 +661,7 @@ class Method:
             Calibration.fromATXCFile(resourcePath(f"calibrations/{f}.atxc"))
             for f in self.calibrations["filename"].values
         ]
+        self.fillLines(calibrations)
         self.fillInterferences(calibrations)
         self.fillCoefficients(calibrations)
         methodPath = resourcePath(f"methods/{self.filename}.atxm")
